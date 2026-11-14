@@ -1394,14 +1394,14 @@ function heroVoice(kind, chance = 1, heroId) {
 
 /* ---------- items ---------- */
 const WEAPONS = {
-  sword:   { name: "Footman's Blade", desc: 'Sweeps the ground in front of you.', up: ['+damage', '+reach', 'Also strikes behind you', '+damage, +reach'] },
-  arrows:  { name: 'Elven Arrows', desc: 'Fires at the nearest enemies.', up: ['+1 arrow', '+damage', '+1 arrow', 'Arrows pierce 2 more'] },
-  axes:    { name: 'Troll Axes', desc: 'Spinning axes fly out and return, cutting everything.', up: ['+damage', '+1 axe', '+damage', '+1 axe'] },
-  aura:    { name: 'Holy Aura', desc: 'Sears enemies who come close.', up: ['+radius', '+damage', '+radius', '+damage, +radius'] },
-  fireball:{ name: 'Fireball', desc: 'Hurls fire that explodes on a distant foe.', up: ['+damage', '+1 fireball', '+blast radius', '+1 fireball'] },
-  ballista:{ name: 'Ballista', desc: 'A heavy bolt that pierces everything in a line.', up: ['+damage', '+damage', 'Also fires behind you', '+damage'] },
-  runes:   { name: 'Runes', desc: 'Lays explosive runes on the ground around you.', up: ['+1 rune', '+damage', '+1 rune', '+damage, +1 rune'] },
-  coil:    { name: 'Death Coil', desc: 'A seeking bolt of shadow that heals you when it hits.', up: ['+damage', '+1 coil', '+damage, more healing', '+1 coil'] },
+  sword:   { name: "Footman's Blade", desc: 'Sweeps the ground in front of you.', up: ['more damage', 'longer reach', 'also strikes behind you', 'more damage and reach'] },
+  arrows:  { name: 'Elven Arrows', desc: 'Fires at the nearest enemies.', up: ['one more arrow', 'more damage', 'one more arrow', 'arrows pierce 2 more'] },
+  axes:    { name: 'Troll Axes', desc: 'Spinning axes fly out and return, cutting everything.', up: ['more damage', 'one more axe', 'more damage', 'one more axe'] },
+  aura:    { name: 'Holy Aura', desc: 'Sears enemies who come close.', up: ['wider', 'more damage', 'wider', 'more damage, wider'] },
+  fireball:{ name: 'Fireball', desc: 'Hurls fire that explodes on a distant foe.', up: ['more damage', 'one more fireball', 'bigger blast', 'one more fireball'] },
+  ballista:{ name: 'Ballista', desc: 'A heavy bolt that pierces everything in a line.', up: ['more damage', 'more damage', 'also fires behind you', 'more damage'] },
+  runes:   { name: 'Runes', desc: 'Lays explosive runes on the ground around you.', up: ['one more rune', 'more damage', 'one more rune', 'more damage, one more rune'] },
+  coil:    { name: 'Death Coil', desc: 'A seeking bolt of shadow that heals you when it hits.', up: ['more damage', 'one more coil', 'more damage and healing', 'one more coil'] },
 };
 const HEROES = {
   lothar:  { name: 'Anduin Lothar', side: 'Alliance', unit: 'Knight', col: '#3f6fd1', start: 'sword', hp: 140, speed: 78, armour: 1,
@@ -1414,7 +1414,7 @@ const HEROES = {
              sig: 'Arcane Mastery', sigDesc: '+25% area of effect and 10% faster attacks.', area: 1.25, haste: 0.9 },
   grom:    { name: 'Grom Hellscream', side: 'Horde', unit: 'Grunt', col: '#c0392b', start: 'sword', hp: 150, speed: 72, armour: 0,
              sig: 'Battle Fury', sigDesc: '+30% damage while below half health.', fury: true },
-  zuljin:  { name: "Zul'jin", side: 'Horde', unit: 'Troll Axethrower', col: '#3fb3a8', start: 'axes', hp: 100, speed: 82, armour: 0,
+  zuljin:  { name: "Zul'jin", side: 'Horde', unit: 'Axethrower', col: '#3fb3a8', start: 'axes', hp: 100, speed: 82, armour: 0,
              sig: 'Troll Regeneration', sigDesc: 'Heals 0.8 health every second.', regen: 0.8 },
   chogall: { name: "Cho'gall", side: 'Horde', unit: 'Ogre-Mage', col: '#d07a2c', start: 'runes', hp: 170, speed: 62, armour: 1,
              sig: 'Bloodlust', sigDesc: '+20% damage and 1 armour, but slow.', might: 1.2 },
@@ -1426,7 +1426,7 @@ const PASSIVES = {
   boots:   { name: 'Swift Boots', desc: '+10% movement speed.' },
   heal:    { name: 'Healing', desc: 'Regenerate 0.4 health per second.' },
   magnet:  { name: 'Gold Mine', desc: '+30% pickup range.' },
-  might:   { name: 'Bloodlust', desc: '+12% damage.' },
+  might:   { name: 'Weaponsmith', desc: '+12% damage.' },
   haste:   { name: 'Haste', desc: '8% faster attacks.' },
   area:    { name: 'Whirlwind', desc: '+12% area of effect.' },
   vitality:{ name: 'Ogre Strength', desc: '+25 maximum health.' },
@@ -1448,7 +1448,7 @@ function addGold(v) { if (!G) return; G.goldFrac = (G.goldFrac || 0) + v * GOLD_
 const POWERUPS = {
   vision:   { name: 'Holy Vision', icon: 106, col: '#7fc4ff', text: 'All experience flies to you!' },
   treasure: { name: 'Gold Rush',   icon: -1,  col: '#ffd24a', text: 'All gold collected, with a bonus!' },
-  lust:     { name: 'Bloodlust',   icon: 112, col: '#ff5a3a', text: 'Double damage for 12 seconds!', dur: 12 },
+  lust:     { name: 'Berserk',     icon: 112, col: '#ff5a3a', text: 'Double damage for 12 seconds!', dur: 12 },
   haste:    { name: 'Haste',       icon: 102, col: '#7be07a', text: 'Faster movement and attacks for 12 seconds!', dur: 12 },
   blizzard: { name: 'Blizzard',    icon: 105, col: '#bfe4ff', text: 'Ice strikes every enemy in sight!' },
   healing:  { name: 'Healing',     icon: 107, col: '#ffffff', text: 'Fully healed!' },
@@ -2152,7 +2152,7 @@ function wcWrap(root) {
     const lines = []; let cur = '';
     for (const w of text.split(' ')) { const t = cur ? cur + ' ' + w : w; if (cur && fontWidth(f, t) > maxW) { lines.push(cur); cur = w; } else cur = t; }
     if (cur) lines.push(cur);
-    const col = el.closest('button')?.disabled ? 'grey' : el.classList.contains('chestgold') ? 'yellow' : el.classList.contains('new') ? 'green' : el.classList.contains('savemsg') ? 'red' : scheme;
+    const col = el.classList.contains('new') ? 'green' : el.closest('button')?.disabled ? 'grey' : el.classList.contains('chestgold') ? 'yellow' : el.classList.contains('new') ? 'green' : el.classList.contains('savemsg') ? 'red' : scheme;
     el.dataset.wc = '1'; el.setAttribute('aria-label', text); el.textContent = ''; el.classList.add('wclines');
     for (const ln of lines) { const img = fontImage(ln, key, col, sc); if (img) el.appendChild(img); }
   });
@@ -2189,7 +2189,7 @@ function uiBar(x, y, w, h, frac, col, lite, dark, label) {
   ctx.fillStyle = '#0c0805'; ctx.fillRect(x, y, w, h);
   const fw = Math.round(w * Math.max(0, Math.min(1, frac)));
   if (fw > 0) { ctx.fillStyle = col; ctx.fillRect(x, y, fw, h); ctx.fillStyle = lite; ctx.fillRect(x, y, fw, 1); ctx.fillStyle = dark; ctx.fillRect(x, y + h - 1, fw, 1); }
-  if (label) txt(label, x + w / 2, y + Math.round((h - 6) / 2), 7, '#ffffff', 'center');
+  if (label) { const lw = fonts.small ? fontWidth(fonts.small, label) : label.length * 5; ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(Math.round(x + w / 2 - lw / 2) - 2, y, lw + 4, h); txt(label, x + w / 2, y + Math.round((h - 6) / 2), 7, '#ffffff', 'center'); }
 }
 function drawHud() {
   const h = G.hero;
@@ -2538,7 +2538,7 @@ function showShop(focus) {
     const U = UPGRADES[id], r = up(id), maxed = r >= U.max, c = upCost(id);
     return `<button class="opt card" data-act="buy" data-id="${id}" ${maxed || meta.gold < c ? 'disabled' : ''}>
       <span class="nm">${U.name}</span><span class="lv">Rank ${r} of ${U.max}</span><span class="ds">${U.desc}${U.max > 1 ? ' per rank' : ''}.</span>
-      <span class="ds chestgold">${maxed ? 'Fully upgraded' : c + ' gold'}</span></button>`;
+      <span class="ds ${maxed ? 'new' : 'chestgold'}">${maxed ? 'Fully upgraded' : c + ' gold'}</span></button>`;
   }).join('');
   showMenu(`<h2>Armoury</h2><p class="sub">Spend the gold you bring back from battle on permanent upgrades. You have <b class="chestgold">${meta.gold} gold</b>.</p>
     <div class="cards shop">${rows}</div>
@@ -2599,8 +2599,24 @@ function choices() {
   if (!out.length) out.push({ kind: 'gold', id: 'gold', lvl: 0 });
   return out;
 }
+// What a weapon does at a level, in numbers, so an upgrade card says exactly what you'll get.
+// Mirrors the formulas in fire() below; keep the two in step.
+function weaponStats(id, l) {
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  switch (id) {
+    case 'sword': return `${14 + 6 * (l - 1)} damage, reach ${30 + 4 * l + (l >= 5 ? 6 : 0)}${l >= 4 ? ', front and back' : ''}.`;
+    case 'arrows': return `${pl(1 + (l >= 2) + (l >= 4), 'arrow')}, ${10 + 3 * (l - 1) + (l >= 3 ? 3 : 0)} damage${l >= 5 ? ', each pierces 3' : ''}.`;
+    case 'axes': return `${pl(1 + (l >= 3) + (l >= 5), 'axe')}, ${12 + 4 * (l - 1) + (l >= 4 ? 4 : 0)} damage each.`;
+    case 'aura': return `${3 + 2 * l} damage every 0.4 s, radius ${26 + 5 * l + (l >= 5 ? 5 : 0)}.`;
+    case 'fireball': return `${pl(1 + (l >= 3) + (l >= 5), 'fireball')}, ${22 + 8 * (l - 1)} damage, blast ${22 + (l >= 4 ? 8 : 0)}.`;
+    case 'ballista': return `${40 + 15 * (l - 1) + (l >= 5 ? 15 : 0)} damage per bolt${l >= 4 ? ', fires both ways' : ''}.`;
+    case 'runes': return `${pl(2 + (l >= 2) + (l >= 4) + (l >= 5), 'rune')}, ${30 + 10 * (l - 1) + (l >= 3 ? 10 : 0)} damage each.`;
+    case 'coil': return `${pl(2 + (l >= 3) + (l >= 5), 'coil')}, ${14 + 5 * (l - 1) + (l >= 4 ? 6 : 0)} damage, heals ${l >= 4 ? 2 : 1}.`;
+  }
+  return '';
+}
 function itemInfo(c) {
-  if (c.kind === 'w') { const W_ = WEAPONS[c.id]; return { nm: W_.name, ds: c.lvl === 1 ? W_.desc : W_.up[c.lvl - 2], lv: c.lvl === 1 ? '<span class="lv new">New weapon</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
+  if (c.kind === 'w') { const W_ = WEAPONS[c.id]; return { nm: W_.name, ds: c.lvl === 1 ? `${W_.desc} ${weaponStats(c.id, 1)}` : `${W_.up[c.lvl - 2].replace(/^./, m => m.toUpperCase())}. Now ${weaponStats(c.id, c.lvl).replace(/^./, m => m.toLowerCase())}`, lv: c.lvl === 1 ? '<span class="lv new">New weapon</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
   if (c.kind === 'p') { const P = PASSIVES[c.id]; return { nm: P.name, ds: P.desc, lv: c.lvl === 1 ? '<span class="lv new">New</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
   return { nm: 'Gold', ds: 'Restore 40 health and gain 25 gold.', lv: '<span class="lv">Everything is maxed</span>' };
 }
