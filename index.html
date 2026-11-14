@@ -101,6 +101,7 @@
   canvas.hpic{width:48px;height:48px;image-rendering:pixelated;background:#140e08;border:1px solid var(--gold2);border-radius:4px;flex:none}
   .lv.ally{color:#8fb8ff;opacity:1}.lv.horde{color:#ff8f7a;opacity:1}
   .card .sig{font-size:13px;opacity:.9}
+  body.wccur,body.wccur *{cursor:var(--cur)!important}
   h3.side{font-family:Cinzel,Georgia,serif;margin:14px 0 8px;font-size:17px}
   h3.side.ally{color:#8fb8ff}h3.side.horde{color:#ff8f7a}
   @media (max-width:720px){button.card,button.card.hero{width:100%}}
@@ -1022,6 +1023,7 @@ function rebuildSprites() {
     }
   }
   buildMenuArt();
+  buildCursors();
   A.icons = {};
   const main = findMain(), icd = main && Core.safeEntry(A.wars[main], ICON_ENTRY);
   if (icd && Core.isGfu(icd)) {
@@ -1051,6 +1053,47 @@ function rawGfuFrame(d, i, P) { // uncompressed frames, used by the menu widgets
   for (let k = 0; k < w * h; k++) { const v = d[off + k]; if (v === 255 || v === undefined) continue; id.data[k * 4] = P[v * 3]; id.data[k * 4 + 1] = P[v * 3 + 1]; id.data[k * 4 + 2] = P[v * 3 + 2]; id.data[k * 4 + 3] = 255; }
   c.getContext('2d').putImageData(id, 0, 0); return c;
 }
+// The original pointers: the human gauntlet and the orc claw (MAINDAT entries 301 and 302,
+// each a hotspot, a size and raw palette indices), drawn with the forest palette.
+const CURSOR_ENTRY = { human: 301, orc: 302 };
+function buildCursors() {
+  A.cursors = null; document.body.classList.remove('wccur');
+  const main = findMain(); if (!main) return;
+  const pd = Core.safeEntry(A.wars[main], 2); if (!pd || pd.length < 768) return;
+  const pal = Core.toPalette(pd), out = {};
+  for (const [side, ix] of Object.entries(CURSOR_ENTRY)) {
+    const d = Core.safeEntry(A.wars[main], ix); if (!d || d.length < 8) continue;
+    const hx = Core.u16(d, 0), hy = Core.u16(d, 2), w = Core.u16(d, 4), h = Core.u16(d, 6);
+    if (!w || !h || w > 64 || h > 64 || d.length < 8 + w * h) continue;
+    const urls = {};
+    for (const k of [1, 2, 3]) {
+      const c = document.createElement('canvas'); c.width = w * k; c.height = h * k;
+      const x = c.getContext('2d'), img = x.createImageData(w * k, h * k);
+      for (let y = 0; y < h * k; y++) for (let xx = 0; xx < w * k; xx++) {
+        const p = d[8 + ((y / k) | 0) * w + ((xx / k) | 0)]; if (!p) continue;
+        const o = (y * w * k + xx) * 4;
+        img.data[o] = pal[p * 3]; img.data[o + 1] = pal[p * 3 + 1]; img.data[o + 2] = pal[p * 3 + 2]; img.data[o + 3] = 255;
+      }
+      x.putImageData(img, 0, 0); urls[k] = c.toDataURL();
+    }
+    out[side] = { urls, hx, hy };
+  }
+  if (!out.human && !out.orc) return;
+  A.cursors = out;
+  applyCursor();
+}
+// Gauntlet for the Alliance, claw for the Horde, sized to roughly match the original 640x480 screen.
+function applyCursor(side) {
+  if (!A.cursors) return;
+  side = side || (G ? (G.HD.side === 'Horde' ? 'orc' : 'human') : ((HEROES[store.get('tos_hero', 'lothar')] || {}).side === 'Horde' ? 'orc' : 'human'));
+  const c = A.cursors[side] || A.cursors.human || A.cursors.orc;
+  const k = Math.max(1, Math.min(3, Math.round(innerHeight / 560)));
+  document.body.style.setProperty('--cur', `url(${c.urls[k]}) ${c.hx * k} ${c.hy * k}, url(${c.urls[1]}) ${c.hx} ${c.hy}, auto`);
+  document.body.classList.add('wccur');
+  A.cursorSide = side;
+}
+addEventListener('resize', () => applyCursor(A.cursorSide));
+
 function buildMenuArt() {
   A.menuBg = null; A.menuBg2 = null; A.btn = null;
   const rez = warNames().find(n => /(^|\/)REZDAT\.WAR$/.test(n)); document.body.classList.remove('wcbtn');
@@ -1285,6 +1328,7 @@ let G = null, attract = 0;
 function newRun(heroId, levelId) {
   const HD = HEROES[heroId] || HEROES.lothar, LV = LEVELS.find(l => l.id === levelId) || LEVELS[0];
   store.set('tos_hero', heroId); meta.last = { hero: heroId, level: LV.id }; saveMeta();
+  applyCursor(HD.side === 'Horde' ? 'orc' : 'human');
   G = { heroId, HD, LV,
     t: 0, kills: 0, spawnAcc: 0, bossNext: 240, swarmNext: 95, pending: 0, state: 'play', banner: null,
     hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
