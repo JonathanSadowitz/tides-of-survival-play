@@ -106,6 +106,8 @@
   .lv.ally{color:#8fb8ff;opacity:1}.lv.horde{color:#ff8f7a;opacity:1}
   .card .sig{font-size:14px;color:#efe3c6}
   body.wccur,body.wccur *{cursor:var(--cur)!important}
+  body.wccur .wcstage,body.wccur .wcstage *{cursor:var(--cur1)!important} /* the stage is zoomed, which scales the pointer too */
+  body.nocur,body.nocur *{cursor:none!important}
   h3.side{font-family:Cinzel,Georgia,serif;margin:14px 0 8px;font-size:17px}
   h3.side.ally{color:#8fb8ff}h3.side.horde{color:#ff8f7a}
   @media (max-width:720px){button.card,button.card.hero{width:100%}}
@@ -1047,6 +1049,7 @@ function rebuildSprites() {
       try { c.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(icd, ix, iw, ih), iw, ih, A.pal), 0, 0); A.icons[id] = c; } catch (e) {}
     }
   }
+  buildPickups();
   A.sbuf = {};
   resize();
 }
@@ -1066,6 +1069,30 @@ function rawGfuFrame(d, i, P) { // uncompressed frames, used by the menu widgets
   for (let k = 0; k < w * h; k++) { const v = d[off + k]; if (v === 255 || v === undefined) continue; id.data[k * 4] = P[v * 3]; id.data[k * 4 + 1] = P[v * 3 + 1]; id.data[k * 4 + 2] = P[v * 3 + 2]; id.data[k * 4 + 3] = 255; }
   c.getContext('2d').putImageData(id, 0, 0); return c;
 }
+// Pickups drawn from the game's own art: the gold nugget and mana sparkle from the resource bar
+// (MAINDAT entry 187, raw 14x14 frames: gold, wood, oil, mana, cropped inside their frame), and the
+// wooden crate icon for treasure chests and supply caches.
+const PICKUP_ICONS = { entry: 187, gold: 0, xp: 3, crate: 87 };
+function buildPickups() {
+  A.pick = {};
+  const main = findMain(); if (!main) return;
+  const war = A.wars[main], pd = Core.safeEntry(war, 2); if (!pd || pd.length < 768) return;
+  const P = Core.toPalette(pd), crop = (src, x, y, w, h, clearDark) => {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const cx = c.getContext('2d'); cx.drawImage(src, x, y, w, h, 0, 0, w, h);
+    if (clearDark) { const im = cx.getImageData(0, 0, w, h), o = im.data; for (let i = 0; i < o.length; i += 4) if (o[i] + o[i + 1] + o[i + 2] < 40) o[i + 3] = 0; cx.putImageData(im, 0, 0); } // icon backgrounds are black
+    return c; };
+  const d = Core.safeEntry(war, PICKUP_ICONS.entry);
+  if (d && d.length > 6 + 4 * 8 && Core.u16(d, 0) >= 4) {
+    try { const g = rawGfuFrame(d, PICKUP_ICONS.gold, P), m = rawGfuFrame(d, PICKUP_ICONS.xp, P);
+      if (g.width >= 12 && m.width >= 12) { A.pick.gold = crop(g, 2, 2, g.width - 4, g.height - 4, true); A.pick.xp = crop(m, 2, 2, m.width - 4, m.height - 4, true); } } catch (e) {}
+  }
+  const icd = Core.safeEntry(war, ICON_ENTRY);
+  if (icd && Core.isGfu(icd) && Core.u16(icd, 0) > PICKUP_ICONS.crate) {
+    try { const iw = Core.u16(icd, 2), ih = Core.u16(icd, 4), c = document.createElement('canvas'); c.width = iw; c.height = ih;
+      c.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(icd, PICKUP_ICONS.crate, iw, ih), iw, ih, P), 0, 0); A.pick.crate = crop(c, 3, 3, iw - 6, ih - 6, true); } catch (e) {}
+  }
+}
+
 // The original pointers: the human gauntlet and the orc claw (MAINDAT entries 301 and 302,
 // each a hotspot, a size and raw palette indices), drawn with the forest palette.
 const CURSOR_ENTRY = { human: 301, orc: 302 };
@@ -1102,6 +1129,7 @@ function applyCursor(side) {
   const c = A.cursors[side] || A.cursors.human || A.cursors.orc;
   const k = Math.max(1, Math.min(3, Math.round(innerHeight / 560)));
   document.body.style.setProperty('--cur', `url(${c.urls[k]}) ${c.hx * k} ${c.hy * k}, url(${c.urls[1]}) ${c.hx} ${c.hy}, auto`);
+  document.body.style.setProperty('--cur1', `url(${c.urls[1]}) ${c.hx} ${c.hy}, auto`);
   document.body.classList.add('wccur');
   A.cursorSide = side;
 }
@@ -2057,10 +2085,15 @@ function render() {
   for (const g of G.gems) {
     const x = Math.round(g.x - camX), y = Math.round(g.y - camY);
     if (x < -10 || y < -10 || x > W + 10 || y > H + 10) continue;
-    if (g.chest) { ctx.fillStyle = '#6b4518'; ctx.fillRect(x - 6, y - 4, 12, 8); ctx.fillStyle = '#e7c04a'; ctx.fillRect(x - 6, y - 1, 12, 2); ctx.fillRect(x - 1, y - 4, 2, 8); continue; }
-    if (g.coin) { circle(x, y, 3, '#e7c04a', '#6b4518'); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x - 1, y - 2, 1, 2); continue; }
+    const pk = A.pick || {};
+    if (g.chest) {
+      if (pk.crate) { const bob = Math.round(Math.sin(performance.now() / 300) * 1); ctx.drawImage(pk.crate, x - 10, y - 9 + bob, 20, 18); continue; }
+      ctx.fillStyle = '#6b4518'; ctx.fillRect(x - 6, y - 4, 12, 8); ctx.fillStyle = '#e7c04a'; ctx.fillRect(x - 6, y - 1, 12, 2); ctx.fillRect(x - 1, y - 4, 2, 8); continue;
+    }
+    if (g.coin) { if (pk.gold) { ctx.drawImage(pk.gold, x - 4, y - 4, 8, 8); continue; } circle(x, y, 3, '#e7c04a', '#6b4518'); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x - 1, y - 2, 1, 2); continue; }
     if (g.meat) { circle(x, y, 3, '#b84a3a', '#3a1208'); ctx.fillStyle = '#eee'; ctx.fillRect(x + 2, y - 3, 3, 2); continue; }
     if (A.sprites.gem && drawSprite('gem', g.x, g.y, 0, attract, false)) continue;
+    if (pk.xp) { const sz = g.v >= 5 ? 10 : g.v >= 3 ? 8 : 6; ctx.drawImage(pk.xp, x - sz / 2, y - sz / 2, sz, sz); continue; }
     ctx.fillStyle = g.v >= 5 ? '#ffd24a' : g.v >= 3 ? '#5ee08a' : '#5aa8ff';
     ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x + 2, y); ctx.lineTo(x, y + 3); ctx.lineTo(x - 2, y); ctx.fill();
   }
@@ -2740,9 +2773,14 @@ function resize() {
 }
 addEventListener('resize', resize);
 let last = performance.now();
+// Hide the pointer while playing; moving the mouse shows it for a moment so the pause button can be clicked.
+let curShownAt = -1e9;
+addEventListener('pointermove', e => { if (e.pointerType === 'mouse') curShownAt = performance.now(); });
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   attract += dt;
+  const hide = !!G && G.state === 'play' && !menuOpen() && now - curShownAt > 1500;
+  if (hide !== document.body.classList.contains('nocur')) document.body.classList.toggle('nocur', hide);
   try {
     pollPad(dt);
     if (G && G.state === 'play') { let rem = dt * cfg.opts.speed; while (rem > 1e-4 && G && G.state === 'play') { const st = Math.min(rem, 0.034); update(st); rem -= st; } }
