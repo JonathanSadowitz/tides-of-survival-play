@@ -47,6 +47,8 @@
   #overlay.parch.bare .panel .sub{color:#3b2a14}
   #overlay.parch .panel{background:linear-gradient(#2e241a,#1d160f)}
   .cards.shop button.card{width:170px}
+  .stats.hist{grid-template-columns:auto auto;text-align:left;max-width:640px}
+  .stats.hist b{text-align:left}
   textarea.savecode{display:block;width:min(560px,80vw);height:110px;margin:4px auto 12px;font:12px/1.4 monospace;color:#f6edd8;background:#120d08;border:1px solid var(--gold2);border-radius:4px;padding:8px;word-break:break-all;resize:vertical}
   .savemsg{color:#ff9b85}
   @media (max-height:860px){
@@ -923,7 +925,8 @@ const ROLES = [
   ['axe', 'Missile: thrown axe'], ['fire', 'Missile: fireball'], ['coil', 'Missile: death coil'], ['boom', 'Explosion'], ['gem', 'XP pickup']
 ];
 const SOUND_ROLES = [['s_hit', 'Enemy hit'], ['s_die', 'Orc dies'], ['s_die_ally', 'Human dies'], ['s_hurt', 'Hero hurt'], ['s_level', 'Level up'], ['s_boom', 'Explosion'],
-  ['s_sword', 'Sword swing'], ['s_bow', 'Bow shot'], ['s_axe', 'Axe throw'], ['s_fire', 'Fireball hit'], ['s_coil', 'Death coil'], ['s_start', 'Run start']];
+  ['s_sword', 'Sword swing'], ['s_bow', 'Bow shot'], ['s_axe', 'Axe throw'], ['s_fire', 'Fireball hit'], ['s_coil', 'Death coil'], ['s_start', 'Run start'],
+  ['s_level_orc', 'Level up (Horde)'], ['s_power', 'Power-up'], ['s_buy', 'Armoury purchase']];
 // Entry numbers inside MAINDAT.WAR (TOME.1 in the Battle.net Edition), from the Wargus project's extraction table.
 const AUTO_PALETTE = 2;
 const unitR = (e, r1 = 4) => ({ e, mode: 'dir5', r0: 0, r1 });
@@ -939,8 +942,9 @@ const AUTO_ROLES = {
 const SWING = 0.45, HSWING = 0.35;
 // Sound files inside War2Dat.mpq (paths from the Wargus project).
 const MPQ_SOUNDS = [['s_hit', 'Gamesfx\\misc\\bowhit.wav'], ['s_hurt', 'Gamesfx\\misc\\punch.wav'], ['s_die', 'Gamesfx\\orc\\odead.wav'], ['s_die_ally', 'Gamesfx\\human\\hdead.wav'],
-  ['s_level', 'Gamesfx\\misc\\hrescue.wav'], ['s_boom', 'Gamesfx\\misc\\explode.wav'], ['s_sword', 'Gamesfx\\misc\\sword1.wav'], ['s_bow', 'Gamesfx\\misc\\bowfire.wav'],
-  ['s_axe', 'Gamesfx\\misc\\axe.wav'], ['s_fire', 'Gamesfx\\misc\\firehit.wav'], ['s_coil', 'Gamesfx\\spells\\dethcoil.wav'], ['s_start', 'Gamesfx\\misc\\orescue.wav']];
+  ['s_level', 'Gamesfx\\misc\\hcapture.wav'], ['s_boom', 'Gamesfx\\misc\\explode.wav'], ['s_sword', 'Gamesfx\\misc\\sword1.wav'], ['s_bow', 'Gamesfx\\misc\\bowfire.wav'],
+  ['s_axe', 'Gamesfx\\misc\\axe.wav'], ['s_fire', 'Gamesfx\\misc\\firehit.wav'], ['s_coil', 'Gamesfx\\spells\\dethcoil.wav'], ['s_start', 'Gamesfx\\misc\\orescue.wav'],
+  ['s_level_orc', 'Gamesfx\\misc\\ocapture.wav'], ['s_power', 'Gamesfx\\spells\\touchdrk.wav'], ['s_buy', 'Gamesfx\\misc\\thunk.wav']]; // new sounds go at the end: stored imports list them by position
 function findMain() { return warNames().find(n => /(^|\/)MAINDAT\.WAR$/.test(n)); }
 // Fill in roles from the known table. force = overwrite the user's own choices too.
 function autoAssign(force) {
@@ -1425,7 +1429,7 @@ const POWERUPS = {
 };
 function usePowerup(id) {
   const P = POWERUPS[id], h = G.hero; if (!P) return;
-  banner(`${P.name}: ${P.text}`); sfx('s_level', 0);
+  banner(`${P.name}: ${P.text}`); sfx(A.sbuf.s_power ? 's_power' : 's_level', 0);
   if (id === 'vision') { for (const g of G.gems) if (g.v) g.pull = true; }
   else if (id === 'treasure') { for (const g of G.gems) if (g.coin) g.pull = true; addGold(20 * goldMul()); }
   else if (id === 'healing') h.hp = h.maxHp;
@@ -1499,7 +1503,7 @@ function newRun(heroId, levelId, seed) {
   G = { heroId, HD, LV, seed,
     t: 0, kills: 0, spawnAcc: 0, bossNext: 240, swarmNext: 95, pending: 0, state: 'play', banner: null,
     hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
-    weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: [], buffs: {}
+    weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: [], buffs: {}, stats: { dmg: 0, hp: 0, next: 60, mins: [], lastHit: null }
   };
   addItem('w', HD.start); recalc(); G.hero.hp = G.hero.maxHp;
   G.revives = up('revival'); G.rerolls = 1 + up('reroll');
@@ -1659,7 +1663,7 @@ function spawnEnemy(type, x, y) {
     const d = Math.hypot(W, H) / 2 + 24;
     for (let k = 0; k < 10; k++) { const a = rnd(0, TAU); x = h.x + Math.cos(a) * d; y = h.y + Math.sin(a) * d; if (type === 'boss' || !footBlocked(x, y, 6)) break; }
   } else if (type !== 'boss' && footBlocked(x, y, 4)) return;
-  const hpMul = (1 + t / 240 + (t / 360) ** 2) * G.LV.hp;
+  const hpMul = (1 + t / 240 + (t / 360) ** 2) * G.LV.hp; G.stats.hp += T.hp * hpMul;
   G.enemies.push({ type, x, y, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (1 + Math.min(0.3, t / 3000)) * rnd(0.92, 1.08),
     dmg: T.dmg * (1 + t / 600), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0, shootT: rnd(1, 3), dir: 4, t: rnd(0, 5) });
 }
@@ -1688,6 +1692,7 @@ function hitEnemy(e, dmg, kx = 0, ky = 0) {
   if (e.dead) return;
   const h = G.hero;
   const dealt = dmg * h.might * (G.HD.fury && h.hp < h.maxHp / 2 ? 1.3 : 1);
+  G.stats.dmg += Math.min(dealt, e.hp);
   e.hp -= dealt; e.flash = 0.1;
   if (cfg.opts.nums && dealt < 9000 && G.numCount < 70) { G.numCount++; G.fx.push({ k: 'num', x: e.x + rnd(-4, 4), y: e.y - e.r - 4, v: Math.max(1, Math.round(dealt)), t: 0, life: 0.6 }); }
   if (e.type !== 'boss' && !e.static) { e.kx += kx; e.ky += ky; }
@@ -1716,8 +1721,8 @@ function drop(e) {
   G.gems.push({ x: e.x, y: e.y, v: e.xp });
   if (G.gems.length > 420) { const i = G.gems.findIndex(g => g.v); if (i >= 0) gainXp(G.gems.splice(i, 1)[0].v); }
 }
-function hurtHero(d) {
-  const h = G.hero; h.hp -= Math.max(1, d - h.armour); h.hurtT = 0.15; sfx('s_hurt', 0.25);
+function hurtHero(d, src) {
+  const h = G.hero; G.stats.lastHit = src || null; h.hp -= Math.max(1, d - h.armour); h.hurtT = 0.15; sfx('s_hurt', 0.25);
 }
 function explode(s) {
   G.fx.push({ k: 'boom', x: s.x, y: s.y, r: s.er, t: 0, life: 0.4 }); sfx(s.k === 'fire' && A.sbuf.s_fire ? 's_fire' : 's_boom', 0.08);
@@ -1854,7 +1859,7 @@ function updateShots(dt) {
   G.shots = G.shots.filter(s => !s.dead);
   for (const s of G.eshots) {
     s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
-    if (Math.hypot(h.x - s.x, h.y - s.y) < 7) { hurtHero(s.dmg); s.dead = true; }
+    if (Math.hypot(h.x - s.x, h.y - s.y) < 7) { hurtHero(s.dmg, 'shot'); s.dead = true; }
     if (s.life <= 0) s.dead = true;
   }
   G.eshots = G.eshots.filter(s => !s.dead);
@@ -1893,7 +1898,7 @@ function updateEnemies(dt) {
       const sx = e.x - o.x, sy = e.y - o.y, dd = sx * sx + sy * sy, rr = (e.r + o.r) * 0.8;
       if (dd < rr * rr && dd > 0.0001) { const dl = Math.sqrt(dd), p = (rr - dl) * 0.25, px = e.x + sx / dl * p, py = e.y + sy / dl * p; if (e.type === 'boss' || !G.terrain || !footBlocked(px, py, e.r * 0.5) || footBlocked(e.x, e.y, e.r * 0.5)) { e.x = px; e.y = py; } }
     });
-    if (d < e.r + 7 && e.atkT <= 0) { hurtHero(e.dmg); e.atkT = 1.0; e.swing = SWING; }
+    if (d < e.r + 7 && e.atkT <= 0) { hurtHero(e.dmg, e.type); e.atkT = 1.0; e.swing = SWING; }
     if (d > far && e.type !== 'boss') { // wrap stragglers back in front of the hero
       const a = Math.atan2(-dy, -dx) + Math.PI + rnd(-0.8, 0.8), r = Math.hypot(W, H) / 2 + 20;
       e.x = h.x + Math.cos(a) * r; e.y = h.y + Math.sin(a) * r;
@@ -1921,6 +1926,8 @@ function updateGems(dt) {
 function update(dt) {
   const h = G.hero; G.t += dt;
   for (const k in G.buffs) if (G.buffs[k] <= G.t) { delete G.buffs[k]; recalc(); }
+  // Once a minute, note how the run is going: used by the run history and the balance report.
+  if (G.t >= G.stats.next) { const S = G.stats; S.mins.push({ lvl: h.level, dmg: Math.round(S.dmg), hp: Math.round(S.hp), kills: G.kills, alive: G.enemies.length }); S.dmg = 0; S.hp = 0; S.next += 60; }
   let [mx, my] = readMove(); const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
   const hs = h.speed, hnx = h.x + mx * hs * dt, hny = h.y + my * hs * dt, stuck = footBlocked(h.x, h.y, 5);
@@ -2236,6 +2243,7 @@ const endJoy = e => { if (joy && e.pointerId === joy.id) joy = null; };
 cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
 function getPad() { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.connected) return p; return null; }
 function readMove() {
+  if (G && G.bot) return G.bot;                 // the balance report's bot steers through this
   let x = 0, y = 0;
   if (keys.has('KeyA') || keys.has('ArrowLeft')) x--; if (keys.has('KeyD') || keys.has('ArrowRight')) x++;
   if (keys.has('KeyW') || keys.has('ArrowUp')) y--; if (keys.has('KeyS') || keys.has('ArrowDown')) y++;
@@ -2320,6 +2328,7 @@ overlay.addEventListener('click', e => {
   else if (act === 'start') newRun(b.dataset.id, b.dataset.level);
   else if (act === 'quick') { const l = meta.last; newRun(l.hero, l.level); }
   else if (act === 'continue') continueRun();
+  else if (act === 'history') showHistory();
   else if (act === 'exportsave') showSaveCode('export');
   else if (act === 'importsave') showSaveCode('import');
   else if (act === 'loadcode') loadSaveCode();
@@ -2394,7 +2403,7 @@ function changeOpt(k) {
 function showSettings(from, focus) {
   const keys = Object.keys(OPT_DEFS);
   const rows = keys.map(k => `<button class="opt" data-act="opt" data-k="${k}" data-from="${from}">${OPT_DEFS[k].label}: ${OPT_DEFS[k].fmt(cfg.opts[k])}</button>`).join('');
-  const xfer = from === 'pause' ? '' : `<button class="opt" data-act="exportsave">Copy save code</button><button class="opt" data-act="importsave">Load save code</button>`;
+  const xfer = from === 'pause' ? '' : `<button class="opt" data-act="history">Run history</button><button class="opt" data-act="exportsave">Copy save code</button><button class="opt" data-act="importsave">Load save code</button>`;
   showMenu(`<h2>Settings</h2><div class="opts">${rows}${xfer}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
   if (focus) { sel = keys.indexOf(focus); highlight(); }
 }
@@ -2402,7 +2411,7 @@ function showSettings(from, focus) {
 // The code holds gold, upgrades, unlocked battlefields, best time, settings and any unfinished run.
 // It never holds the imported game files: import those once on each device.
 function makeSaveCode() {
-  const data = { v: 1, meta, best, opts: cfg.opts, hero: store.get('tos_hero', null), run: savedRun() };
+  const data = { v: 1, meta, best, opts: cfg.opts, hero: store.get('tos_hero', null), run: savedRun(), runs: runs.slice(-60) };
   const bytes = new TextEncoder().encode(JSON.stringify(data));
   let bin = ''; for (const b of bytes) bin += String.fromCharCode(b);
   const body = btoa(bin), sum = [...body].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36);
@@ -2438,13 +2447,27 @@ function loadSaveCode() {
   if (d.best) { best = d.best; store.set('tos_best', best); }
   if (d.opts) { cfg.opts = Object.assign(cfg.opts, d.opts); saveCfg(); musicVolume(); }
   if (d.hero) store.set('tos_hero', d.hero);
+  if (Array.isArray(d.runs)) { runs = d.runs; store.set('tos_runs', runs); }
   if (d.run) store.set(RUN_KEY, d.run); else store.del(RUN_KEY);
   showTitle();
+}
+function showHistory() {
+  if (!runs.length) return showMenu(`<h2>Run history</h2><p class="sub">Finish a run and it will be recorded here.</p><div class="opts"><button class="opt" data-act="settings" data-from="title" data-back>Back</button></div>`);
+  const by = {}; for (const r of runs) { const k = r.hero + '|' + r.level, o = by[k] ||= { hero: r.hero, level: r.level, n: 0, wins: 0, sum: 0, best: 0 }; o.n++; o.wins += r.won; o.sum += r.t; o.best = Math.max(o.best, r.t); }
+  const lv = id => (LEVELS.find(l => l.id === id) || { name: id }).name, hn = id => HEROES[id] ? HEROES[id].name.split(' ')[0] : id;
+  const rows = Object.values(by).sort((a, b) => b.n - a.n).slice(0, 10).map(o => `<b>${hn(o.hero)}, ${lv(o.level)}</b><span>${o.n} run${o.n > 1 ? 's' : ''}, ${o.wins} won, average ${fmtTime(o.sum / o.n)}, best ${fmtTime(o.best)}</span>`).join('');
+  const deaths = {}; for (const r of runs) if (!r.won) { const k = KILLER[r.by] || 'Unknown'; deaths[k] = (deaths[k] || 0) + 1; }
+  const dl = Object.entries(deaths).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(', ');
+  const last = runs.slice(-6).reverse().map(r => `<b>${hn(r.hero)}, ${lv(r.level)}</b><span>${r.won ? 'Won' : 'Fell at ' + fmtTime(r.t)}, level ${r.lvl}, ${r.kills} kills${r.won ? '' : ', to ' + (KILLER[r.by] || 'unknown').toLowerCase()}</span>`).join('');
+  const wins = runs.filter(r => r.won).length;
+  showMenu(`<h2>Run history</h2><p class="sub">${runs.length} runs, ${wins} won (${Math.round(wins / runs.length * 100)}%).${dl ? ' Deaths: ' + dl + '.' : ''}</p>
+    <div class="stats hist">${rows}</div><h3 class="side">Latest runs</h3><div class="stats hist">${last}</div>
+    <div class="opts" style="margin-top:12px"><button class="opt" data-act="settings" data-from="title" data-back>Back</button></div>`);
 }
 function buyUp(id) {
   const c = upCost(id);
   if (up(id) >= UPGRADES[id].max || meta.gold < c) return;
-  meta.gold -= c; meta.spent += c; meta.ups[id] = up(id) + 1; saveMeta(); sfx('s_level', 0);
+  meta.gold -= c; meta.spent += c; meta.ups[id] = up(id) + 1; saveMeta(); sfx('s_buy', 0);
 }
 function showShop(focus) {
   const ids = Object.keys(UPGRADES);
@@ -2518,10 +2541,11 @@ function itemInfo(c) {
   if (c.kind === 'p') { const P = PASSIVES[c.id]; return { nm: P.name, ds: P.desc, lv: c.lvl === 1 ? '<span class="lv new">New</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
   return { nm: 'Gold', ds: 'Restore 40 health and gain 25 gold.', lv: '<span class="lv">Everything is maxed</span>' };
 }
+const levelSnd = () => G && G.HD.side === 'Horde' && A.sbuf.s_level_orc ? 's_level_orc' : 's_level';
 function openLevelUp(reroll) {
   G.state = 'levelup'; if (!reroll) G.pending--; joy = null; showHudBtns(false);
   if (!reroll) guardMenu(350);
-  if (!reroll) { sfx('s_level', 0); heroVoice('yes', 0.35); }
+  if (!reroll) { sfx(levelSnd(), 0); heroVoice('yes', 0.35); }
   const cards = choices().map((c, i) => {
     const { nm, ds, lv } = itemInfo(c);
     return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="nm">${i + 1}. ${nm}</span>${lv}<span class="ds">${ds}</span></button>`;
@@ -2540,7 +2564,7 @@ function pickCard(kind, id) {
 }
 // Treasure chests: boss chests give 1, 3 or 5 upgrades; camp chests give gold and sometimes an upgrade.
 function openChest(kind) {
-  G.state = 'chest'; joy = null; showHudBtns(false); sfx('s_level', 0); guardMenu(350);
+  G.state = 'chest'; joy = null; showHudBtns(false); sfx(levelSnd(), 0); guardMenu(350);
   const r = Math.random(), n = kind === 'boss' ? (r < 0.15 ? 5 : r < 0.5 ? 3 : 1) : (r < 0.35 ? 1 : 0);
   const got = [];
   for (let i = 0; i < n; i++) { const c = choices()[0]; if (!c) break; addItem(c.kind, c.id); got.push(itemInfo(c)); }
@@ -2553,8 +2577,15 @@ function openChest(kind) {
   showMenu(`<h2>${kind === 'boss' ? 'Treasure!' : 'Supply cache'}</h2><ul class="loot${step ? '' : ' fast'}" id="loot">${items}</ul>
     <div class="opts"><button class="opt" data-act="chestok" data-back>Continue</button></div>`);
 }
+const KILLER = { basic: 'Infantry', fast: 'Sappers', tank: 'Heavy units', ranged: 'Ranged units', boss: 'The boss', shot: 'Missiles', bld: 'A tower' };
+function runRecord(won) {
+  return { at: Date.now(), hero: G.heroId, level: G.LV.id, t: Math.floor(G.t), won: !!won, kills: G.kills, gold: G.gold, lvl: G.hero.level,
+    by: won ? null : G.stats.lastHit, w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), p: { ...G.passives }, ups: Object.values(meta.ups).reduce((a, b) => a + b, 0) };
+}
+let runs = store.get('tos_runs', []); if (!Array.isArray(runs)) runs = [];
 function endRun(won) {
   G.state = 'over'; G.won = won; showHudBtns(false); joy = null;
+  runs.push(runRecord(won)); if (runs.length > 200) runs = runs.slice(-200); store.set('tos_runs', runs);
   if (G.t > best.time || (won && G.kills > best.kills)) { best = { time: Math.floor(G.t), kills: G.kills, level: G.hero.level, hero: G.HD.name }; store.set('tos_best', best); }
   const unlocked = bankRun();
   playMusic(won ? 'victory' : 'defeat');
@@ -2918,7 +2949,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker };
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker };
 boot();
 })();
 </script>
