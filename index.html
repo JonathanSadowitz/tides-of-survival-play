@@ -895,7 +895,8 @@ const store = {
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(() => {}); } catch (e) {}
 let cfg = store.get('tos_cfg', null) || { roles: {}, sounds: {}, palette: null };
 cfg.roles ||= {}; cfg.sounds ||= {};
-cfg.opts = Object.assign({ speed: 1, music: 0.6, sfx: 0.8, nums: true, quickChest: false }, cfg.opts || {});
+cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, nums: true, quickChest: false }, cfg.opts || {});
+if (!cfg.optsV) { if (cfg.opts.music === 0.6) cfg.opts.music = 0.4; cfg.optsV = 2; }   // 60% was the old default: too loud
 const saveCfg = () => store.set('tos_cfg', cfg);
 let best = store.get('tos_best', { time: 0, kills: 0, level: 0 });
 
@@ -1098,7 +1099,7 @@ function rawGfuFrame(d, i, P, skip) { // uncompressed frames, used by the menu w
 // Pickups drawn from the game's own art: the gold nugget from the resource bar (MAINDAT entry 187, raw
 // 14x14 frames: gold, wood, oil, mana), the lightning bolt from the small spell icons (entry 323, raw 16x16)
 // for experience, and the wooden crate icon for treasure chests and supply caches.
-const PICKUP_ICONS = { entry: 187, gold: 0, crate: 87, xpEntry: 323, xp: 1, xpBg: [179, 181] }; // xpBg: the icon's navy background
+const PICKUP_ICONS = { entry: 187, gold: 0, crate: 87, runestone: 181, circle: 166, xpEntry: 323, xp: 1, xpBg: [179, 181] }; // xpBg: the icon's navy background
 function buildPickups() {
   A.pick = {};
   const main = findMain(); if (!main) return;
@@ -1114,6 +1115,15 @@ function buildPickups() {
   const xd = Core.safeEntry(war, PICKUP_ICONS.xpEntry);
   if (xd && xd.length > 6 + 2 * 8 && Core.u16(xd, 0) > PICKUP_ICONS.xp) {
     try { const m = rawGfuFrame(xd, PICKUP_ICONS.xp, P, PICKUP_ICONS.xpBg); if (m.width >= 12) A.pick.xp = crop(m, 1, 1, m.width - 2, m.height - 2); } catch (e) {}
+  }
+  // Treasure chests alternate between two things that always stood out on a Warcraft II map: the runestone and
+  // the circle of power (the game has no chest of its own).
+  for (const k of ['runestone', 'circle']) {
+    const sd = Core.safeEntry(war, PICKUP_ICONS[k]); if (!sd || !Core.isGfu(sd)) continue;
+    try { const w = Core.u16(sd, 2), h = Core.u16(sd, 4), px = Core.decodeGfuFrame(sd, 0, w, h), c = document.createElement('canvas'); c.width = w; c.height = h;
+      const cx = c.getContext('2d'), im = cx.createImageData(w, h);
+      for (let i = 0; i < w * h; i++) { const v = px[i]; if (v <= 0) continue; im.data[i * 4] = P[v * 3]; im.data[i * 4 + 1] = P[v * 3 + 1]; im.data[i * 4 + 2] = P[v * 3 + 2]; im.data[i * 4 + 3] = 255; }
+      cx.putImageData(im, 0, 0); A.pick[k] = c; } catch (e) {}
   }
   const icd = Core.safeEntry(war, ICON_ENTRY);
   A.pick.pow = {};
@@ -2211,7 +2221,11 @@ function render() {
     if (x < -10 || y < -10 || x > W + 10 || y > H + 10) continue;
     const pk = A.pick || {};
     if (g.chest) {
-      if (pk.crate) { const bob = Math.round(Math.sin(performance.now() / 300) * 1); ctx.drawImage(pk.crate, x - 10, y - 9 + bob, 20, 18); continue; }
+      if (g.look === undefined) g.look = (G.chestLook = (G.chestLook || 0) + 1) % 2;
+      const now = performance.now();
+      if (g.look === 0 && pk.circle) { ctx.globalAlpha = 0.7 + 0.3 * Math.sin(now / 220); ctx.drawImage(pk.circle, x - 16, y - 16, 32, 32); ctx.globalAlpha = 1; continue; }
+      if (pk.runestone) { ctx.globalAlpha = 0.1 + 0.08 * Math.sin(now / 200); circle(x, y + 7, 11, '#8fd0ff', null); ctx.globalAlpha = 1; ctx.drawImage(pk.runestone, x - 16, y - 20, 32, 32); continue; }
+      if (pk.crate) { const bob = Math.round(Math.sin(now / 300) * 1); ctx.drawImage(pk.crate, x - 10, y - 9 + bob, 20, 18); continue; }
       ctx.fillStyle = '#6b4518'; ctx.fillRect(x - 6, y - 4, 12, 8); ctx.fillStyle = '#e7c04a'; ctx.fillRect(x - 6, y - 1, 12, 2); ctx.fillRect(x - 1, y - 4, 2, 8); continue;
     }
     if (g.pow) { // a framed, pulsing icon so it reads as something special
