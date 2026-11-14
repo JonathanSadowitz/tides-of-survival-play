@@ -47,6 +47,10 @@
   #overlay.parch.bare .panel .sub{color:#3b2a14}
   #overlay.parch .panel{background:linear-gradient(#2e241a,#1d160f)}
   .cards.shop button.card{width:170px}
+  .chead{display:flex;gap:8px;align-items:center}
+  .ctitle{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+  img.cicon{width:46px;height:38px;image-rendering:pixelated;flex:none;border:1px solid #000;box-shadow:0 0 0 1px #8c6a2c}
+  .loot img.cicon{float:left;margin:0 8px 0 0;width:34px;height:28px}
   .stats.hist{grid-template-columns:auto auto;text-align:left;max-width:640px}
   .stats.hist b{text-align:left}
   textarea.savecode{display:block;width:min(560px,80vw);height:110px;margin:4px auto 12px;font:12px/1.4 monospace;color:#f6edd8;background:#120d08;border:1px solid var(--gold2);border-radius:4px;padding:8px;word-break:break-all;resize:vertical}
@@ -1070,7 +1074,7 @@ function rebuildSprites() {
   const main = findMain(), icd = main && Core.safeEntry(A.wars[main], ICON_ENTRY);
   if (icd && Core.isGfu(icd)) {
     const n = Core.u16(icd, 0), iw = Core.u16(icd, 2), ih = Core.u16(icd, 4);
-    for (const [id, ix] of Object.entries(HERO_ICONS)) {
+    for (const [id, ix] of [...Object.entries(HERO_ICONS), ...Object.entries(ITEM_ICONS)]) {
       if (ix >= n) continue;
       const c = document.createElement('canvas'); c.width = iw; c.height = ih;
       try { c.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(icd, ix, iw, ih), iw, ih, A.pal), 0, 0); A.icons[id] = c; } catch (e) {}
@@ -1100,11 +1104,28 @@ function rawGfuFrame(d, i, P, skip) { // uncompressed frames, used by the menu w
 // 14x14 frames: gold, wood, oil, mana), the lightning bolt from the small spell icons (entry 323, raw 16x16)
 // for experience, and the wooden crate icon for treasure chests and supply caches.
 const PICKUP_ICONS = { entry: 187, gold: 0, crate: 87, runestone: 181, circle: 166, xpEntry: 323, xp: 1, xpBg: [179, 181] }; // xpBg: the icon's navy background
+// The original in-game interface: human stone and orc wood, from MAINDAT (raw images 287 to 298, in human/orc pairs).
+const UI_ENTRY = { top: [287, 288], panel: [297, 298] };
+function buildUi(war, P) {
+  A.ui = {};
+  for (const [side, k] of [['Alliance', 0], ['Horde', 1]]) {
+    const ui = {};
+    for (const [name, pair] of Object.entries(UI_ENTRY)) {
+      const d = Core.safeEntry(war, pair[k]); if (!d || !Core.isImg(d)) continue;
+      const im = Core.decodeImg(d), c = document.createElement('canvas'); c.width = im.w; c.height = im.h;
+      const cx = c.getContext('2d'), id = cx.createImageData(im.w, im.h), px = im.frames[0];
+      for (let i = 0; i < px.length; i++) { const v = px[i]; if (v < 0) continue; id.data[i * 4] = P[v * 3]; id.data[i * 4 + 1] = P[v * 3 + 1]; id.data[i * 4 + 2] = P[v * 3 + 2]; id.data[i * 4 + 3] = 255; }
+      cx.putImageData(id, 0, 0); ui[name] = c;
+    }
+    if (ui.top && ui.panel) A.ui[side] = ui;
+  }
+}
 function buildPickups() {
   A.pick = {};
   const main = findMain(); if (!main) return;
   const war = A.wars[main], pd = Core.safeEntry(war, 2); if (!pd || pd.length < 768) return;
-  const P = Core.toPalette(pd), crop = (src, x, y, w, h, clearDark) => {
+  const P = Core.toPalette(pd); buildUi(war, P);
+  const crop = (src, x, y, w, h, clearDark) => {
     const c = document.createElement('canvas'); c.width = w; c.height = h; const cx = c.getContext('2d'); cx.drawImage(src, x, y, w, h, 0, 0, w, h);
     if (clearDark) { const im = cx.getImageData(0, 0, w, h), o = im.data; for (let i = 0; i < o.length; i += 4) if (o[i] + o[i + 1] + o[i + 2] < 40) o[i + 3] = 0; cx.putImageData(im, 0, 0); } // icon backgrounds are black
     return c; };
@@ -1430,6 +1451,7 @@ const PASSIVES = {
   haste:   { name: 'Haste', desc: '8% faster attacks.' },
   area:    { name: 'Whirlwind', desc: '+12% area of effect.' },
   vitality:{ name: 'Ogre Strength', desc: '+25 maximum health.' },
+  troops:  { name: 'Call to Arms', desc: 'One more soldier fights at your side. The fallen return after 20 seconds.' },
 };
 const MAX_LVL = 5, MAX_SLOTS = 6;
 
@@ -1529,7 +1551,7 @@ function newRun(heroId, levelId, seed) {
   G = { heroId, HD, LV, seed,
     t: 0, kills: 0, spawnAcc: 0, bossNext: 300, swarmNext: 95, pending: 0, state: 'play', banner: null,
     hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
-    weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: [], buffs: {}, stats: { dmg: 0, hp: 0, next: 60, mins: [], lastHit: null }
+    weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: [], buffs: {}, troops: [], stats: { dmg: 0, hp: 0, next: 60, mins: [], lastHit: null }
   };
   addItem('w', HD.start); recalc(); G.hero.hp = G.hero.maxHp;
   G.revives = up('revival'); G.rerolls = 1 + up('reroll');
@@ -1891,6 +1913,53 @@ function updateShots(dt) {
   }
   G.eshots = G.eshots.filter(s => !s.dead);
 }
+/* ---------- allied troops ---------- */
+// Footmen (Alliance) or grunts (Horde) who keep formation round the hero, break off to fight anything close,
+// and return as reinforcements 20 seconds after falling. Two to start, one more per rank of Call to Arms.
+const TROOP = { hp: 60, spd: 76, r: 7, back: 20 };
+const friendRole = r => { const k = (G.HD.side === 'Alliance' ? 'ally_' : '') + r; return A.sprites[k] ? k : r; };
+const troopCount = () => 2 + (G.passives.troops || 0);
+function updateTroops(dt) {
+  const h = G.hero, n = troopCount(), maxHp = TROOP.hp * (1 + G.t / 300), dmg = 7 + 1.2 * h.level;
+  while (G.troops.length < n) G.troops.push({ alive: false, back: G.t, hp: 0, x: h.x, y: h.y, t: 0, dir: 4, atkT: 0, swing: 0, flash: 0 });
+  G.troops.forEach((tr, i) => {
+    if (!tr.alive) {
+      if (G.t < tr.back) return;
+      const a = i / n * TAU; tr.x = h.x + Math.cos(a) * 20; tr.y = h.y + Math.sin(a) * 20;
+      if (G.terrain && footBlocked(tr.x, tr.y, 4)) { tr.x = h.x; tr.y = h.y; }
+      Object.assign(tr, { alive: true, hp: maxHp, maxHp, atkT: 0.5 }); return;
+    }
+    tr.t += dt; tr.atkT -= dt; tr.swing -= dt; tr.flash -= dt; tr.maxHp = maxHp;
+    // Someone to fight: the nearest enemy close to this soldier, as long as it's not far from the hero.
+    let foe = null, fd = 1e9;
+    query(tr.x, tr.y, 80, e => { if (e.dead) return; const d = Math.hypot(e.x - tr.x, e.y - tr.y); if (d < fd && Math.hypot(e.x - h.x, e.y - h.y) < 170) { fd = d; foe = e; } });
+    const toHero = Math.hypot(h.x - tr.x, h.y - tr.y);
+    if (toHero > 340) { tr.x = h.x + rnd(-15, 15); tr.y = h.y + rnd(-15, 15); return; }   // left behind: catch up
+    let tx, ty, stopAt;
+    if (foe) { tx = foe.x; ty = foe.y; stopAt = foe.r + TROOP.r; }
+    else { const a = i / n * TAU + 0.4; tx = h.x + Math.cos(a) * 26; ty = h.y + Math.sin(a) * 26; stopAt = 3; tr.hp = Math.min(maxHp, tr.hp + maxHp * 0.03 * dt); }
+    const dx = tx - tr.x, dy = ty - tr.y, d = Math.hypot(dx, dy) || 1;
+    if (d > stopAt) {
+      const sp = TROOP.spd * (toHero > 110 && !foe ? 1.6 : 1) * Math.min(1, (d - stopAt) / 6 + 0.3);
+      const nx = tr.x + dx / d * sp * dt, ny = tr.y + dy / d * sp * dt;
+      if (!G.terrain || !footBlocked(nx, tr.y, 3.5)) tr.x = nx; if (!G.terrain || !footBlocked(tr.x, ny, 3.5)) tr.y = ny;
+      tr.dir = dirOf(dx / d, dy / d);
+    } else if (foe) tr.dir = dirOf(dx / d, dy / d);
+    if (foe && fd <= foe.r + TROOP.r + 3 && tr.atkT <= 0) { tr.atkT = 0.9; tr.swing = SWING; hitEnemy(foe, dmg, dx / d * 30, dy / d * 30); }
+    // Enemies hit soldiers who get in their way.
+    query(tr.x, tr.y, 22, e => {
+      if (e.dead || e.static || e.atkT > 0 || e.type === 'ranged') return;
+      if (Math.hypot(e.x - tr.x, e.y - tr.y) < e.r + TROOP.r && Math.random() < 0.5) { tr.hp -= e.dmg; tr.flash = 0.12; e.atkT = 1; e.swing = SWING; }
+    });
+    if (tr.hp <= 0) { tr.alive = false; tr.back = G.t + TROOP.back; G.fx.push({ k: 'boom', x: tr.x, y: tr.y, r: 6, t: 0, life: 0.3 }); }
+  });
+}
+function drawTroop(tr) {
+  const x = tr.x - camX, y = tr.y - camY;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y + 6, 7, 3, 0, 0, TAU); ctx.fill();
+  if (!drawSprite(friendRole('basic'), tr.x, tr.y, tr.dir, tr.t, tr.flash > 0, tr.swing > 0 ? 1 - tr.swing / SWING : null)) circle(x, y, TROOP.r, G.HD.col, '#1a0d08');
+  if (tr.hp < tr.maxHp) { ctx.fillStyle = '#000'; ctx.fillRect(x - 9, y - 18, 18, 3); ctx.fillStyle = '#4ac94a'; ctx.fillRect(x - 8, y - 17, Math.round(16 * Math.max(0, tr.hp / tr.maxHp)), 1); }
+}
 function updateEnemies(dt) {
   const h = G.hero, far = Math.hypot(W, H) * 0.75;
   for (const e of G.enemies) {
@@ -1961,7 +2030,7 @@ function update(dt) {
   if (stuck || !footBlocked(hnx, h.y, 5)) h.x = hnx; if (stuck || !footBlocked(h.x, hny, 5)) h.y = hny;
   if (ml > 0.15) { h.face = Math.atan2(my, mx); h.dir = dirOf(mx, my); h.moveT += dt; }
   h.hp = Math.min(h.maxHp, h.hp + h.regen * dt); h.hurtT -= dt; h.atkT -= dt;
-  spawn(dt); updateCamps(dt); buildGrid(); updateEnemies(dt); buildGrid(); updateWeapons(dt); updateShots(dt); updateGems(dt);
+  spawn(dt); updateCamps(dt); buildGrid(); updateEnemies(dt); buildGrid(); updateTroops(dt); updateWeapons(dt); updateShots(dt); updateGems(dt);
   for (const f of G.fx) f.t += dt; G.fx = G.fx.filter(f => f.t < f.life); G.numCount = 0; for (const f of G.fx) if (f.k === 'num') G.numCount++;
   for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
   if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
@@ -2191,17 +2260,61 @@ function uiBar(x, y, w, h, frac, col, lite, dark, label) {
   if (fw > 0) { ctx.fillStyle = col; ctx.fillRect(x, y, fw, h); ctx.fillStyle = lite; ctx.fillRect(x, y, fw, 1); ctx.fillStyle = dark; ctx.fillRect(x, y + h - 1, fw, 1); }
   if (label) { const lw = fonts.small ? fontWidth(fonts.small, label) : label.length * 5; ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(Math.round(x + w / 2 - lw / 2) - 2, y, lw + 4, h); txt(label, x + w / 2, y + Math.round((h - 6) / 2), 7, '#ffffff', 'center'); }
 }
+// A thin bevelled frame in the side's colours, for the info panel and the portrait.
+function bevel(x, y, w, h, lite, dark) {
+  ctx.fillStyle = '#000'; ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+  ctx.fillStyle = lite; ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y, 1, h);
+  ctx.fillStyle = dark; ctx.fillRect(x, y + h - 1, w, 1); ctx.fillRect(x + w - 1, y, 1, h);
+}
+function miniBar(x, y, w, frac, col, lite) {
+  ctx.fillStyle = '#000'; ctx.fillRect(x - 1, y - 1, w + 2, 6); ctx.fillStyle = '#16100a'; ctx.fillRect(x, y, w, 4);
+  const f = Math.round(w * Math.max(0, Math.min(1, frac))); ctx.fillStyle = col; ctx.fillRect(x, y, f, 4); ctx.fillStyle = lite; ctx.fillRect(x, y, f, 1);
+}
+// The Warcraft II interface: the resource bar along the top and the unit panel in the bottom-left corner,
+// in stone for the Alliance and wood for the Horde.
+function drawFrame(ui) {
+  const h = G.hero, horde = G.HD.side === 'Horde', lite = horde ? '#c9a65a' : '#d8d8d8', dark = horde ? '#3c2a0e' : '#3a3a3a';
+  for (let x = 0; x < W; x += ui.top.width) ctx.drawImage(ui.top, x, 0);
+  txt(G.LV.name, 8, 4, 7, '#e8d9b0');
+  txt(fmtTime(G.t), W / 2, 1, 11, '#f1e6c8', 'center');
+  const gx = W - 60;
+  if (A.pick && A.pick.gold) ctx.drawImage(A.pick.gold, gx - fontWidth(fonts.small || { glyphs: [] }, String(G.gold)) - 13, 3, 10, 10);
+  txt(String(G.gold), gx, 4, 7, '#ffd24a', 'right');
+  txt(`${G.kills} kills`, gx - 64, 4, 7, '#f1e6c8', 'right');
+  // Unit panel: portrait, name, level, health, experience, then weapons and passives as icons.
+  const wl = Object.keys(G.weapons), pl = Object.keys(G.passives), rows = 1 + (pl.length ? 1 : 0);
+  const pw = 160, ph = 50 + rows * 22, px = 6, py = H - ph - 6;
+  bevel(px, py, pw, ph, lite, dark); ctx.drawImage(ui.panel, 0, 0, pw - 2, ph - 2, px + 1, py + 1, pw - 2, ph - 2);
+  const pic = A.icons && A.icons[G.heroId];
+  bevel(px + 6, py + 6, 48, 40, lite, dark); if (pic) ctx.drawImage(pic, px + 7, py + 7); else { ctx.fillStyle = G.HD.col; ctx.fillRect(px + 7, py + 7, 46, 38); }
+  txt(G.HD.name.split(' ')[0], px + 60, py + 5, 9, '#ffd27a');
+  txt(`Level ${h.level}`, px + 60, py + 19, 7, '#f1e6c8');
+  miniBar(px + 60, py + 30, pw - 68, h.hp / h.maxHp, '#3fa53f', '#8fe08f');
+  miniBar(px + 60, py + 38, pw - 68, h.xp / h.next, '#3a6fd0', '#8fb8ff');
+  const icons = (list, kind, lvl, y) => list.forEach((id, i) => {
+    const key = kind + ':' + (id === 'troops' ? (horde ? 'troops_h' : 'troops_a') : id), ic = A.icons && A.icons[key], x = px + 6 + i * 25;
+    if (x + 23 > px + pw) return;
+    ctx.fillStyle = '#000'; ctx.fillRect(x - 1, y - 1, 25, 21);
+    if (ic) ctx.drawImage(ic, x, y, 23, 19); else { ctx.fillStyle = dark; ctx.fillRect(x, y, 23, 19); }
+    txt(String(lvl(id)), x + 22, y + 12, 7, '#ffffff', 'right');
+  });
+  icons(wl, 'w', id => G.weapons[id].lvl, py + 50);
+  if (pl.length) icons(pl, 'p', id => G.passives[id], py + 72);
+}
 function drawHud() {
-  const h = G.hero;
-  uiBar(4, 4, W - 8, 7, h.xp / h.next, '#3a6fd0', '#8fb8ff', '#1c3c80', `Level ${h.level}`);
-  txt(fmtTime(G.t), W / 2, 16, 11, '#f1e6c8', 'center');
+  const h = G.hero, ui = A.ui && A.ui[G.HD.side];
   const boss = G.enemies.find(e => e.type === 'boss');
-  if (W < 320) txt(`${G.kills} kills  ${G.gold} gold`, W / 2, boss ? 46 : 30, 8, '#f1e6c8', 'center');
-  else { txt(`${G.kills} kills`, W - 60, 16, 9, '#f1e6c8', 'right'); txt(`${G.gold} gold`, W - 60, 27, 8, '#ffd24a', 'right'); }
-  let y = 18;
-  for (const id in G.weapons) { txt(`${WEAPONS[id].name} ${G.weapons[id].lvl}`, 6, y, 7, '#e8d9b0'); y += 9; }
-  for (const id in G.passives) { txt(`${PASSIVES[id].name} ${G.passives[id]}`, 6, y, 7, '#a8c4e0'); y += 9; }
-  let bx = W / 2 - Object.keys(G.buffs).length * 15, by = boss ? 46 : 31;   // active power-ups, under the clock (and boss bar)
+  if (ui && W >= 320) drawFrame(ui);
+  else {
+    uiBar(4, 4, W - 8, 7, h.xp / h.next, '#3a6fd0', '#8fb8ff', '#1c3c80', `Level ${h.level}`);
+    txt(fmtTime(G.t), W / 2, 16, 11, '#f1e6c8', 'center');
+    if (W < 320) txt(`${G.kills} kills  ${G.gold} gold`, W / 2, boss ? 46 : 30, 8, '#f1e6c8', 'center');
+    else { txt(`${G.kills} kills`, W - 60, 16, 9, '#f1e6c8', 'right'); txt(`${G.gold} gold`, W - 60, 27, 8, '#ffd24a', 'right'); }
+    let y = 18;
+    for (const id in G.weapons) { txt(`${WEAPONS[id].name} ${G.weapons[id].lvl}`, 6, y, 7, '#e8d9b0'); y += 9; }
+    for (const id in G.passives) { txt(`${PASSIVES[id].name} ${G.passives[id]}`, 6, y, 7, '#a8c4e0'); y += 9; }
+  }
+  let bx = W / 2 - Object.keys(G.buffs).length * 15, by = boss ? 46 : 31;   // with the frame, the clock sits in the top bar   // active power-ups, under the clock (and boss bar)
   for (const id in G.buffs) { const im = A.pick && A.pick.pow && A.pick.pow[id], left = Math.ceil(G.buffs[id] - G.t);
     ctx.fillStyle = '#000'; ctx.fillRect(bx, by, 20, 18); if (im) ctx.drawImage(im, bx + 1, by + 1, 18, 16); ctx.strokeStyle = POWERUPS[id].col; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, 19, 17);
     txt(String(left), bx + 22, by + 5, 7, '#ffffff'); bx += 34; }
@@ -2259,9 +2372,10 @@ function render() {
   const list = G.enemies.filter(e => Math.abs(e.x - h.x) < W / 2 + 90 && Math.abs(e.y - h.y) < H / 2 + 90);
   for (const p of G.props) if (Math.abs(p.x - h.x) < W / 2 + 90 && Math.abs(p.y - h.y) < H / 2 + 90) list.push(p);
   list.push(null);
+  for (const tr of G.troops) if (tr.alive) list.push({ troop: tr, y: tr.y });
   const sy = e => e ? e.y + (e.spr ? e.spr.height / 2 - 10 : 0) : h.y;
   list.sort((a, b) => sy(a) - sy(b));
-  for (const e of list) !e ? drawHero() : e.spr && !e.type ? drawBuilding(e) : drawEnemy(e);
+  for (const e of list) !e ? drawHero() : e.troop ? drawTroop(e.troop) : e.spr && !e.type ? drawBuilding(e) : drawEnemy(e);
   for (const s of G.shots) if (s.k !== 'rune') drawShot(s);
   for (const s of G.eshots) { if (!drawSprite(foeRole('eshot'), s.x, s.y, s.dir, attract, false)) circle(s.x - camX, s.y - camY, 2.5, '#9be04a', '#203a08'); }
   for (const f of G.fx) drawFx(f);
@@ -2615,6 +2729,17 @@ function weaponStats(id, l) {
   }
   return '';
 }
+// Icons from the Warcraft II command card for each weapon and passive (frames of the icon sheet).
+const ITEM_ICONS = {
+  'w:sword': 117, 'w:arrows': 125, 'w:axes': 129, 'w:aura': 100, 'w:fireball': 101, 'w:ballista': 140, 'w:runes': 81, 'w:coil': 114,
+  'p:troops_a': 2, 'p:troops_h': 3, 'p:armour': 164, 'p:boots': 130, 'p:heal': 107, 'p:magnet': 133, 'p:might': 118, 'p:haste': 102, 'p:area': 104, 'p:vitality': 112,
+};
+const iconUrls = {};
+function itemIcon(kind, id) {
+  const key = kind + ':' + (id === 'troops' ? (G && G.HD.side === 'Horde' ? 'troops_h' : 'troops_a') : id), c = A.icons && A.icons[key]; if (!c) return '';
+  if (!iconUrls[key]) iconUrls[key] = c.toDataURL();
+  return `<img class="cicon" src="${iconUrls[key]}" alt="">`;
+}
 function itemInfo(c) {
   if (c.kind === 'w') { const W_ = WEAPONS[c.id]; return { nm: W_.name, ds: c.lvl === 1 ? `${W_.desc} ${weaponStats(c.id, 1)}` : `${W_.up[c.lvl - 2].replace(/^./, m => m.toUpperCase())}. Now ${weaponStats(c.id, c.lvl).replace(/^./, m => m.toLowerCase())}`, lv: c.lvl === 1 ? '<span class="lv new">New weapon</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
   if (c.kind === 'p') { const P = PASSIVES[c.id]; return { nm: P.name, ds: P.desc, lv: c.lvl === 1 ? '<span class="lv new">New</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
@@ -2627,7 +2752,7 @@ function openLevelUp(reroll) {
   if (!reroll && !heroVoice('any')) sfx(levelSnd(), 0);   // a random line from the hero, or the jingle if no voices were imported
   const cards = choices().map((c, i) => {
     const { nm, ds, lv } = itemInfo(c);
-    return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="nm">${i + 1}. ${nm}</span>${lv}<span class="ds">${ds}</span></button>`;
+    return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="chead">${itemIcon(c.kind, c.id)}<span class="ctitle"><span class="nm">${i + 1}. ${nm}</span>${lv}</span></span><span class="ds">${ds}</span></button>`;
   }).join('');
   showMenu(`<h2>Level ${G.hero.level}</h2><div class="cards">${cards}</div>
     <div class="lvlrow"><button class="opt" data-act="reroll" ${G.rerolls > 0 ? '' : 'disabled'}>Reroll (${G.rerolls})</button><button class="opt" data-act="skip">Skip (+10% health)</button></div>`);
@@ -2646,11 +2771,11 @@ function openChest(kind) {
   G.state = 'chest'; joy = null; showHudBtns(false); sfx(levelSnd(), 0); guardMenu(350);
   const r = Math.random(), n = kind === 'boss' ? (r < 0.15 ? 5 : r < 0.5 ? 3 : 1) : (r < 0.35 ? 1 : 0);
   const got = [];
-  for (let i = 0; i < n; i++) { const c = choices()[0]; if (!c) break; addItem(c.kind, c.id); got.push(itemInfo(c)); }
+  for (let i = 0; i < n; i++) { const c = choices()[0]; if (!c) break; addItem(c.kind, c.id); got.push({ ...itemInfo(c), ic: itemIcon(c.kind, c.id) }); }
   const gold = Math.round((kind === 'boss' ? 60 + rnd(0, 40) : 15 + rnd(0, 20)) * goldMul());
   addGold(gold);
   const step = cfg.opts.quickChest ? 0 : 0.45;
-  const items = got.map((g, i) => `<li style="animation-delay:${(i * step).toFixed(2)}s"><b>${g.nm}</b> ${g.lv}<br><span class="ds">${g.ds}</span></li>`).join('')
+  const items = got.map((g, i) => `<li style="animation-delay:${(i * step).toFixed(2)}s">${g.ic || ''}<b>${g.nm}</b> ${g.lv}<br><span class="ds">${g.ds}</span></li>`).join('')
     + `<li style="animation-delay:${(got.length * step).toFixed(2)}s" class="chestgold">+${gold} gold</li>`;
   G.chestAt = performance.now();
   showMenu(`<h2>${kind === 'boss' ? 'Treasure!' : 'Supply cache'}</h2><ul class="loot${step ? '' : ' fast'}" id="loot">${items}</ul>
