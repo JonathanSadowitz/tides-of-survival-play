@@ -1439,7 +1439,10 @@ const saveMeta = () => store.set('tos_meta', meta);
 const up = id => meta.ups[id] || 0;
 const upCost = id => UPGRADES[id].cost * (up(id) + 1);
 const goldMul = () => 1 + 0.15 * up('greed');
-function addGold(v) { if (G) G.gold += Math.round(v); }
+// All gold collected in a run is scaled by GOLD_RATE (tuned from real runs: the Armoury should take
+// roughly 15 to 20 runs to fill). Fractions carry over so small coins still count.
+const GOLD_RATE = 0.5;
+function addGold(v) { if (!G) return; G.goldFrac = (G.goldFrac || 0) + v * GOLD_RATE; const n = Math.floor(G.goldFrac); G.gold += n; G.goldFrac -= n; }
 
 /* ---------- power-ups: rare drops with a spell icon from the game ---------- */
 const POWERUPS = {
@@ -1693,7 +1696,7 @@ function spawnEnemy(type, x, y) {
     dmg: T.dmg * (1 + t / 600) * (0.6 + 0.4 * EASE(t)) * (bossK < 1 ? 0.7 : 1), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0, shootT: rnd(1, 3), dir: 4, t: rnd(0, 5) });
 }
 function pickType(t) {
-  const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 210 ? 0.25 : 0, tank: t > 240 ? Math.min(0.55, 0.05 + t / 1500) : 0 };
+  const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 210 ? 0.25 : 0, tank: t > 240 ? Math.min(0.4, 0.05 + t / 1500) : 0 };
   for (const k in w) w[k] *= G.LV.mix[k] || 1;
   let s = 0; for (const k in w) s += w[k];
   let r = Math.random() * s; for (const k in w) { r -= w[k]; if (r <= 0) return k; }
@@ -2657,7 +2660,7 @@ function endRun(won) {
 // Bank the run's gold and unlock the next level. Returns the name of a newly unlocked level, if any.
 function bankRun() {
   if (G.banked) return null;
-  G.banked = true; G.bonus = Math.floor(G.t / 60) * 12; meta.gold += G.gold + G.bonus; store.del(RUN_KEY);   // a little extra for every minute survived
+  G.banked = true; G.bonus = Math.floor(G.t / 60) * 6; meta.gold += G.gold + G.bonus; store.del(RUN_KEY);   // a little extra for every minute survived
   const i = LEVELS.indexOf(G.LV); let unlocked = null;
   if (G.t >= UNLOCK_T && i === meta.unlocked && i + 1 < LEVELS.length) { meta.unlocked = i + 1; unlocked = LEVELS[i + 1].name; }
   saveMeta(); return unlocked;
