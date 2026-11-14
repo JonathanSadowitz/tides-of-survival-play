@@ -117,6 +117,18 @@
   .fine{font-size:11px;opacity:.55;margin-top:10px}
   .stats{display:grid;grid-template-columns:auto auto;gap:4px 16px;justify-content:center;margin:8px 0 16px;font-size:15px}
   .stats b{color:var(--gold);text-align:right}
+  .panel.wide{max-width:860px;width:min(860px,94vw)}
+  .sheet{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.3fr);gap:4px 18px;text-align:left;margin:6px 0 10px}
+  .sheet .who{display:flex;gap:10px;align-items:center;grid-column:1}
+  .sheet .who .nm{color:var(--gold);font-size:1.15em}
+  .sheet .stats{grid-column:1;margin:4px 0}
+  .sheet .items{grid-column:2;grid-row:1 / span 3}
+  .sheet .items h3{margin:2px 0 4px}
+  .sheet .sigline{font-size:.85em;opacity:.9;margin-top:2px}
+  .sheet .sigline b{color:var(--gold)}
+  .pitem{display:flex;gap:8px;align-items:center;margin:0 0 5px}
+  .pitem .ds{font-size:.85em;opacity:.85}
+  .pitem .lv{color:var(--gold);font-size:.85em}
   button.card.hero{width:330px}
   .hrow{display:flex;gap:10px;align-items:center}
   .hrow>span{display:flex;flex-direction:column}
@@ -1397,7 +1409,17 @@ async function mpqFileMusic(file, onProgress) {
 /* ---------- unit voices from the GameSFX folder ---------- */
 const VOICE_DIRS = { lothar: 'Knight', uther: 'Paladin', alleria: 'Aleria', khadgar: 'Khadgar', grom: 'Grom', zuljin: 'Troll', chogall: 'Ogremage', teron: 'Teron' };
 const VOICE_KIND = [['what', /what\d*\.wav$/i], ['yes', /ye?s+(sir|sr|r)\d*\.wav$/i], ['pissed', /piss/i], ['ready', /ready\.wav$/i]];
-const vo = { last: 0, buf: new Map() };
+const vo = { last: 0, buf: new Map(), bags: new Map(), prev: new Map() };
+// Shuffle bag: every line plays once in random order before any repeats, and a new round never opens with the line just played.
+function drawFromBag(key, idx) {
+  let bag = vo.bags.get(key);
+  if (!bag || !bag.length || bag.some(i => !idx.includes(i))) {
+    bag = idx.slice(); for (let k = bag.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [bag[k], bag[j]] = [bag[j], bag[k]]; }
+    if (bag.length > 1 && bag[bag.length - 1] === vo.prev.get(key)) [bag[0], bag[bag.length - 1]] = [bag[bag.length - 1], bag[0]];
+    vo.bags.set(key, bag);
+  }
+  const i = bag.pop(); vo.prev.set(key, i); return i;
+}
 function heroVoice(kind, chance = 1, heroId) {
   heroId ||= G && G.heroId; if (!heroId || Math.random() > chance) return;
   const war = A.wars['GAMESFX/VOICES.WAR']; if (!war || !war.names || !A.actx) return;
@@ -1406,7 +1428,7 @@ function heroVoice(kind, chance = 1, heroId) {
   if (!idx.length && kind === 'ready') idx = war.names.map((n, i) => n === heroId + ':yes' ? i : -1).filter(i => i >= 0);
   if (!idx.length) return false;
   vo.last = now;
-  const i = idx[Math.floor(Math.random() * idx.length)];
+  const i = drawFromBag(heroId + ':' + kind, idx);
   if (vo.buf.has(i)) { playBuffer(vo.buf.get(i), 0.7); return true; }
   const d = Core.safeEntry(war, i); if (!d) return false;
   A.actx.decodeAudioData(d.slice().buffer).then(b => { vo.buf.set(i, b); playBuffer(b, 0.7); }).catch(() => {});
@@ -1467,16 +1489,16 @@ function addGold(v) { if (!G) return; G.goldFrac = (G.goldFrac || 0) + v * GOLD_
 
 /* ---------- power-ups: rare drops with a spell icon from the game ---------- */
 const POWERUPS = {
-  vision:   { name: 'Holy Vision', icon: 106, col: '#7fc4ff', text: 'All experience flies to you!' },
-  treasure: { name: 'Gold Rush',   icon: -1,  col: '#ffd24a', text: 'All gold collected, with a bonus!' },
-  lust:     { name: 'Berserk',     icon: 112, col: '#ff5a3a', text: 'Double damage for 12 seconds!', dur: 12 },
-  haste:    { name: 'Haste',       icon: 102, col: '#7be07a', text: 'Faster movement and attacks for 12 seconds!', dur: 12 },
-  blizzard: { name: 'Blizzard',    icon: 105, col: '#bfe4ff', text: 'Ice strikes every enemy in sight!' },
-  healing:  { name: 'Healing',     icon: 107, col: '#ffffff', text: 'Fully healed!' },
+  vision:   { name: 'Holy Vision', icon: 106, col: '#7fc4ff', text: 'All experience flies to you!', short: 'Experience drawn in' },
+  treasure: { name: 'Gold Rush',   icon: -1,  col: '#ffd24a', text: 'All gold collected, with a bonus!', short: 'Gold drawn in' },
+  lust:     { name: 'Berserk',     icon: 112, col: '#ff5a3a', text: 'Double damage for 12 seconds!', short: 'Double damage', dur: 12 },
+  haste:    { name: 'Haste',       icon: 96,  col: '#7be07a', text: 'Faster movement and attacks for 12 seconds!', short: 'Faster', dur: 12 },
+  blizzard: { name: 'Blizzard',    icon: 105, col: '#bfe4ff', text: 'Ice strikes every enemy in sight!', short: 'Ice storm' },
+  healing:  { name: 'Healing',     icon: 107, col: '#ffffff', text: 'Fully healed!', short: 'Fully healed' },
 };
 function usePowerup(id) {
   const P = POWERUPS[id], h = G.hero; if (!P) return;
-  banner(`${P.name}: ${P.text}`); sfx(A.sbuf.s_power ? 's_power' : 's_level', 0);
+  banner(`${P.name}: ${P.short}`, A.pick && A.pick.pow && A.pick.pow[id]); sfx(A.sbuf.s_power ? 's_power' : 's_level', 0);
   if (id === 'vision') { for (const g of G.gems) if (g.v) g.pull = true; }
   else if (id === 'treasure') { for (const g of G.gems) if (g.coin) g.pull = true; addGold(20 * goldMul()); }
   else if (id === 'healing') h.hp = h.maxHp;
@@ -1561,7 +1583,7 @@ function newRun(heroId, levelId, seed) {
 function addItem(kind, id) {
   if (kind === 'w') { const w = G.weapons[id] || (G.weapons[id] = { lvl: 0, cd: 0.3, tick: 0 }); w.lvl++; }
   else if (kind === 'p') { G.passives[id] = (G.passives[id] || 0) + 1; if (id === 'vitality') G.hero.hp += 25; recalc(); }
-  else if (kind === 'gold') { G.hero.hp = Math.min(G.hero.maxHp, G.hero.hp + 40); }
+  else if (kind === 'food') { G.hero.hp = Math.min(G.hero.maxHp, G.hero.hp + G.hero.maxHp * 0.4); }
 }
 function recalc() {
   const h = G.hero, p = id => G.passives[id] || 0;
@@ -1733,7 +1755,8 @@ function spawn(dt) {
     for (let i = 0; i < 26; i++) { const a = i / 26 * TAU; spawnEnemy('fast', h.x + Math.cos(a) * d, h.y + Math.sin(a) * d); }
   }
 }
-function banner(text) { G.banner = { text, t: 3 }; }
+// A small, quick note near the top of the screen (with the power-up's icon when there is one).
+function banner(text, icon) { G.banner = { text, icon, t: 1.5 }; }
 
 /* ---------- combat ---------- */
 function hitEnemy(e, dmg, kx = 0, ky = 0) {
@@ -2244,7 +2267,7 @@ function drawFrame(ui) {
   miniBar(px + 60, py + 30, pw - 68, h.hp / h.maxHp, '#3fa53f', '#8fe08f');
   miniBar(px + 60, py + 38, pw - 68, h.xp / h.next, '#3a6fd0', '#8fb8ff');
   const icons = (list, kind, lvl, y) => list.forEach((id, i) => {
-    const key = kind + ':' + id, ic = A.icons && A.icons[key], x = px + 6 + i * 25;
+    const key = iconKey(kind, id), ic = A.icons && A.icons[key], x = px + 6 + i * 25;
     if (x + 23 > px + pw) return;
     ctx.fillStyle = '#000'; ctx.fillRect(x - 1, y - 1, 25, 21);
     if (ic) ctx.drawImage(ic, x, y, 23, 19); else { ctx.fillStyle = dark; ctx.fillRect(x, y, 23, 19); }
@@ -2274,7 +2297,12 @@ function drawHud() {
     const bw = Math.min(200, W - 120);
     uiBar((W - bw) / 2, 32, bw, 7, boss.hp / boss.maxHp, '#b8261a', '#ff7a5c', '#5e100a', G.HD.side === 'Horde' ? 'Gryphon Rider' : 'Dragon');
   }
-  if (G.banner) { ctx.globalAlpha = Math.min(1, G.banner.t); txt(G.banner.text, W / 2, H * 0.28, 13, '#ffd27a', 'center'); ctx.globalAlpha = 1; }
+  if (G.banner) {
+    const b = G.banner, y = 24; ctx.globalAlpha = Math.min(1, b.t / 0.4);
+    if (b.icon) { const f = fonts.small, iw = 13, ih = Math.round(iw * b.icon.height / b.icon.width), tw = f ? fontWidth(f, b.text) : b.text.length * 6;
+      ctx.drawImage(b.icon, Math.round(W / 2 - tw / 2 - iw - 3), Math.round(y + 3 - ih / 2), iw, ih); }
+    txt(b.text, W / 2, y, 7, '#ffd27a', 'center'); ctx.globalAlpha = 1;
+  }
   if (G.moveTo && !ms.held) {   // where a mouse click sent the hero: a small green cross, as in Warcraft II
     const mx = Math.round(G.moveTo[0] - camX), my = Math.round(G.moveTo[1] - camY);
     ctx.fillStyle = '#000'; ctx.fillRect(mx - 4, my - 1, 9, 3); ctx.fillRect(mx - 1, my - 4, 3, 9);
@@ -2491,10 +2519,10 @@ function showTitle() {
       <div class="ver" data-wcsmall="TIDES OF SURVIVAL"></div></div>`;
     overlay.className = 'wcmenu'; overlay.style.display = 'flex'; overlay.style.backgroundImage = '';
     sel = 0; wcify(overlay);
-    const v = overlay.querySelector('.ver'), vi = fontImage('TIDES OF SURVIVAL  ' + (best.time ? 'BEST ' + fmtTime(best.time) : ''), 'small', 'white', 1); if (vi) v.appendChild(vi);
+    const v = overlay.querySelector('.ver'), vi = fontImage('TIDES OF SURVIVAL', 'small', 'white', 1); if (vi) v.appendChild(vi);
     fitStage(); highlight(); return;
   }
-  const b = best.time ? `<p class="help">Best: survived ${fmtTime(best.time)} as ${best.hero || 'a hero'}, ${best.kills} kills, level ${best.level}.</p>` : '';
+  const b = '';
   const sr = savedRun(), quick = (sr ? `<button class="opt" data-act="continue">Continue: ${HEROES[sr.hero].name.split(' ')[0]}, ${fmtTime(sr.t)}</button>` : '')
     + (l && HEROES[l.hero] && lv ? `<button class="opt" data-act="quick">Quick start: ${HEROES[l.hero].name.split(' ')[0]}, ${lv.name}</button>` : '');
   showMenu(`<h1>Tides of Survival</h1><p class="sub">A Warcraft II survivors-like fan game</p>
@@ -2647,9 +2675,26 @@ function showChoose() {
 function pauseRun(again) {
   if (!G || (G.state !== 'play' && !again)) return;
   G.state = 'paused'; showHudBtns(false); joy = null; musicDuck(true); if (!again) guardMenu();
-  showMenu(`<h2>Paused</h2><div class="stats"><b>Battlefield</b><span>${G.LV.name}</span><b>Time</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>${G.gold}</span></div>
+  showMenu(`<h2>Paused</h2>${pauseSheet()}
     <div class="opts"><button class="opt" data-act="resume" data-back>Resume</button><button class="opt" data-act="retry">Restart</button>
     <button class="opt" data-act="settings" data-from="pause">Settings</button><button class="opt" data-act="quit">Quit to title (keep gold)</button></div>`);
+  overlay.querySelector('.panel').classList.add('wide'); drawHeroPics(); fitPanel();
+}
+// The character sheet on the pause screen: who you are, your numbers, and everything you're carrying.
+function pauseSheet() {
+  const h = G.hero, HD = G.HD, pct = v => `${v >= 0 ? '+' : ''}${Math.round(v * 100)}%`;
+  const stat = (k, v) => `<b>${k}</b><span>${v}</span>`;
+  const stats = [stat('Health', `${Math.ceil(h.hp)} / ${h.maxHp}`), stat('Damage', pct(h.might - 1)), stat('Armour', h.armour), stat('Speed', Math.round(h.speed)),
+    stat('Attack speed', pct(1 / h.haste - 1)), stat('Area', pct(h.area - 1)), stat('Pickup range', pct(h.magnet - 1)), stat('Regeneration', `${h.regen.toFixed(1)} per second`),
+    stat('Revives', G.revives), stat('Rerolls', G.rerolls)].join('');
+  const row = (kind, id, nm, lvl, ds) => `<div class="pitem">${itemIcon(kind, id)}<div><div class="nm">${nm} <span class="lv">Level ${lvl}${lvl >= MAX_LVL ? ' (max)' : ''}</span></div>${ds ? `<div class="ds">${ds}</div>` : ''}</div></div>`;
+  const ws = Object.entries(G.weapons).map(([id, w]) => row('w', id, WEAPONS[id].name, w.lvl, weaponStats(id, w.lvl))).join('');
+  const ps = Object.entries(G.passives).map(([id, l]) => row('p', id, PASSIVES[id].name, l, PASSIVES[id].desc)).join('') || '<p class="sub">None yet.</p>';
+  return `<div class="sheet"><div class="who"><canvas class="hpic" data-hero="${G.heroId}" width="48" height="48"></canvas>
+      <div><div class="nm">${HD.name}</div><div class="sub">${HD.unit}, level ${h.level}</div>${HD.sig ? `<div class="sigline"><b>${HD.sig}:</b> ${HD.sigDesc}</div>` : ''}</div></div>
+    <div class="stats">${stats}</div>
+    <div class="stats run">${stat('Battlefield', G.LV.name)}${stat('Time', fmtTime(G.t))}${stat('Kills', G.kills)}${stat('Gold', G.gold)}</div>
+    <div class="items"><h3>Weapons</h3>${ws}<h3>Passives</h3>${ps}</div></div>`;
 }
 function choices() {
   const o = [], wc = Object.keys(G.weapons).length, pc = Object.keys(G.passives).length;
@@ -2661,7 +2706,7 @@ function choices() {
     for (; i < o.length; i++) { r -= o[i].wgt; if (r <= 0) break; }
     out.push(o.splice(Math.min(i, o.length - 1), 1)[0]);
   }
-  if (!out.length) out.push({ kind: 'gold', id: 'gold', lvl: 0 });
+  if (!out.length) out.push({ kind: 'food', id: 'food', lvl: 0 }, { kind: 'gold', id: 'gold', lvl: 0 });   // everything maxed
   return out;
 }
 // What a weapon does at a level, in numbers, so an upgrade card says exactly what you'll get.
@@ -2681,20 +2726,24 @@ function weaponStats(id, l) {
   return '';
 }
 // Icons from the Warcraft II command card for each weapon and passive (frames of the icon sheet).
+// Matched to the official spell and upgrade icons on classic.battle.net (Battle.net's Warcraft II unit pages).
+// Keys ending .orc are the Horde version of an upgrade icon.
 const ITEM_ICONS = {
-  'w:sword': 117, 'w:arrows': 125, 'w:axes': 129, 'w:aura': 100, 'w:fireball': 101, 'w:ballista': 140, 'w:runes': 81, 'w:coil': 114,
-  'p:armour': 164, 'p:boots': 130, 'p:heal': 107, 'p:magnet': 133, 'p:might': 118, 'p:haste': 102, 'p:area': 104, 'p:vitality': 112,
+  'w:sword': 117, 'w:arrows': 125, 'w:axes': 129, 'w:aura': 110, 'w:fireball': 101, 'w:ballista': 140, 'w:runes': 97, 'w:coil': 108,
+  'p:armour': 165, 'p:armour.orc': 168, 'p:boots': 130, 'p:heal': 107, 'p:magnet': 133, 'p:might': 118, 'p:might.orc': 120, 'p:haste': 96, 'p:area': 104, 'p:vitality': 9, 'food:food': 134,
 };
+const iconKey = (kind, id) => { const k = kind + ':' + id; return G && G.HD.side === 'Horde' && ITEM_ICONS[k + '.orc'] != null ? k + '.orc' : k; };
 const iconUrls = {};
 function itemIcon(kind, id) {
-  const key = kind + ':' + id, c = A.icons && A.icons[key]; if (!c) return '';
+  const key = iconKey(kind, id), c = A.icons && A.icons[key]; if (!c) return '';
   if (!iconUrls[key]) iconUrls[key] = c.toDataURL();
   return `<img class="cicon" src="${iconUrls[key]}" alt="">`;
 }
 function itemInfo(c) {
   if (c.kind === 'w') { const W_ = WEAPONS[c.id]; return { nm: W_.name, ds: c.lvl === 1 ? `${W_.desc} ${weaponStats(c.id, 1)}` : `${W_.up[c.lvl - 2].replace(/^./, m => m.toUpperCase())}. Now ${weaponStats(c.id, c.lvl).replace(/^./, m => m.toLowerCase())}`, lv: c.lvl === 1 ? '<span class="lv new">New weapon</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
   if (c.kind === 'p') { const P = PASSIVES[c.id]; return { nm: P.name, ds: P.desc, lv: c.lvl === 1 ? '<span class="lv new">New</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
-  return { nm: 'Gold', ds: 'Restore 40 health and gain 25 gold.', lv: '<span class="lv">Everything is maxed</span>' };
+  if (c.kind === 'food') return { nm: 'Field rations', ds: 'Restore 40% of your health.', lv: '<span class="lv">Everything is maxed</span>' };
+  return { nm: 'Sack of gold', ds: 'Gain 50 gold.', lv: '<span class="lv">Everything is maxed</span>' };
 }
 const levelSnd = () => G && G.HD.side === 'Horde' && A.sbuf.s_level_orc ? 's_level_orc' : 's_level';
 function openLevelUp(reroll) {
@@ -2714,7 +2763,7 @@ function resumeOrNext() {
   else { hideMenu(); G.state = 'play'; showHudBtns(true); }
 }
 function pickCard(kind, id) {
-  addItem(kind, id); if (kind === 'gold') addGold(25);
+  addItem(kind, id); if (kind === 'gold') G.gold += 50;   // the full 50, not scaled by GOLD_RATE
   resumeOrNext();
 }
 // Treasure chests: boss chests give 1, 3 or 5 upgrades; camp chests give gold and sometimes an upgrade.
@@ -3107,7 +3156,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker };
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
