@@ -45,8 +45,10 @@
   #overlay.parch.bare{align-items:flex-start;padding-top:max(12px,calc(50vh - min(37.5vw,50vh) * 0.42))}
   #overlay.parch.bare .panel{background:none;border:0;outline:0;box-shadow:none;max-width:420px}
   #overlay.parch.bare .panel .sub{color:#3b2a14}
-  #overlay.parch .panel{background:linear-gradient(rgba(59,47,34,.94),rgba(36,27,18,.96))}
+  #overlay.parch .panel{background:linear-gradient(#2e241a,#1d160f)}
   .cards.shop button.card{width:170px}
+  textarea.savecode{display:block;width:min(560px,80vw);height:110px;margin:4px auto 12px;font:12px/1.4 monospace;color:#f6edd8;background:#120d08;border:1px solid var(--gold2);border-radius:4px;padding:8px;word-break:break-all;resize:vertical}
+  .savemsg{color:#ff9b85}
   @media (max-height:860px){
     #overlay{padding-top:6px;padding-bottom:6px}
     .panel{padding:10px 16px}
@@ -79,18 +81,20 @@
   h1,h2{font-family:Cinzel,Georgia,serif;color:var(--gold);margin:.1em 0 .3em;text-shadow:0 2px 0 #000,0 0 12px rgba(217,178,90,.35)}
   h1{font-size:clamp(28px,7vw,52px);letter-spacing:.04em}
   h2{font-size:clamp(20px,5vw,30px)}
-  .sub{margin:0 0 12px;opacity:.85}
+  .sub{margin:0 0 12px;color:#e9dcc0;text-shadow:0 1px 0 #000}
   .status{font-size:13px;margin:8px auto 14px;padding:8px 10px;border:1px dashed var(--gold2);border-radius:4px;max-width:520px;opacity:.9}
   .opts{display:flex;flex-direction:column;gap:10px;align-items:center}
   button.opt{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:17px;color:var(--ink);cursor:pointer;
     background:linear-gradient(#5b4730,#3a2c1c);border:2px solid var(--gold2);border-radius:5px;padding:10px 18px;min-width:220px}
   button.opt.sel,button.opt:hover{border-color:var(--gold);color:#fff;box-shadow:0 0 0 2px rgba(217,178,90,.35),0 0 14px rgba(217,178,90,.35)}
   .cards{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-  button.card{min-width:0;width:200px;text-align:left;font-family:inherit;font-weight:400;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+  button.card{min-width:0;width:200px;text-align:left;font-family:inherit;font-weight:400;padding:12px 14px;display:flex;flex-direction:column;gap:4px;background:#17110b;text-shadow:0 1px 0 #000}
+  button.card.sel,button.card:hover{background:#2a1f13}
   .card .nm{font-family:Cinzel,Georgia,serif;font-size:17px;color:var(--gold)}
-  .card .lv{font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.06em}
+  .card .lv{font-size:12px;color:#c8b58c;text-transform:uppercase;letter-spacing:.06em}
   .card .lv.new{color:#8fe08a;opacity:1}
-  .card .ds{font-size:14px}
+  .card .ds{font-size:15px;line-height:1.35;color:#f6edd8}
+  .card .ds.chestgold{color:#f0c850}
   .help{font-size:13px;opacity:.8;margin-top:14px}
   .fine{font-size:11px;opacity:.55;margin-top:10px}
   .stats{display:grid;grid-template-columns:auto auto;gap:4px 16px;justify-content:center;margin:8px 0 16px;font-size:15px}
@@ -100,7 +104,7 @@
   .hrow>span{display:flex;flex-direction:column}
   canvas.hpic{width:48px;height:48px;image-rendering:pixelated;background:#140e08;border:1px solid var(--gold2);border-radius:4px;flex:none}
   .lv.ally{color:#8fb8ff;opacity:1}.lv.horde{color:#ff8f7a;opacity:1}
-  .card .sig{font-size:13px;opacity:.9}
+  .card .sig{font-size:14px;color:#efe3c6}
   body.wccur,body.wccur *{cursor:var(--cur)!important}
   h3.side{font-family:Cinzel,Georgia,serif;margin:14px 0 8px;font-size:17px}
   h3.side.ally{color:#8fb8ff}h3.side.horde{color:#ff8f7a}
@@ -754,19 +758,25 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
   }
   // Keep the start clear.
   for (let y = -16; y <= 16; y++) for (let x = -16; x <= 16; x++) if (x * x + y * y <= 196) { const i = I(x, y); if (T_BLOCK[q[i]]) q[i] = TT.G; }
-  // 5. Settle clashes so every 2x2 block holds at most two neighbouring types.
+  // 5. Warcraft II keeps terrain on tile corners: each tile is drawn from the types at its four corners, and
+  // neighbouring tiles share them, so shores and forest edges carry on across tile boundaries. Take every other
+  // half-tile as a corner, settle clashes so neighbouring corners are equal or one step apart (each tile then
+  // holds at most two types), and write each corner back to the four quarter-tiles that touch it.
+  const V = new Uint8Array(TN * TN), J = (x, y) => tmod(y, TN) * TN + tmod(x, TN);
+  for (let ty = 0; ty < TN; ty++) for (let tx = 0; tx < TN; tx++) V[ty * TN + tx] = q[I(tx * 2, ty * 2)];
   for (let pass = 0; pass < 12; pass++) {
     let changed = 0;
-    for (let y = 0; y < TM; y++) for (let x = 0; x < TM; x++) {
-      const i = y * TM + x, t = q[i];
+    for (let y = 0; y < TN; y++) for (let x = 0; x < TN; x++) {
+      const i = y * TN + x, t = V[i];
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dy) continue;
-        const u = q[I(x + dx, y + dy)];
-        if (T_NEXT.dist[t][u] > 1 && (T_PRI[t] < T_PRI[u] || (T_PRI[t] === T_PRI[u] && t < u))) { q[i] = T_NEXT.nx[t][u]; changed++; dy = 2; break; }
+        const u = V[J(x + dx, y + dy)];
+        if (T_NEXT.dist[t][u] > 1 && (T_PRI[t] < T_PRI[u] || (T_PRI[t] === T_PRI[u] && t < u))) { V[i] = T_NEXT.nx[t][u]; changed++; dy = 2; break; }
       }
     }
     if (!changed) break;
   }
+  for (let ty = 0; ty < TN; ty++) for (let tx = 0; tx < TN; tx++) for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) q[I(tx * 2 + i, ty * 2 + j)] = V[J(tx + i, ty + j)];
   for (let i = 0; i < q.length; i++) blk[i] = T_BLOCK[q[i]];
   // 6. Bases, laid out like the scenario maps: hall in the middle, farms in touching pairs, barracks and other
   // buildings a tile or two apart, the lumber mill on the forest edge, and towers where the lanes come in.
@@ -859,8 +869,11 @@ let W = 400, H = 240, SCALE = 1, camX = 0, camY = 0;
 /* ---------- storage ---------- */
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
 };
+// Ask the browser not to clear our saves and imported files when space runs low.
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(() => {}); } catch (e) {}
 let cfg = store.get('tos_cfg', null) || { roles: {}, sounds: {}, palette: null };
 cfg.roles ||= {}; cfg.sounds ||= {};
 cfg.opts = Object.assign({ speed: 1, music: 0.6, sfx: 0.8, nums: true, quickChest: false }, cfg.opts || {});
@@ -1189,13 +1202,45 @@ function playlistFor(kind) {
 }
 function musicVolume() { if (mu.gain && A.actx) mu.gain.gain.setTargetAtTime(cfg.opts.music * (mu.duck ? 0.35 : 1), A.actx.currentTime, 0.15); }
 function musicDuck(v) { mu.duck = v; musicVolume(); }
-async function loadTrack(id) {
-  if (mu.cache.has(id)) return mu.cache.get(id);
-  const rec = await DB.getMusic(id); if (!rec || !A.actx) return null;
-  let wav; try { wav = Core.mpqRead({ d: new Uint8Array(rec.buf), base: -rec.b.pos, sectorSize: rec.sectorSize, blocks: [rec.b] }, 0, MUSIC[id]); } catch (e) { console.warn('music decode', id, e); return null; }
-  let buf; try { buf = await A.actx.decodeAudioData(wav.buffer.slice(wav.byteOffset, wav.byteOffset + wav.byteLength)); } catch (e) { console.warn('music audio', id, e); return null; }
-  mu.cache.set(id, buf); while (mu.cache.size > 3) mu.cache.delete(mu.cache.keys().next().value);
-  return buf;
+// Unpacking a track from the MPQ takes a few hundred milliseconds, so it happens in a background worker
+// built from the same decoder code; the game keeps running smoothly while the next song is prepared.
+// If workers aren't allowed (some sandboxes), it falls back to unpacking on the page.
+const muJobs = new Map(); let muWorker = null, muJobId = 0;
+function musicWorker() {
+  if (muWorker !== null) return muWorker;
+  try {
+    const src = $('#core').textContent + `
+onmessage = e => {
+  const { job, buf, pos, sectorSize, b, path } = e.data;
+  try { const w = Core.mpqRead({ d: new Uint8Array(buf), base: -pos, sectorSize, blocks: [b] }, 0, path), out = w.buffer.slice(w.byteOffset, w.byteOffset + w.byteLength); postMessage({ job, wav: out }, [out]); }
+  catch (err) { postMessage({ job, err: String(err) }); }
+};`;
+    muWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    muWorker.onmessage = e => { const j = muJobs.get(e.data.job); if (!j) return; muJobs.delete(e.data.job); e.data.wav ? j.ok(e.data.wav) : j.fail(new Error(e.data.err)); };
+    muWorker.onerror = () => { muWorker = false; for (const j of muJobs.values()) j.fail(new Error('worker unavailable')); muJobs.clear(); };
+  } catch (e) { muWorker = false; }
+  return muWorker;
+}
+function unpackTrack(rec, path) {
+  const onPage = () => { const w = Core.mpqRead({ d: new Uint8Array(rec.buf), base: -rec.b.pos, sectorSize: rec.sectorSize, blocks: [rec.b] }, 0, path); return w.buffer.slice(w.byteOffset, w.byteOffset + w.byteLength); };
+  const wk = musicWorker(); if (!wk) return Promise.resolve().then(onPage);
+  return new Promise((ok, fail) => {
+    const job = ++muJobId; muJobs.set(job, { ok, fail });
+    wk.postMessage({ job, buf: rec.buf.slice(0), pos: rec.b.pos, sectorSize: rec.sectorSize, b: rec.b, path });
+  }).catch(onPage);
+}
+const muLoading = new Map();
+function loadTrack(id) {
+  if (mu.cache.has(id)) return Promise.resolve(mu.cache.get(id));
+  if (muLoading.has(id)) return muLoading.get(id);
+  const p = (async () => {
+    const rec = await DB.getMusic(id); if (!rec || !A.actx) return null;
+    let wav; try { wav = await unpackTrack(rec, MUSIC[id]); } catch (e) { console.warn('music decode', id, e); return null; }
+    let buf; try { buf = await A.actx.decodeAudioData(wav); } catch (e) { console.warn('music audio', id, e); return null; }
+    mu.cache.set(id, buf); while (mu.cache.size > 3) mu.cache.delete(mu.cache.keys().next().value);
+    return buf;
+  })().finally(() => muLoading.delete(id));
+  muLoading.set(id, p); return p;
 }
 function playMusic(kind) {
   mu.want = kind;
@@ -1218,7 +1263,7 @@ async function nextTrack() {
   const loop = mu.kind === 'menu'; src.loop = loop;
   src.onended = () => { if (mu.cur && mu.cur.src === src && !loop && (mu.kind === 'battle')) { mu.cur = null; nextTrack(); } };
   src.start(); mu.cur = { src, g, id };
-  if (mu.kind === 'battle') loadTrack(mu.list[mu.idx % mu.list.length]); // decode the next one in advance
+  if (mu.kind === 'battle') { const nx = mu.list[mu.idx % mu.list.length]; setTimeout(() => loadTrack(nx), 4000); } // prepare the next one in the background
 }
 // Read only the music out of a large MPQ File, using slices so the whole archive never sits in memory.
 async function mpqFileMusic(file, onProgress) {
@@ -1325,11 +1370,49 @@ const ET = {
 
 /* ---------- run state ---------- */
 let G = null, attract = 0;
-function newRun(heroId, levelId) {
+/* ---------- saving a run in progress ---------- */
+// The run is saved every few seconds and whenever the page is hidden or closed, so closing the browser
+// (or the Deck going to sleep) loses nothing. The map is rebuilt from its seed; enemies start afresh.
+const RUN_KEY = 'tos_run';
+function snapRun() {
+  if (!G || G.state === 'over' || G.banked || !G.terrain) return null;
+  const h = G.hero;
+  return { v: 1, hero: G.heroId, level: G.LV.id, seed: G.terrain.seed, t: G.t, kills: G.kills, gold: G.gold,
+    bossNext: G.bossNext, swarmNext: G.swarmNext, revives: G.revives, rerolls: G.rerolls,
+    pending: G.pending + (G.state === 'levelup' ? 1 : 0), chests: G.chestQueue,
+    h: { x: h.x, y: h.y, hp: h.hp, xp: h.xp, level: h.level, next: h.next },
+    w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), p: G.passives,
+    camps: [...G.camps.values()].filter(c => c.dead.size || c.chest).map(c => ({ key: c.key, ox: c.ox, oy: c.oy, dead: [...c.dead], chest: c.chest })) };
+}
+function saveRun() { const s = snapRun(); if (s) store.set(RUN_KEY, s); }
+const savedRun = () => { const s = store.get(RUN_KEY, null); return s && s.v === 1 && HEROES[s.hero] && LEVELS.some(l => l.id === s.level) ? s : null; };
+function continueRun() {
+  const s = savedRun(); if (!s) return showTitle();
+  newRun(s.hero, s.level, s.seed);
+  if (!G || !G.terrain) return;
+  G.weapons = {}; for (const [k, l] of Object.entries(s.w || {})) if (WEAPONS[k]) G.weapons[k] = { lvl: l, cd: 0.3, tick: 0 };
+  G.passives = s.p || {};
+  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossNext: s.bossNext, swarmNext: s.swarmNext, revives: s.revives, rerolls: s.rerolls, pending: s.pending || 0, chestQueue: s.chests || [] });
+  Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next });
+  recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
+  for (const c of s.camps || []) {
+    const camp = G.terrain.camps.find(x => x.id === +c.key.split(':')[0]); if (!camp) continue;
+    G.camps.set(c.key, { key: c.key, c: camp, ox: c.ox, oy: c.oy, dead: new Set(c.dead), chest: c.chest, ents: [], spawnT: 2, live: false, warned: true });
+  }
+  saveRun(); pauseRun(true);
+}
+addEventListener('pagehide', saveRun);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveRun(); });
+setInterval(() => { if (G && (G.state === 'play' || G.state === 'paused')) saveRun(); }, 5000);
+
+function newRun(heroId, levelId, seed) {
   const HD = HEROES[heroId] || HEROES.lothar, LV = LEVELS.find(l => l.id === levelId) || LEVELS[0];
+  // Starting afresh from the title while an unfinished run is saved: keep the gold that run had collected.
+  if (!G && seed == null) { const old = store.get(RUN_KEY, null); if (old && old.gold) { meta.gold += old.gold; saveMeta(); } }
+  store.del(RUN_KEY);
   store.set('tos_hero', heroId); meta.last = { hero: heroId, level: LV.id }; saveMeta();
   applyCursor(HD.side === 'Horde' ? 'orc' : 'human');
-  G = { heroId, HD, LV,
+  G = { heroId, HD, LV, seed,
     t: 0, kills: 0, spawnAcc: 0, bossNext: 240, swarmNext: 95, pending: 0, state: 'play', banner: null,
     hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
     weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: []
@@ -1413,7 +1496,7 @@ function footBlocked(x, y, r) { return solidAt(x, y + 4) || solidAt(x - r, y + 4
 function startLevel() {
   G.terrain = null; G.camps = new Map(); G.props = [];
   if (!loadTileset(G.LV)) return;
-  try { G.terrain = buildTerrain(G.LV, SEED_PARAM ?? ((Math.random() * 1e9) | 0), G.HD.side === 'Horde' ? 'human' : 'orc'); } catch (e) { console.error(e); G.terrain = null; }
+  try { G.terrain = buildTerrain(G.LV, G.seed ?? SEED_PARAM ?? ((Math.random() * 1e9) | 0), G.HD.side === 'Horde' ? 'human' : 'orc'); } catch (e) { console.error(e); G.terrain = null; }
 }
 function updateCamps(dt) {
   const T = G.terrain; if (!T) return;
@@ -1998,6 +2081,7 @@ const keys = new Set();
 let joy = null, pad = { prev: [], navT: 0 };
 addEventListener('keydown', e => {
   if (labOpen) { if (e.code === 'Escape') closeLab(); return; }
+  if (e.target && e.target.tagName === 'TEXTAREA') return;   // typing a save code
   keys.add(e.code);
   if (menuOpen()) { menuKey(e.code); if (['ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault(); return; }
   if (e.code === 'Escape' || e.code === 'KeyP') pauseRun();
@@ -2093,6 +2177,10 @@ overlay.addEventListener('click', e => {
   else if (act === 'hero') { heroVoice('yes', 1, b.dataset.id); showLevels(b.dataset.id); }
   else if (act === 'start') newRun(b.dataset.id, b.dataset.level);
   else if (act === 'quick') { const l = meta.last; newRun(l.hero, l.level); }
+  else if (act === 'continue') continueRun();
+  else if (act === 'exportsave') showSaveCode('export');
+  else if (act === 'importsave') showSaveCode('import');
+  else if (act === 'loadcode') loadSaveCode();
   else if (act === 'retry') newRun(G.heroId, G.LV.id);
   else if (act === 'lab') openLab();
   else if (act === 'settings') showSettings(b.dataset.from);
@@ -2115,7 +2203,8 @@ function showTitle() {
   showHudBtns(false); playMusic('menu');
   const l = meta.last, lv = l && LEVELS.find(x => x.id === l.level);
   if (A.menuBg && A.btn) {
-    const quick = l && HEROES[l.hero] && lv ? `<button class="opt" data-act="quick">Quick Start: ${HEROES[l.hero].name.split(' ')[0]}</button>` : '';
+    const sr = savedRun(), quick = sr ? `<button class="opt" data-act="continue">Continue: ${HEROES[sr.hero].name.split(' ')[0]} ${fmtTime(sr.t)}</button>`
+      : l && HEROES[l.hero] && lv ? `<button class="opt" data-act="quick">Quick Start: ${HEROES[l.hero].name.split(' ')[0]}</button>` : '';
     overlay.innerHTML = `<div class="wcstage"><img class="bg" src="${A.menuBg}" alt="">
       <div class="wcbtns"><button class="opt" data-act="choose">Start a Run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
       <button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="lab">Asset Lab</button></div>
@@ -2127,7 +2216,8 @@ function showTitle() {
     fitStage(); highlight(); return;
   }
   const b = best.time ? `<p class="help">Best: survived ${fmtTime(best.time)} as ${best.hero || 'a hero'}, ${best.kills} kills, level ${best.level}.</p>` : '';
-  const quick = l && HEROES[l.hero] && lv ? `<button class="opt" data-act="quick">Quick start: ${HEROES[l.hero].name.split(' ')[0]}, ${lv.name}</button>` : '';
+  const sr = savedRun(), quick = (sr ? `<button class="opt" data-act="continue">Continue: ${HEROES[sr.hero].name.split(' ')[0]}, ${fmtTime(sr.t)}</button>` : '')
+    + (l && HEROES[l.hero] && lv ? `<button class="opt" data-act="quick">Quick start: ${HEROES[l.hero].name.split(' ')[0]}, ${lv.name}</button>` : '');
   showMenu(`<h1>Tides of Survival</h1><p class="sub">A Warcraft II survivors-like fan game</p>
     <div class="status">${assetSummary()}</div>
     <div class="opts"><button class="opt" data-act="choose">Start a run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
@@ -2162,8 +2252,52 @@ function changeOpt(k) {
 function showSettings(from, focus) {
   const keys = Object.keys(OPT_DEFS);
   const rows = keys.map(k => `<button class="opt" data-act="opt" data-k="${k}" data-from="${from}">${OPT_DEFS[k].label}: ${OPT_DEFS[k].fmt(cfg.opts[k])}</button>`).join('');
-  showMenu(`<h2>Settings</h2><div class="opts">${rows}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
+  const xfer = from === 'pause' ? '' : `<button class="opt" data-act="exportsave">Copy save code</button><button class="opt" data-act="importsave">Load save code</button>`;
+  showMenu(`<h2>Settings</h2><div class="opts">${rows}${xfer}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
   if (focus) { sel = keys.indexOf(focus); highlight(); }
+}
+/* ---------- save codes: move your progress to another browser or device ---------- */
+// The code holds gold, upgrades, unlocked battlefields, best time, settings and any unfinished run.
+// It never holds the imported game files: import those once on each device.
+function makeSaveCode() {
+  const data = { v: 1, meta, best, opts: cfg.opts, hero: store.get('tos_hero', null), run: savedRun() };
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  let bin = ''; for (const b of bytes) bin += String.fromCharCode(b);
+  const body = btoa(bin), sum = [...body].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36);
+  return `TOS1-${sum}-${body}`;
+}
+function readSaveCode(code) {
+  const m = String(code).replace(/\s+/g, '').match(/^TOS1-([0-9a-z]+)-([A-Za-z0-9+/=]+)$/);
+  if (!m) throw new Error("That doesn't look like a Tides of Survival save code.");
+  if ([...m[2]].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36) !== m[1]) throw new Error('The code is incomplete. Copy the whole thing and try again.');
+  const bin = atob(m[2]), bytes = Uint8Array.from(bin, c => c.charCodeAt(0)), d = JSON.parse(new TextDecoder().decode(bytes));
+  if (!d || d.v !== 1 || !d.meta || typeof d.meta.gold !== 'number') throw new Error('The code could not be read.');
+  return d;
+}
+function showSaveCode(mode, msg) {
+  if (mode === 'export') {
+    const code = makeSaveCode();
+    showMenu(`<h2>Save code</h2><p class="sub">Copy this code, then choose <b>Load save code</b> in Settings on your other browser or device. It holds your gold, upgrades, unlocked battlefields, best time, settings and any unfinished run. Your game files aren't included: import those once on each device.</p>
+      <textarea id="saveCode" class="savecode" readonly>${code}</textarea>
+      <div class="opts"><button class="opt" id="copyCode">Copy to clipboard</button><button class="opt" data-act="settings" data-from="title" data-back>Back</button></div>`);
+    const ta = $('#saveCode'); ta.focus(); ta.select();
+    $('#copyCode').onclick = async () => { ta.select(); let ok = false; try { await navigator.clipboard.writeText(code); ok = true; } catch (e) { try { ok = document.execCommand('copy'); } catch (e2) {} } $('#copyCode').textContent = ok ? 'Copied!' : 'Select the code and press Ctrl+C'; };
+  } else {
+    showMenu(`<h2>Load save code</h2><p class="sub">Paste a code from <b>Copy save code</b> on another browser or device. This replaces the gold, upgrades and unlocks on this one.</p>
+      <textarea id="saveCode" class="savecode" placeholder="TOS1-..."></textarea>${msg ? `<p class="sub savemsg">${msg}</p>` : ''}
+      <div class="opts"><button class="opt" data-act="loadcode">Load</button><button class="opt" data-act="settings" data-from="title" data-back>Back</button></div>`);
+    $('#saveCode').focus();
+  }
+}
+function loadSaveCode() {
+  let d; try { d = readSaveCode($('#saveCode').value); } catch (e) { return showSaveCode('import', e.message); }
+  for (const k of Object.keys(meta)) delete meta[k];
+  Object.assign(meta, { gold: 0, spent: 0, ups: {}, unlocked: 0, last: null }, d.meta); saveMeta();
+  if (d.best) { best = d.best; store.set('tos_best', best); }
+  if (d.opts) { cfg.opts = Object.assign(cfg.opts, d.opts); saveCfg(); musicVolume(); }
+  if (d.hero) store.set('tos_hero', d.hero);
+  if (d.run) store.set(RUN_KEY, d.run); else store.del(RUN_KEY);
+  showTitle();
 }
 function buyUp(id) {
   const c = upCost(id);
@@ -2289,7 +2423,7 @@ function endRun(won) {
 // Bank the run's gold and unlock the next level. Returns the name of a newly unlocked level, if any.
 function bankRun() {
   if (G.banked) return null;
-  G.banked = true; meta.gold += G.gold;
+  G.banked = true; meta.gold += G.gold; store.del(RUN_KEY);
   const i = LEVELS.indexOf(G.LV); let unlocked = null;
   if (G.t >= UNLOCK_T && i === meta.unlocked && i + 1 < LEVELS.length) { meta.unlocked = i + 1; unlocked = LEVELS[i + 1].name; }
   saveMeta(); return unlocked;
@@ -2636,7 +2770,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths };
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker };
 boot();
 })();
 </script>
