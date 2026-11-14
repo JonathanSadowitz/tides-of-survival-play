@@ -1008,6 +1008,13 @@ function frameImage(px, w, h, pal) {
   }
   return id;
 }
+// Warcraft II draws every unit in red (palette colours 208-211) and swaps in the owner's colour.
+// As in the campaigns, the Alliance is blue (colours 212-215) and the Horde stays red.
+function teamPalette(pal, human) {
+  if (!human) return pal;
+  const p = pal.slice(); for (let i = 0; i < 12; i++) p[208 * 3 + i] = pal[212 * 3 + i]; return p;
+}
+const HUMAN_ROLE = /^(hero|hero_lothar|hero_uther|hero_alleria|hero_khadgar|ally_(basic|fast|tank|ranged|boss))$/;
 function buildAtlas(g, pal, cols) {
   cols = Math.max(1, Math.min(cols, g.count));
   const rows = Math.ceil(g.count / cols);
@@ -1024,7 +1031,7 @@ function rebuildSprites() {
     const d = Core.safeEntry(war, r.entry); if (!d) continue;
     let g = null; try { g = decodeAny(d) || (r.force ? Core.decodeGfu(d) : null); } catch (e) {}
     if (!g) continue;
-    const at = buildAtlas(g, A.pal, r.mode === 'dir5' ? 5 : 10);
+    const at = buildAtlas(g, teamPalette(A.pal, HUMAN_ROLE.test(role)), r.mode === 'dir5' ? 5 : 10);
     const an = (r.mode || 'dir5') === 'dir5' && /(^|\/)MAINDAT\.WAR$/.test(r.file) ? ANIM[r.entry] : null;
     A.sprites[role] = { ...at, mode: r.mode || 'dir5', r0: r.r0 ?? 0, r1: r.r1 ?? 4, walk: an && an.walk, atk: an && an.atk, die: an && an.die };
   }
@@ -1062,17 +1069,17 @@ function assetSummary() {
 }
 
 /* ---------- menu art from REZDAT.WAR (TOME.2): background and buttons ---------- */
-function rawGfuFrame(d, i, P) { // uncompressed frames, used by the menu widgets
+function rawGfuFrame(d, i, P, skip) { // uncompressed frames, used by the menu widgets; skip lists extra see-through colours
   const b = 6 + i * 8; let w = d[b + 2], off = Core.u32(d, b + 4); const h = d[b + 3];
   if (off & 0x80000000) { w += 256; off &= 0x7FFFFFFF; }
   const c = document.createElement('canvas'); c.width = w; c.height = h; const id = new ImageData(w, h);
-  for (let k = 0; k < w * h; k++) { const v = d[off + k]; if (v === 255 || v === undefined) continue; id.data[k * 4] = P[v * 3]; id.data[k * 4 + 1] = P[v * 3 + 1]; id.data[k * 4 + 2] = P[v * 3 + 2]; id.data[k * 4 + 3] = 255; }
+  for (let k = 0; k < w * h; k++) { const v = d[off + k]; if (v === 255 || v === undefined || (skip && skip.includes(v))) continue; id.data[k * 4] = P[v * 3]; id.data[k * 4 + 1] = P[v * 3 + 1]; id.data[k * 4 + 2] = P[v * 3 + 2]; id.data[k * 4 + 3] = 255; }
   c.getContext('2d').putImageData(id, 0, 0); return c;
 }
-// Pickups drawn from the game's own art: the gold nugget and mana sparkle from the resource bar
-// (MAINDAT entry 187, raw 14x14 frames: gold, wood, oil, mana, cropped inside their frame), and the
-// wooden crate icon for treasure chests and supply caches.
-const PICKUP_ICONS = { entry: 187, gold: 0, xp: 3, crate: 87 };
+// Pickups drawn from the game's own art: the gold nugget from the resource bar (MAINDAT entry 187, raw
+// 14x14 frames: gold, wood, oil, mana), the lightning bolt from the small spell icons (entry 323, raw 16x16)
+// for experience, and the wooden crate icon for treasure chests and supply caches.
+const PICKUP_ICONS = { entry: 187, gold: 0, crate: 87, xpEntry: 323, xp: 1, xpBg: [179, 181] }; // xpBg: the icon's navy background
 function buildPickups() {
   A.pick = {};
   const main = findMain(); if (!main) return;
@@ -1083,8 +1090,11 @@ function buildPickups() {
     return c; };
   const d = Core.safeEntry(war, PICKUP_ICONS.entry);
   if (d && d.length > 6 + 4 * 8 && Core.u16(d, 0) >= 4) {
-    try { const g = rawGfuFrame(d, PICKUP_ICONS.gold, P), m = rawGfuFrame(d, PICKUP_ICONS.xp, P);
-      if (g.width >= 12 && m.width >= 12) { A.pick.gold = crop(g, 2, 2, g.width - 4, g.height - 4, true); A.pick.xp = crop(m, 2, 2, m.width - 4, m.height - 4, true); } } catch (e) {}
+    try { const g = rawGfuFrame(d, PICKUP_ICONS.gold, P); if (g.width >= 12) A.pick.gold = crop(g, 2, 2, g.width - 4, g.height - 4, true); } catch (e) {}
+  }
+  const xd = Core.safeEntry(war, PICKUP_ICONS.xpEntry);
+  if (xd && xd.length > 6 + 2 * 8 && Core.u16(xd, 0) > PICKUP_ICONS.xp) {
+    try { const m = rawGfuFrame(xd, PICKUP_ICONS.xp, P, PICKUP_ICONS.xpBg); if (m.width >= 12) A.pick.xp = crop(m, 1, 1, m.width - 2, m.height - 2); } catch (e) {}
   }
   const icd = Core.safeEntry(war, ICON_ENTRY);
   if (icd && Core.isGfu(icd) && Core.u16(icd, 0) > PICKUP_ICONS.crate) {
@@ -1496,10 +1506,11 @@ function loadTileset(LV) {
   // Building sprites for this level, drawn with the level's own palette.
   const bp = Core.toPalette(Core.safeEntry(war, LV.bld.pal) || pal);
   A.bldSpr = {};
+  const bpH = teamPalette(bp, true);
   for (const e of [...LV.bld.human, ...LV.bld.orc]) {
-    const d = Core.safeEntry(war, e); if (!d || !Core.isGfu(d)) continue;
+    const d = Core.safeEntry(war, e); if (!d || !Core.isGfu(d)) continue; const tp = LV.bld.human.includes(e) ? bpH : bp;
     const w = Core.u16(d, 2), h = Core.u16(d, 4), bc = document.createElement('canvas'); bc.width = w; bc.height = h;
-    bc.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(d, 0, w, h), w, h, bp), 0, 0); A.bldSpr[e] = bc;
+    bc.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(d, 0, w, h), w, h, tp), 0, 0); A.bldSpr[e] = bc;
   }
   return (A.tilesets[LV.id] = { atlas: c, cols, recs, bldSpr: A.bldSpr });
 }
@@ -2093,7 +2104,7 @@ function render() {
     if (g.coin) { if (pk.gold) { ctx.drawImage(pk.gold, x - 4, y - 4, 8, 8); continue; } circle(x, y, 3, '#e7c04a', '#6b4518'); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x - 1, y - 2, 1, 2); continue; }
     if (g.meat) { circle(x, y, 3, '#b84a3a', '#3a1208'); ctx.fillStyle = '#eee'; ctx.fillRect(x + 2, y - 3, 3, 2); continue; }
     if (A.sprites.gem && drawSprite('gem', g.x, g.y, 0, attract, false)) continue;
-    if (pk.xp) { const sz = g.v >= 5 ? 10 : g.v >= 3 ? 8 : 6; ctx.drawImage(pk.xp, x - sz / 2, y - sz / 2, sz, sz); continue; }
+    if (pk.xp) { const sz = g.v >= 5 ? 14 : g.v >= 3 ? 12 : 10; ctx.drawImage(pk.xp, x - sz / 2, y - sz / 2, sz, sz); continue; }
     ctx.fillStyle = g.v >= 5 ? '#ffd24a' : g.v >= 3 ? '#5ee08a' : '#5aa8ff';
     ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x + 2, y); ctx.lineTo(x, y + 3); ctx.lineTo(x - 2, y); ctx.fill();
   }
@@ -2116,11 +2127,11 @@ addEventListener('keydown', e => {
   if (labOpen) { if (e.code === 'Escape') closeLab(); return; }
   if (e.target && e.target.tagName === 'TEXTAREA') return;   // typing a save code
   keys.add(e.code);
-  if (menuOpen()) { menuKey(e.code); if (['ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault(); return; }
+  if (menuOpen()) { if (!heldAtOpen.has(e.code)) menuKey(e.code); if (['ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault(); return; }
   if (e.code === 'Escape' || e.code === 'KeyP') pauseRun();
   else if ((e.code === 'KeyF' || e.code === 'Tab') && G && G.state === 'play') { cycleSpeed(); e.preventDefault(); }
 });
-addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('keyup', e => { keys.delete(e.code); heldAtOpen.delete(e.code); });
 addEventListener('blur', () => { keys.clear(); joy = null; });
 cv.addEventListener('pointerdown', e => {
   if (!G || G.state !== 'play') return;
@@ -2157,9 +2168,9 @@ function pollPad(dt) {
     let nav = 0;
     if (edge(12) || edge(14)) nav = -1; else if (edge(13) || edge(15)) nav = 1;
     else if (pad.navT <= 0 && (Math.abs(ay) > 0.6 || Math.abs(ax) > 0.6)) { nav = (Math.abs(ay) > Math.abs(ax) ? ay : ax) > 0 ? 1 : -1; pad.navT = 0.22; }
-    if (Math.abs(ay) < 0.3 && Math.abs(ax) < 0.3) pad.navT = 0;
-    if (nav) moveSel(nav);
-    if (edge(0)) clickSel();
+    if (Math.abs(ay) < 0.3 && Math.abs(ax) < 0.3) { pad.navT = 0; pad.needNeutral = false; }
+    if (nav && !(pad.needNeutral && !(edge(12) || edge(13) || edge(14) || edge(15)))) moveSel(nav);
+    if (edge(0) && !menuLocked()) clickSel();
     if (edge(1) || edge(9)) { const back = overlay.querySelector('[data-back]'); if (back) back.click(); }
   } else if (G && G.state === 'play') { if (edge(9) || edge(8)) pauseRun(); else if (edge(3)) cycleSpeed(); }
   pad.prev = p.buttons.map(b => b.pressed);
@@ -2168,6 +2179,11 @@ function pollPad(dt) {
 /* ---------- menus ---------- */
 let sel = 0;
 const menuOpen = () => overlay.style.display === 'flex';
+// A menu that pops up mid-fight (level-up, chest) must not react to the keys or stick you were already
+// holding to move: those are ignored until released, and choosing is locked for a moment.
+let heldAtOpen = new Set(), menuLockUntil = 0;
+function guardMenu(lockMs = 0) { heldAtOpen = new Set(keys); pad.needNeutral = true; menuLockUntil = performance.now() + lockMs; }
+const menuLocked = () => performance.now() < menuLockUntil;
 function showMenu(html) {
   overlay.className = ''; overlay.innerHTML = `<div class="panel">${html}</div>`; overlay.style.display = 'flex'; sel = 0; titleArt(false);
   if (!G && A.menuBg) { overlay.classList.add('parch'); overlay.style.backgroundImage = `url(${A.menuBg})`; if (!overlay.querySelector('.cards')) overlay.classList.add('bare'); }
@@ -2195,6 +2211,7 @@ function clickSel() { const b = opts()[sel]; if (b) b.click(); }
 function menuKey(code) {
   if (['ArrowUp', 'ArrowLeft', 'KeyW', 'KeyA'].includes(code)) moveSel(-1);
   else if (['ArrowDown', 'ArrowRight', 'KeyS', 'KeyD'].includes(code)) moveSel(1);
+  else if (menuLocked()) return;
   else if (code === 'Enter' || code === 'Space') clickSel();
   else if (/^Digit[1-9]$/.test(code)) { const b = opts()[+code.slice(5) - 1]; if (b) b.click(); }
   else if (code === 'Escape') { const back = overlay.querySelector('[data-back]'); if (back) back.click(); }
@@ -2386,7 +2403,7 @@ function showChoose() {
 }
 function pauseRun(again) {
   if (!G || (G.state !== 'play' && !again)) return;
-  G.state = 'paused'; showHudBtns(false); joy = null; musicDuck(true);
+  G.state = 'paused'; showHudBtns(false); joy = null; musicDuck(true); if (!again) guardMenu();
   showMenu(`<h2>Paused</h2><div class="stats"><b>Battlefield</b><span>${G.LV.name}</span><b>Time</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>${G.gold}</span></div>
     <div class="opts"><button class="opt" data-act="resume" data-back>Resume</button><button class="opt" data-act="retry">Restart</button>
     <button class="opt" data-act="settings" data-from="pause">Settings</button><button class="opt" data-act="quit">Quit to title (keep gold)</button></div>`);
@@ -2411,6 +2428,7 @@ function itemInfo(c) {
 }
 function openLevelUp(reroll) {
   G.state = 'levelup'; if (!reroll) G.pending--; joy = null; showHudBtns(false);
+  if (!reroll) guardMenu(350);
   if (!reroll) { sfx('s_level', 0); heroVoice('yes', 0.35); }
   const cards = choices().map((c, i) => {
     const { nm, ds, lv } = itemInfo(c);
@@ -2430,7 +2448,7 @@ function pickCard(kind, id) {
 }
 // Treasure chests: boss chests give 1, 3 or 5 upgrades; camp chests give gold and sometimes an upgrade.
 function openChest(kind) {
-  G.state = 'chest'; joy = null; showHudBtns(false); sfx('s_level', 0);
+  G.state = 'chest'; joy = null; showHudBtns(false); sfx('s_level', 0); guardMenu(350);
   const r = Math.random(), n = kind === 'boss' ? (r < 0.15 ? 5 : r < 0.5 ? 3 : 1) : (r < 0.35 ? 1 : 0);
   const got = [];
   for (let i = 0; i < n; i++) { const c = choices()[0]; if (!c) break; addItem(c.kind, c.id); got.push(itemInfo(c)); }
