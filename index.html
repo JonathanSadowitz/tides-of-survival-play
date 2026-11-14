@@ -1380,15 +1380,16 @@ const vo = { last: 0, buf: new Map() };
 function heroVoice(kind, chance = 1, heroId) {
   heroId ||= G && G.heroId; if (!heroId || Math.random() > chance) return;
   const war = A.wars['GAMESFX/VOICES.WAR']; if (!war || !war.names || !A.actx) return;
-  const now = performance.now(); if (now - vo.last < 1200) return;
-  let idx = war.names.map((n, i) => n === heroId + ':' + kind ? i : -1).filter(i => i >= 0);
+  const now = performance.now(); if (now - vo.last < (kind === 'any' ? 500 : 1200)) return false;
+  let idx = war.names.map((n, i) => (kind === 'any' ? n.startsWith(heroId + ':') && !n.endsWith(':ready') : n === heroId + ':' + kind) ? i : -1).filter(i => i >= 0);
   if (!idx.length && kind === 'ready') idx = war.names.map((n, i) => n === heroId + ':yes' ? i : -1).filter(i => i >= 0);
-  if (!idx.length) return;
+  if (!idx.length) return false;
   vo.last = now;
   const i = idx[Math.floor(Math.random() * idx.length)];
-  if (vo.buf.has(i)) return playBuffer(vo.buf.get(i), 0.7);
-  const d = Core.safeEntry(war, i); if (!d) return;
+  if (vo.buf.has(i)) { playBuffer(vo.buf.get(i), 0.7); return true; }
+  const d = Core.safeEntry(war, i); if (!d) return false;
   A.actx.decodeAudioData(d.slice().buffer).then(b => { vo.buf.set(i, b); playBuffer(b, 0.7); }).catch(() => {});
+  return true;
 }
 
 /* ---------- items ---------- */
@@ -2174,25 +2175,36 @@ function txt(s, x, y, size, col, align = 'left') {
   ctx.fillStyle = '#000'; ctx.fillText(s, x + 1, y + 1); ctx.fillStyle = col; ctx.fillText(s, x, y);
 }
 function fmtTime(t) { t = Math.max(0, Math.floor(t)); return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; }
+// A bar in the style of the Warcraft II interface: a bevelled bronze frame (light top-left, dark bottom-right)
+// around a black well, with the fill lit along its top edge.
+function uiBar(x, y, w, h, frac, col, lite, dark, label) {
+  x = Math.round(x); y = Math.round(y); w = Math.round(w);
+  ctx.fillStyle = '#000'; ctx.fillRect(x - 3, y - 3, w + 6, h + 6);
+  ctx.fillStyle = '#c9a65a'; ctx.fillRect(x - 2, y - 2, w + 4, 1); ctx.fillRect(x - 2, y - 2, 1, h + 4);
+  ctx.fillStyle = '#4c3714'; ctx.fillRect(x - 2, y + h + 1, w + 4, 1); ctx.fillRect(x + w + 1, y - 2, 1, h + 4);
+  ctx.fillStyle = '#8c6a2c'; ctx.fillRect(x - 1, y - 1, w + 2, 1); ctx.fillRect(x - 1, y - 1, 1, h + 2); ctx.fillRect(x - 1, y + h, w + 2, 1); ctx.fillRect(x + w, y - 1, 1, h + 2);
+  ctx.fillStyle = '#0c0805'; ctx.fillRect(x, y, w, h);
+  const fw = Math.round(w * Math.max(0, Math.min(1, frac)));
+  if (fw > 0) { ctx.fillStyle = col; ctx.fillRect(x, y, fw, h); ctx.fillStyle = lite; ctx.fillRect(x, y, fw, 1); ctx.fillStyle = dark; ctx.fillRect(x, y + h - 1, fw, 1); }
+  if (label) txt(label, x + w / 2, y + Math.round((h - 6) / 2), 7, '#ffffff', 'center');
+}
 function drawHud() {
   const h = G.hero;
-  ctx.fillStyle = '#120c06'; ctx.fillRect(0, 0, W, 6);
-  ctx.fillStyle = '#4a86e8'; ctx.fillRect(1, 1, Math.round((W - 2) * Math.min(1, h.xp / h.next)), 4);
-  txt(`Lv ${h.level}`, 6, 9, 9, '#d9b25a');
-  txt(fmtTime(G.t), W / 2, 9, 11, '#f1e6c8', 'center');
-  if (W < 320) txt(`${G.kills} kills  ${G.gold} gold`, W / 2, 22, 8, '#f1e6c8', 'center');
-  else { txt(`${G.kills} kills`, W - 60, 9, 9, '#f1e6c8', 'right'); txt(`${G.gold} gold`, W - 60, 20, 8, '#ffd24a', 'right'); }
-  let y = 22;
+  uiBar(4, 4, W - 8, 7, h.xp / h.next, '#3a6fd0', '#8fb8ff', '#1c3c80', `Level ${h.level}`);
+  txt(fmtTime(G.t), W / 2, 16, 11, '#f1e6c8', 'center');
+  const boss = G.enemies.find(e => e.type === 'boss');
+  if (W < 320) txt(`${G.kills} kills  ${G.gold} gold`, W / 2, boss ? 46 : 30, 8, '#f1e6c8', 'center');
+  else { txt(`${G.kills} kills`, W - 60, 16, 9, '#f1e6c8', 'right'); txt(`${G.gold} gold`, W - 60, 27, 8, '#ffd24a', 'right'); }
+  let y = 18;
   for (const id in G.weapons) { txt(`${WEAPONS[id].name} ${G.weapons[id].lvl}`, 6, y, 7, '#e8d9b0'); y += 9; }
   for (const id in G.passives) { txt(`${PASSIVES[id].name} ${G.passives[id]}`, 6, y, 7, '#a8c4e0'); y += 9; }
-  let bx = W / 2 - Object.keys(G.buffs).length * 15;   // active power-ups, under the clock
+  let bx = W / 2 - Object.keys(G.buffs).length * 15, by = boss ? 46 : 31;   // active power-ups, under the clock (and boss bar)
   for (const id in G.buffs) { const im = A.pick && A.pick.pow && A.pick.pow[id], left = Math.ceil(G.buffs[id] - G.t);
-    ctx.fillStyle = '#000'; ctx.fillRect(bx, 23, 20, 18); if (im) ctx.drawImage(im, bx + 1, 24, 18, 16); ctx.strokeStyle = POWERUPS[id].col; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, 23.5, 19, 17);
-    txt(String(left), bx + 22, 28, 7, '#ffffff'); bx += 34; }
-  const boss = G.enemies.find(e => e.type === 'boss');
+    ctx.fillStyle = '#000'; ctx.fillRect(bx, by, 20, 18); if (im) ctx.drawImage(im, bx + 1, by + 1, 18, 16); ctx.strokeStyle = POWERUPS[id].col; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, 19, 17);
+    txt(String(left), bx + 22, by + 5, 7, '#ffffff'); bx += 34; }
   if (boss) {
-    const bw = Math.min(200, W - 120), bx = (W - bw) / 2;
-    ctx.fillStyle = '#000'; ctx.fillRect(bx - 1, 24, bw + 2, 6); ctx.fillStyle = '#c92a1e'; ctx.fillRect(bx, 25, bw * Math.max(0, boss.hp / boss.maxHp), 4);
+    const bw = Math.min(200, W - 120);
+    uiBar((W - bw) / 2, 32, bw, 7, boss.hp / boss.maxHp, '#b8261a', '#ff7a5c', '#5e100a', G.HD.side === 'Horde' ? 'Gryphon Rider' : 'Dragon');
   }
   if (G.banner) { ctx.globalAlpha = Math.min(1, G.banner.t); txt(G.banner.text, W / 2, H * 0.28, 13, '#ffd27a', 'center'); ctx.globalAlpha = 1; }
   if (G.moveTo && !ms.held) {   // where a mouse click sent the hero: a small green cross, as in Warcraft II
@@ -2593,7 +2605,7 @@ const levelSnd = () => G && G.HD.side === 'Horde' && A.sbuf.s_level_orc ? 's_lev
 function openLevelUp(reroll) {
   G.state = 'levelup'; if (!reroll) G.pending--; joy = null; showHudBtns(false);
   if (!reroll) guardMenu(350);
-  if (!reroll) { sfx(levelSnd(), 0); heroVoice('yes', 0.35); }
+  if (!reroll && !heroVoice('any')) sfx(levelSnd(), 0);   // a random line from the hero, or the jingle if no voices were imported
   const cards = choices().map((c, i) => {
     const { nm, ds, lv } = itemInfo(c);
     return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="nm">${i + 1}. ${nm}</span>${lv}<span class="ds">${ds}</span></button>`;
