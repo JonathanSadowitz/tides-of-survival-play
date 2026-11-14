@@ -2887,10 +2887,11 @@ function labRenderGrid() {
 }
 // Likely install folders, most likely first for this system. Paste one into the folder window (Ctrl+L, or the address bar on Windows).
 function installPaths() {
-  const ua = navigator.userAgent, win = /Windows/.test(ua), mac = /Mac OS X/.test(ua) && !/Mobile/.test(ua);
-  const linux = [['GOG installer or Lutris', '~/Games/gog/warcraft-ii-tides-of-darkness/drive_c/GOG Games/Warcraft II BNE'], ['Heroic (also the Steam Deck)', '~/Games/Heroic/Warcraft II BNE']];
+  const win = /Windows/.test(navigator.userAgent);
+  // Only the installers' default folders: anything custom is found by picking a folder above it.
+  const linux = [['Heroic (also the Steam Deck)', '~/Games/Heroic/Warcraft II BNE']];
   const windows = [['GOG Galaxy', 'C:\\Program Files (x86)\\GOG Galaxy\\Games\\Warcraft II BNE'], ['GOG installer', 'C:\\GOG Games\\Warcraft II BNE']];
-  return win ? [...windows, ...linux] : mac ? [['GOG (Mac)', '/Applications/Warcraft II BNE'], ...linux] : [...linux, ...windows];
+  return win ? [...windows, ...linux] : [...linux, ...windows];
 }
 function installPathsHtml() {
   const rows = installPaths().map(([who, path]) => `<div class="pathrow"><span class="muted">${who}</span><code>${path}</code><button class="lbtn" data-copy="${path.replace(/"/g, '&quot;')}">Copy</button></div>`).join('');
