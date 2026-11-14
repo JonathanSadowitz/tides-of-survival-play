@@ -63,6 +63,9 @@
   canvas.wct{image-rendering:pixelated;vertical-align:middle;display:inline-block;max-width:100%;height:auto}
   body.wcfont .panel{font-family:Georgia,'Times New Roman',serif}
   button.opt canvas.wct{margin:2px 0}
+  .wclines{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+  .panel .sub.wclines{align-items:center}
+  .wclines canvas.wct{margin:0;flex:none}
   .pathrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
   .pathrow code{flex:1;min-width:0;word-break:break-all;user-select:all;-webkit-user-select:all}
   .pathrow .muted{flex-basis:100%}
@@ -1097,6 +1100,12 @@ function buildPickups() {
     try { const m = rawGfuFrame(xd, PICKUP_ICONS.xp, P, PICKUP_ICONS.xpBg); if (m.width >= 12) A.pick.xp = crop(m, 1, 1, m.width - 2, m.height - 2); } catch (e) {}
   }
   const icd = Core.safeEntry(war, ICON_ENTRY);
+  A.pick.pow = {};
+  if (icd && Core.isGfu(icd)) {
+    const iw = Core.u16(icd, 2), ih = Core.u16(icd, 4), n = Core.u16(icd, 0);
+    for (const [id, pw] of Object.entries(POWERUPS)) { if (pw.icon < 0 || pw.icon >= n) continue;
+      try { const c = document.createElement('canvas'); c.width = iw; c.height = ih; c.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(icd, pw.icon, iw, ih), iw, ih, P), 0, 0); A.pick.pow[id] = crop(c, 4, 3, iw - 8, ih - 6); } catch (e) {} }
+  }
   if (icd && Core.isGfu(icd) && Core.u16(icd, 0) > PICKUP_ICONS.crate) {
     try { const iw = Core.u16(icd, 2), ih = Core.u16(icd, 4), c = document.createElement('canvas'); c.width = iw; c.height = ih;
       c.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(icd, PICKUP_ICONS.crate, iw, ih), iw, ih, P), 0, 0); A.pick.crate = crop(c, 3, 3, iw - 6, ih - 6, true); } catch (e) {}
@@ -1210,16 +1219,24 @@ function ensureAudio() {
   }
 }
 function playBuffer(b, vol = 0.45) {
-  if (!A.actx || !b || A.active > 10) return;
+  if (!A.actx || !b || A.active > 6) return;
   const src = A.actx.createBufferSource(), g = A.actx.createGain();
   g.gain.value = vol * cfg.opts.sfx; src.buffer = b; src.connect(g).connect(A.actx.destination);
   A.active++; src.onended = () => A.active--; src.start();
 }
+// Sound mix. With many weapons and a high attack speed, playing every swing turns into a wall of noise, so:
+// each weapon sound has its own minimum gap, all weapon sounds together share a budget of about three a
+// second, impacts are quieter and rarer, and weapon sounds get quieter the more weapons you carry.
+const WEAPON_SND = { s_sword: 0.45, s_bow: 0.4, s_axe: 0.6, s_coil: 0.7, s_fire: 0.5, s_boom: 0.35 };
 function sfx(role, gap = 0.06) {
   const b = A.sbuf[role]; if (!b) return;
-  const now = performance.now() / 1000;
-  if (now - (A.lastPlay[role] || 0) < gap) return;
-  A.lastPlay[role] = now; playBuffer(b, role === 's_hit' ? 0.25 : 0.45);
+  const now = performance.now() / 1000, wg = WEAPON_SND[role]; let vol = 0.45;
+  if (wg && G && G.state === 'play') {
+    if (now - (A.lastPlay[role] || 0) < wg || now - (A.lastWeapon || 0) < 0.3) return;
+    A.lastWeapon = now; vol = 0.4 / Math.sqrt(Math.max(1, Object.keys(G.weapons).length));
+  } else if (role === 's_hit') { if (now - (A.lastPlay[role] || 0) < 0.18) return; vol = 0.16; }
+  else if (now - (A.lastPlay[role] || 0) < gap) return;
+  A.lastPlay[role] = now; playBuffer(b, vol);
 }
 
 /* ---------- music: read straight out of Install.mpq ---------- */
@@ -1397,6 +1414,34 @@ const upCost = id => UPGRADES[id].cost * (up(id) + 1);
 const goldMul = () => 1 + 0.15 * up('greed');
 function addGold(v) { if (G) G.gold += Math.round(v); }
 
+/* ---------- power-ups: rare drops with a spell icon from the game ---------- */
+const POWERUPS = {
+  vision:   { name: 'Holy Vision', icon: 106, col: '#7fc4ff', text: 'All experience flies to you!' },
+  treasure: { name: 'Gold Rush',   icon: -1,  col: '#ffd24a', text: 'All gold collected, with a bonus!' },
+  lust:     { name: 'Bloodlust',   icon: 112, col: '#ff5a3a', text: 'Double damage for 12 seconds!', dur: 12 },
+  haste:    { name: 'Haste',       icon: 102, col: '#7be07a', text: 'Faster movement and attacks for 12 seconds!', dur: 12 },
+  blizzard: { name: 'Blizzard',    icon: 105, col: '#bfe4ff', text: 'Ice strikes every enemy in sight!' },
+  healing:  { name: 'Healing',     icon: 107, col: '#ffffff', text: 'Fully healed!' },
+};
+function usePowerup(id) {
+  const P = POWERUPS[id], h = G.hero; if (!P) return;
+  banner(`${P.name}: ${P.text}`); sfx('s_level', 0);
+  if (id === 'vision') { for (const g of G.gems) if (g.v) g.pull = true; }
+  else if (id === 'treasure') { for (const g of G.gems) if (g.coin) g.pull = true; addGold(20 * goldMul()); }
+  else if (id === 'healing') h.hp = h.maxHp;
+  else if (id === 'blizzard') {
+    const dmg = 60 + G.t / 6;
+    for (const e of G.enemies.slice()) if (!e.dead && !e.static && Math.abs(e.x - h.x) < W / 2 + 20 && Math.abs(e.y - h.y) < H / 2 + 20) { G.fx.push({ k: 'boom', x: e.x, y: e.y, r: 10, t: 0, life: 0.35 }); hitEnemy(e, dmg); }
+  } else { G.buffs[id] = G.t + P.dur; recalc(); }
+}
+// Drops are rare and spaced out; early in a run the first one comes a little sooner so you meet them.
+function maybePowerup(e) {
+  if (e.static || G.t < (G.nextPow ?? 45)) return;
+  if (Math.random() > (e.type === 'tank' ? 0.05 : 0.012)) return;
+  const ids = Object.keys(POWERUPS).filter(id => id !== 'healing' || G.hero.hp < G.hero.maxHp * 0.7);
+  G.gems.push({ x: e.x, y: e.y, pow: ids[Math.floor(Math.random() * ids.length)] }); G.nextPow = G.t + 25;
+}
+
 /* ---------- enemies ---------- */
 const ET = {
   basic:  { hp: 8, spd: 34, dmg: 5, r: 7, xp: 1, col: '#b8432f' },
@@ -1436,6 +1481,7 @@ function continueRun() {
   for (const c of s.camps || []) {
     const camp = G.terrain.camps.find(x => x.id === +c.key.split(':')[0]); if (!camp) continue;
     G.camps.set(c.key, { key: c.key, c: camp, ox: c.ox, oy: c.oy, dead: new Set(c.dead), chest: c.chest, ents: [], spawnT: 2, live: false, warned: true });
+    if (camp.enemy) for (const i of c.dead) clearBuilding(camp, i);
   }
   saveRun(); pauseRun(true);
 }
@@ -1453,7 +1499,7 @@ function newRun(heroId, levelId, seed) {
   G = { heroId, HD, LV, seed,
     t: 0, kills: 0, spawnAcc: 0, bossNext: 240, swarmNext: 95, pending: 0, state: 'play', banner: null,
     hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
-    weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: []
+    weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: [], buffs: {}
   };
   addItem('w', HD.start); recalc(); G.hero.hp = G.hero.maxHp;
   G.revives = up('revival'); G.rerolls = 1 + up('reroll');
@@ -1473,6 +1519,8 @@ function recalc() {
   h.might = (HD.might || 1) * (1 + 0.12 * p('might')); h.haste = (HD.haste || 1) * (1 - 0.08 * p('haste')); h.area = (HD.area || 1) * (1 + 0.12 * p('area')); h.maxHp = HD.hp + 25 * p('vitality');
   h.might *= 1 + 0.05 * up('might'); h.armour += up('armour'); h.maxHp = Math.round(h.maxHp * (1 + 0.1 * up('maxhp'))); h.regen += 0.2 * up('regen');
   h.magnet *= 1 + 0.15 * up('magnet'); h.speed *= 1 + 0.05 * up('speed'); h.haste *= 1 - 0.04 * up('haste');
+  if (G.buffs.lust > G.t) h.might *= 2;
+  if (G.buffs.haste > G.t) { h.speed *= 1.4; h.haste *= 0.6; }
   h.hp = Math.min(h.hp, h.maxHp);
 }
 function gainXp(v) {
@@ -1529,6 +1577,11 @@ function terrainChunk(T, cx, cy) {
 }
 // Is the world point blocked? Units walk on half-tile cells (16 px).
 function solidAt(x, y) { const T = G && G.terrain; if (!T) return false; return T.blk[tmod(Math.floor(y / 16), TM) * TM + tmod(Math.floor(x / 16), TM)] !== 0; }
+// A destroyed building leaves open ground you can walk over.
+function clearBuilding(c, idx) {
+  const T = G && G.terrain, b = c.blds[idx]; if (!T || !b) return;
+  for (let y = 0; y < b.h * 2; y++) for (let x = 0; x < b.w * 2; x++) T.blk[tmod(b.ty * 2 + y, TM) * TM + tmod(b.tx * 2 + x, TM)] = 0;
+}
 function footBlocked(x, y, r) { return solidAt(x, y + 4) || solidAt(x - r, y + 4) || solidAt(x + r, y + 4) || solidAt(x, y + 4 - r * 0.6) || solidAt(x, y + 4 + r * 0.6); }
 
 /* ---------- camps ---------- */
@@ -1578,7 +1631,7 @@ function deactivateCamp(st) {
   G.enemies = G.enemies.filter(e => !e.gone); G.props = G.props.filter(p => !p.gone); G.gems = G.gems.filter(g => !g.gone);
 }
 function buildingDestroyed(e) {
-  e.camp.dead.add(e.idx);
+  e.camp.dead.add(e.idx); clearBuilding(e.camp.c, e.idx);
   G.fx.push({ k: 'boom', x: e.x, y: e.y, r: e.r * 1.5, t: 0, life: 0.6 }); sfx('s_boom', 0.05);
   for (let i = 0; i < 3 + (e.kind === 3) * 4; i++) G.gems.push({ x: e.x + rnd(-e.r, e.r), y: e.y + rnd(-e.r, e.r), coin: Math.round(rnd(3, 7) * goldMul()) });
   G.gems.push({ x: e.x, y: e.y, v: e.xp });
@@ -1657,10 +1710,11 @@ function drawCorpse(c) {
 }
 function drop(e) {
   if (e.type === 'boss') { G.gems.push({ x: e.x, y: e.y, chest: 'boss' }); banner('The boss dropped a treasure chest!'); return; }
+  maybePowerup(e);
   if (Math.random() < 0.012) G.gems.push({ x: e.x + rnd(-4, 4), y: e.y + rnd(-4, 4), meat: true });
   if (Math.random() < 0.035 + 0.02 * (e.type === 'tank')) G.gems.push({ x: e.x + rnd(-5, 5), y: e.y + rnd(-5, 5), coin: Math.round((e.type === 'tank' ? 5 : 2) * goldMul()) });
   G.gems.push({ x: e.x, y: e.y, v: e.xp });
-  if (G.gems.length > 420) { const g = G.gems.shift(); if (g.v) gainXp(g.v); }
+  if (G.gems.length > 420) { const i = G.gems.findIndex(g => g.v); if (i >= 0) gainXp(G.gems.splice(i, 1)[0].v); }
 }
 function hurtHero(d) {
   const h = G.hero; h.hp -= Math.max(1, d - h.armour); h.hurtT = 0.15; sfx('s_hurt', 0.25);
@@ -1714,7 +1768,15 @@ function fire(id, l) {
       G.shots.push({ k: 'fire', role: 'fire', x: h.x, y: h.y, tx, ty, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, dmg, er, pierce: 1, life: 2.5, r: 4 });
     }
   } else if (id === 'ballista') {
-    const dmg = 40 + 15 * (l - 1) + (l >= 5 ? 15 : 0), dirs = [h.face]; if (l >= 4) dirs.push(h.face + Math.PI);
+    // Aim down the line that skewers the most enemies (trying the nearest dozen as targets); with nobody near, fire ahead.
+    let aim = h.face, bestN = 0;
+    const near = nearest(40, 330);
+    for (const t of near.slice(0, 12)) {
+      const a = Math.atan2(t.y - h.y, t.x - h.x), cx = Math.cos(a), cy = Math.sin(a); let n = 0;
+      for (const e of near) { const dx = e.x - h.x, dy = e.y - h.y, along = dx * cx + dy * cy; if ((along > 0 || l >= 4) && Math.abs(dx * cy - dy * cx) < e.r + 5) n++; }
+      if (n > bestN) { bestN = n; aim = a; }
+    }
+    const dmg = 40 + 15 * (l - 1) + (l >= 5 ? 15 : 0), dirs = [aim]; if (l >= 4) dirs.push(aim + Math.PI);
     for (const a of dirs) G.shots.push({ k: 'bolt', role: 'bolt', x: h.x, y: h.y, vx: Math.cos(a) * 270, vy: Math.sin(a) * 270, dmg, pierce: Infinity, life: 1.5, r: 5 });
   } else if (id === 'coil') {
     const n = 2 + (l >= 3) + (l >= 5), dmg = 14 + 5 * (l - 1) + (l >= 4 ? 6 : 0), heal = l >= 4 ? 2 : 1;
@@ -1746,7 +1808,7 @@ function updateWeapons(dt) {
     w.cd -= dt;
     if (w.cd <= 0) {
       fire(id, w.lvl); w.cd = CD[id] * h.haste;
-      const tg = ['sword', 'axes', 'ballista'].includes(id) ? null : nearest(1, 300)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
+      const tg = ['sword', 'axes'].includes(id) ? null : nearest(1, 300)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
       h.atkT = HSWING; h.atkDir = dirOf(Math.cos(a), Math.sin(a)); const snd = { sword: 's_sword', arrows: 's_bow', axes: 's_axe', coil: 's_coil', ballista: 's_bow' }[id]; if (snd) sfx(snd, 0.1); }
   }
 }
@@ -1851,12 +1913,14 @@ function updateGems(dt) {
       else if (g.meat) h.hp = Math.min(h.maxHp, h.hp + 25);
       else if (g.chest) { G.chestQueue.push(g.chest === true ? 'boss' : g.chest); if (g.camp) g.camp.chest = true; }
       else if (g.coin) addGold(g.coin);
+      else if (g.pow) usePowerup(g.pow);
     }
   }
   G.gems = G.gems.filter(g => !g.dead);
 }
 function update(dt) {
   const h = G.hero; G.t += dt;
+  for (const k in G.buffs) if (G.buffs[k] <= G.t) { delete G.buffs[k]; recalc(); }
   let [mx, my] = readMove(); const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
   const hs = h.speed, hnx = h.x + mx * hs * dt, hny = h.y + my * hs * dt, stuck = footBlocked(h.x, h.y, 5);
@@ -2011,6 +2075,7 @@ const FONT_COL = { // colour ramps from the Wargus project's font definitions
   white: [[252, 248, 240], [252, 248, 240], [252, 248, 240], [252, 248, 240], [108, 108, 108], [0, 0, 0], [0, 0, 0]],
   grey: [[192, 192, 192], [192, 192, 192], [180, 180, 180], [168, 168, 168], [108, 108, 108], [0, 0, 0], [0, 0, 0]],
   ink: [[101, 60, 28], [65, 32, 32], [65, 32, 32], [81, 40, 32], [36, 16, 16], [117, 52, 20], [117, 52, 20]],
+  green: [[236, 255, 228], [143, 224, 138], [120, 200, 116], [96, 168, 92], [40, 80, 36], [0, 0, 0], [0, 0, 0]],
   red: [[255, 200, 180], [220, 40, 20], [164, 0, 0], [124, 0, 0], [68, 4, 0], [0, 0, 0], [0, 0, 0]],
 };
 const fonts = {};
@@ -2041,8 +2106,24 @@ function fontImage(str, key, scheme, scale) {
   return c;
 }
 const WC_RULES = [['h1', 'title', 'yellow', 1], ['h2', 'large', 'yellow', 1.5], ['h3.side', 'game', 'yellow', 1.5], ['button.opt:not(.card)', 'game', 'yellow', 1.5], ['.card .nm', 'game', 'yellow', 1.4]];
+// Body text in the game font as well, wrapped to the width of its box, so a menu doesn't mix
+// the pixel font with a smooth browser font.
+const WC_WRAP = [['.card .lv', 'small', 'grey', 1.6], ['.card .ds', 'game', 'white', 1.2], ['.panel .sub', 'game', 'white', 1.2]];
+function wcWrap(root) {
+  for (const [selr, key, scheme, sc] of WC_WRAP) root.querySelectorAll(selr).forEach(el => {
+    const f = fonts[key]; if (!f || el.dataset.wc) return;
+    const text = el.textContent.replace(/\s+/g, ' ').trim(), maxW = (el.clientWidth || 180) / sc; if (!text) return;
+    const lines = []; let cur = '';
+    for (const w of text.split(' ')) { const t = cur ? cur + ' ' + w : w; if (cur && fontWidth(f, t) > maxW) { lines.push(cur); cur = w; } else cur = t; }
+    if (cur) lines.push(cur);
+    const col = el.closest('button')?.disabled ? 'grey' : el.classList.contains('chestgold') ? 'yellow' : el.classList.contains('new') ? 'green' : el.classList.contains('savemsg') ? 'red' : scheme;
+    el.dataset.wc = '1'; el.setAttribute('aria-label', text); el.textContent = ''; el.classList.add('wclines');
+    for (const ln of lines) { const img = fontImage(ln, key, col, sc); if (img) el.appendChild(img); }
+  });
+}
 function wcify(root) {
   if (!fonts.game) return;
+  if (!root.querySelector('.wcstage') && !root.classList.contains('bare')) wcWrap(root);
   for (const [selr, key, scheme, sc] of WC_RULES) root.querySelectorAll(selr).forEach(el => {
     if (el.dataset.wc || el.children.length && !(el.children.length === 1 && el.firstElementChild.tagName === 'B')) return;
     const text = el.textContent.replace(/\s+/g, ' ').trim(); if (!text) return;
@@ -2072,6 +2153,10 @@ function drawHud() {
   let y = 22;
   for (const id in G.weapons) { txt(`${WEAPONS[id].name} ${G.weapons[id].lvl}`, 6, y, 7, '#e8d9b0'); y += 9; }
   for (const id in G.passives) { txt(`${PASSIVES[id].name} ${G.passives[id]}`, 6, y, 7, '#a8c4e0'); y += 9; }
+  let bx = W / 2 - Object.keys(G.buffs).length * 15;   // active power-ups, under the clock
+  for (const id in G.buffs) { const im = A.pick && A.pick.pow && A.pick.pow[id], left = Math.ceil(G.buffs[id] - G.t);
+    ctx.fillStyle = '#000'; ctx.fillRect(bx, 23, 20, 18); if (im) ctx.drawImage(im, bx + 1, 24, 18, 16); ctx.strokeStyle = POWERUPS[id].col; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, 23.5, 19, 17);
+    txt(String(left), bx + 22, 28, 7, '#ffffff'); bx += 34; }
   const boss = G.enemies.find(e => e.type === 'boss');
   if (boss) {
     const bw = Math.min(200, W - 120), bx = (W - bw) / 2;
@@ -2100,6 +2185,13 @@ function render() {
     if (g.chest) {
       if (pk.crate) { const bob = Math.round(Math.sin(performance.now() / 300) * 1); ctx.drawImage(pk.crate, x - 10, y - 9 + bob, 20, 18); continue; }
       ctx.fillStyle = '#6b4518'; ctx.fillRect(x - 6, y - 4, 12, 8); ctx.fillStyle = '#e7c04a'; ctx.fillRect(x - 6, y - 1, 12, 2); ctx.fillRect(x - 1, y - 4, 2, 8); continue;
+    }
+    if (g.pow) { // a framed, pulsing icon so it reads as something special
+      const pw = POWERUPS[g.pow], im = g.pow === 'treasure' ? pk.gold : pk.pow && pk.pow[g.pow], bob = Math.round(Math.sin(performance.now() / 250) * 2), gl = 0.35 + 0.25 * Math.sin(performance.now() / 180);
+      ctx.globalAlpha = gl; circle(x, y + bob, 15, pw.col, null); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#000'; ctx.fillRect(x - 11, y - 10 + bob, 22, 20); ctx.strokeStyle = pw.col; ctx.lineWidth = 1; ctx.strokeRect(x - 10.5, y - 9.5 + bob, 21, 19);
+      if (im) ctx.drawImage(im, x - 9, y - 8 + bob, 18, 16); else { ctx.fillStyle = pw.col; ctx.fillRect(x - 5, y - 5 + bob, 10, 10); }
+      continue;
     }
     if (g.coin) { if (pk.gold) { ctx.drawImage(pk.gold, x - 4, y - 4, 8, 8); continue; } circle(x, y, 3, '#e7c04a', '#6b4518'); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x - 1, y - 2, 1, 2); continue; }
     if (g.meat) { circle(x, y, 3, '#b84a3a', '#3a1208'); ctx.fillStyle = '#eee'; ctx.fillRect(x + 2, y - 3, 3, 2); continue; }
@@ -2826,7 +2918,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker };
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker };
 boot();
 })();
 </script>
