@@ -1702,11 +1702,10 @@ function spawn(dt) {
   const t = G.t;
   G.spawnAcc += (0.7 + t / 50) * EASE(t) * dt;
   while (G.spawnAcc >= 1) { G.spawnAcc--; if (G.enemies.length < 330) spawnEnemy(pickType(t)); }
-  if (t >= G.bossNext) { G.bossNext += 240; spawnEnemy('boss'); banner(G.HD.side === 'Horde' ? 'A gryphon rider swoops in!' : 'A dragon approaches!'); }
+  if (t >= G.bossNext) { G.bossNext += 240; spawnEnemy('boss'); }
   if (t >= G.swarmNext) {
     G.swarmNext += 100; const h = G.hero, d = Math.hypot(W, H) / 2 + 10;
     for (let i = 0; i < 26; i++) { const a = i / 26 * TAU; spawnEnemy('fast', h.x + Math.cos(a) * d, h.y + Math.sin(a) * d); }
-    banner(G.HD.side === 'Horde' ? 'Dwarven demolition squads close in!' : 'Goblin sappers close in!');
   }
 }
 function banner(text) { G.banner = { text, t: 3 }; }
