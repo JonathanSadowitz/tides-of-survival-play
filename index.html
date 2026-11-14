@@ -863,6 +863,9 @@ const SPEEDS = [1, 1.5, 2];
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedBtn.textContent = cfg.opts.speed + 'x'; }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedBtn.textContent = cfg.opts.speed + 'x'; if (G && G.state === 'play') banner(`Game speed ${cfg.opts.speed}x`); }
 const RUN_LEN = 15 * 60;
+// The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
+// so a fresh save has time to find its feet. After that the pressure is the same as before.
+const EASE = t => Math.min(1, 0.35 + t / 650);
 const TAU = Math.PI * 2;
 const { ANIM, ICON_ENTRY, HERO_ICONS, LEVELS, UNLOCK_T, UPGRADES, xpFor, decodeFont } = GameData;
 const { TT, TN, TM, tmod } = Terrain;
@@ -1465,7 +1468,7 @@ function snapRun() {
   if (!G || G.state === 'over' || G.banked || !G.terrain) return null;
   const h = G.hero;
   return { v: 1, hero: G.heroId, level: G.LV.id, seed: G.terrain.seed, t: G.t, kills: G.kills, gold: G.gold,
-    bossNext: G.bossNext, swarmNext: G.swarmNext, revives: G.revives, rerolls: G.rerolls,
+    bossNext: G.bossNext, bossN: G.bossN || 0, swarmNext: G.swarmNext, revives: G.revives, rerolls: G.rerolls,
     pending: G.pending + (G.state === 'levelup' ? 1 : 0), chests: G.chestQueue,
     h: { x: h.x, y: h.y, hp: h.hp, xp: h.xp, level: h.level, next: h.next },
     w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), p: G.passives,
@@ -1479,7 +1482,7 @@ function continueRun() {
   if (!G || !G.terrain) return;
   G.weapons = {}; for (const [k, l] of Object.entries(s.w || {})) if (WEAPONS[k]) G.weapons[k] = { lvl: l, cd: 0.3, tick: 0 };
   G.passives = s.p || {};
-  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossNext: s.bossNext, swarmNext: s.swarmNext, revives: s.revives, rerolls: s.rerolls, pending: s.pending || 0, chestQueue: s.chests || [] });
+  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossNext: s.bossNext, bossN: s.bossN || 0, swarmNext: s.swarmNext, revives: s.revives, rerolls: s.rerolls, pending: s.pending || 0, chestQueue: s.chests || [] });
   Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next });
   recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
   for (const c of s.camps || []) {
@@ -1501,7 +1504,7 @@ function newRun(heroId, levelId, seed) {
   store.set('tos_hero', heroId); meta.last = { hero: heroId, level: LV.id }; saveMeta();
   applyCursor(HD.side === 'Horde' ? 'orc' : 'human');
   G = { heroId, HD, LV, seed,
-    t: 0, kills: 0, spawnAcc: 0, bossNext: 240, swarmNext: 95, pending: 0, state: 'play', banner: null,
+    t: 0, kills: 0, spawnAcc: 0, bossNext: 300, swarmNext: 95, pending: 0, state: 'play', banner: null,
     hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
     weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: [], buffs: {}, stats: { dmg: 0, hp: 0, next: 60, mins: [], lastHit: null }
   };
@@ -1528,7 +1531,7 @@ function recalc() {
   h.hp = Math.min(h.hp, h.maxHp);
 }
 function gainXp(v) {
-  const h = G.hero; h.xp += v * (1 + 0.08 * up('growth'));
+  const h = G.hero; h.xp += v * (1 + 0.08 * up('growth')) * (2 - EASE(G.t));   // fewer enemies early, so each is worth more
   while (h.xp >= h.next) { h.xp -= h.next; h.level++; h.next = xpFor(h.level); G.pending++; }
 }
 
@@ -1663,12 +1666,14 @@ function spawnEnemy(type, x, y) {
     const d = Math.hypot(W, H) / 2 + 24;
     for (let k = 0; k < 10; k++) { const a = rnd(0, TAU); x = h.x + Math.cos(a) * d; y = h.y + Math.sin(a) * d; if (type === 'boss' || !footBlocked(x, y, 6)) break; }
   } else if (type !== 'boss' && footBlocked(x, y, 4)) return;
-  const hpMul = (1 + t / 240 + (t / 360) ** 2) * G.LV.hp; G.stats.hp += T.hp * hpMul;
+  // Each boss is tougher than the last: the first is a fair fight, from the third on they're at full strength.
+  const bossK = type === 'boss' ? [0.45, 0.75][(G.bossN = (G.bossN || 0) + 1) - 1] ?? 1 : 1;
+  const hpMul = (1 + t / 240 + (t / 360) ** 2) * G.LV.hp * (0.6 + 0.4 * EASE(t)) * bossK; G.stats.hp += T.hp * hpMul;
   G.enemies.push({ type, x, y, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (1 + Math.min(0.3, t / 3000)) * rnd(0.92, 1.08),
-    dmg: T.dmg * (1 + t / 600), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0, shootT: rnd(1, 3), dir: 4, t: rnd(0, 5) });
+    dmg: T.dmg * (1 + t / 600) * (0.6 + 0.4 * EASE(t)) * (bossK < 1 ? 0.7 : 1), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0, shootT: rnd(1, 3), dir: 4, t: rnd(0, 5) });
 }
 function pickType(t) {
-  const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 110 ? 0.25 : 0, tank: t > 170 ? Math.min(0.55, 0.1 + t / 1500) : 0 };
+  const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 210 ? 0.25 : 0, tank: t > 240 ? Math.min(0.55, 0.05 + t / 1500) : 0 };
   for (const k in w) w[k] *= G.LV.mix[k] || 1;
   let s = 0; for (const k in w) s += w[k];
   let r = Math.random() * s; for (const k in w) { r -= w[k]; if (r <= 0) return k; }
@@ -1676,7 +1681,7 @@ function pickType(t) {
 }
 function spawn(dt) {
   const t = G.t;
-  G.spawnAcc += (0.7 + t / 50) * dt;
+  G.spawnAcc += (0.7 + t / 50) * EASE(t) * dt;
   while (G.spawnAcc >= 1) { G.spawnAcc--; if (G.enemies.length < 330) spawnEnemy(pickType(t)); }
   if (t >= G.bossNext) { G.bossNext += 240; spawnEnemy('boss'); banner(G.HD.side === 'Horde' ? 'A gryphon rider swoops in!' : 'A dragon approaches!'); }
   if (t >= G.swarmNext) {
@@ -1717,7 +1722,7 @@ function drop(e) {
   if (e.type === 'boss') { G.gems.push({ x: e.x, y: e.y, chest: 'boss' }); banner('The boss dropped a treasure chest!'); return; }
   maybePowerup(e);
   if (Math.random() < 0.012) G.gems.push({ x: e.x + rnd(-4, 4), y: e.y + rnd(-4, 4), meat: true });
-  if (Math.random() < 0.035 + 0.02 * (e.type === 'tank')) G.gems.push({ x: e.x + rnd(-5, 5), y: e.y + rnd(-5, 5), coin: Math.round((e.type === 'tank' ? 5 : 2) * goldMul()) });
+  if (Math.random() < 0.06 + 0.03 * (e.type === 'tank')) G.gems.push({ x: e.x + rnd(-5, 5), y: e.y + rnd(-5, 5), coin: Math.round((e.type === 'tank' ? 8 : 3) * goldMul()) });
   G.gems.push({ x: e.x, y: e.y, v: e.xp });
   if (G.gems.length > 420) { const i = G.gems.findIndex(g => g.v); if (i >= 0) gainXp(G.gems.splice(i, 1)[0].v); }
 }
@@ -1875,7 +1880,7 @@ function updateEnemies(dt) {
     if (e.type === 'ranged') {
       if (d < e.range * 0.75) sp = -e.spd * 0.6; else if (d < e.range) sp = 0;
       e.shootT -= dt;
-      if (e.shootT <= 0 && d < e.range * 1.3) { e.shootT = 2.6; e.swing = SWING; G.eshots.push({ x: e.x, y: e.y, vx: dx * 95, vy: dy * 95, dmg: e.dmg, life: 3, dir: dirOf(dx, dy) }); }
+      if (e.shootT <= 0 && d < e.range * 1.3) { e.shootT = 2.6 + 1.2 * (1 - EASE(G.t)); e.swing = SWING; G.eshots.push({ x: e.x, y: e.y, vx: dx * 95, vy: dy * 95, dmg: e.dmg, life: 3, dir: dirOf(dx, dy) }); }
     }
     let vx = dx * sp, vy = dy * sp;
     if (G.terrain && e.type !== 'boss' && sp && !footBlocked(e.x, e.y, e.r * 0.5)) {
@@ -2590,14 +2595,14 @@ function endRun(won) {
   const unlocked = bankRun();
   playMusic(won ? 'victory' : 'defeat');
   showMenu(`<h2>${won ? 'Victory!' : 'You have fallen'}</h2><p class="sub">${won ? 'You held the line for fifteen minutes.' : 'The horde was too much this time.'}</p>
-    <div class="stats"><b>Hero</b><span>${G.HD.name}</span><b>Battlefield</b><span>${G.LV.name}</span><b>Survived</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>+${G.gold}</span></div>
+    <div class="stats"><b>Hero</b><span>${G.HD.name}</span><b>Battlefield</b><span>${G.LV.name}</span><b>Survived</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>+${G.gold}${G.bonus ? ` (+${G.bonus} for surviving)` : ''}</span></div>
     ${unlocked ? `<p class="sub chestgold">New battlefield unlocked: ${unlocked}!</p>` : ''}
     <div class="opts"><button class="opt" data-act="retry">Retry</button><button class="opt" data-act="choose">Change hero</button><button class="opt" data-act="quit" data-back>Title screen</button></div>`);
 }
 // Bank the run's gold and unlock the next level. Returns the name of a newly unlocked level, if any.
 function bankRun() {
   if (G.banked) return null;
-  G.banked = true; meta.gold += G.gold; store.del(RUN_KEY);
+  G.banked = true; G.bonus = Math.floor(G.t / 60) * 12; meta.gold += G.gold + G.bonus; store.del(RUN_KEY);   // a little extra for every minute survived
   const i = LEVELS.indexOf(G.LV); let unlocked = null;
   if (G.t >= UNLOCK_T && i === meta.unlocked && i + 1 < LEVELS.length) { meta.unlocked = i + 1; unlocked = LEVELS[i + 1].name; }
   saveMeta(); return unlocked;
