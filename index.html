@@ -59,6 +59,8 @@
     .cards{gap:8px}
     button.card{padding:7px 11px;gap:2px}
     .card .ds{font-size:13px;line-height:1.25}
+    .wclines{gap:1px}
+    .card .sig{margin-top:0}
     .opts{gap:7px}
     .sub{margin-bottom:6px}
   }
@@ -68,6 +70,13 @@
   .wclines{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
   .panel .sub.wclines{align-items:center}
   .wclines canvas.wct{margin:0;flex:none}
+  .panel.tight h2 canvas.wct{width:auto!important}   /* heading at 1x instead of 2x */
+  .panel.tight h2{margin:0}
+  .panel.tight h3.side{margin:3px 0 3px}
+  .panel.tight .cards{gap:6px}
+  .panel.tight button.card{padding:6px 10px}
+  .panel.tight .opts.set{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+  .panel.tight .opts.set [data-back]{grid-column:1 / -1;justify-self:center}
   .pathrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
   .pathrow code{flex:1;min-width:0;word-break:break-all;user-select:all;-webkit-user-select:all}
   .pathrow .muted{flex-basis:100%}
@@ -2114,13 +2123,15 @@ function fontImage(str, key, scheme, scale) {
   const f = fonts[key]; if (!f) return null;
   const c = document.createElement('canvas'); c.width = Math.max(1, fontWidth(f, str)); c.height = f.mh;
   const x = c.getContext('2d'); fontDraw(x, f, str, 0, 0, scheme);
-  c.className = 'wct'; c.style.width = c.width * scale + 'px'; c.setAttribute('aria-hidden', 'true');
+  const dpr = window.devicePixelRatio || 1, s = Math.max(1, Math.round(scale * dpr)) / dpr;   // whole screen pixels per font pixel
+  c.className = 'wct'; c.style.width = c.width * s + 'px'; c.setAttribute('aria-hidden', 'true');
   return c;
 }
-const WC_RULES = [['h1', 'title', 'yellow', 1], ['h2', 'large', 'yellow', 1.5], ['h3.side', 'game', 'yellow', 1.5], ['button.opt:not(.card)', 'game', 'yellow', 1.5], ['.card .nm', 'game', 'yellow', 1.4]];
+// Pixel fonts only look right at whole-number sizes (in screen pixels), so every scale here is one.
+const WC_RULES = [['h1', 'title', 'yellow', 1], ['h2', 'large', 'yellow', 2], ['h3.side', 'large', 'yellow', 1], ['button.opt:not(.card)', 'large', 'yellow', 1], ['.card .nm', 'large', 'yellow', 1]];
 // Body text in the game font as well, wrapped to the width of its box, so a menu doesn't mix
 // the pixel font with a smooth browser font.
-const WC_WRAP = [['.card .lv', 'small', 'grey', 1.6], ['.card .ds', 'game', 'white', 1.2], ['.panel .sub', 'game', 'white', 1.2]];
+const WC_WRAP = [['.card .lv', 'small', 'grey', 2], ['.card .ds', 'game', 'white', 1], ['.panel .sub', 'game', 'white', 1]];
 function wcWrap(root) {
   for (const [selr, key, scheme, sc] of WC_WRAP) root.querySelectorAll(selr).forEach(el => {
     const f = fonts[key]; if (!f || el.dataset.wc) return;
@@ -2175,6 +2186,11 @@ function drawHud() {
     ctx.fillStyle = '#000'; ctx.fillRect(bx - 1, 24, bw + 2, 6); ctx.fillStyle = '#c92a1e'; ctx.fillRect(bx, 25, bw * Math.max(0, boss.hp / boss.maxHp), 4);
   }
   if (G.banner) { ctx.globalAlpha = Math.min(1, G.banner.t); txt(G.banner.text, W / 2, H * 0.28, 13, '#ffd27a', 'center'); ctx.globalAlpha = 1; }
+  if (G.moveTo && !ms.held) {   // where a mouse click sent the hero: a small green cross, as in Warcraft II
+    const mx = Math.round(G.moveTo[0] - camX), my = Math.round(G.moveTo[1] - camY);
+    ctx.fillStyle = '#000'; ctx.fillRect(mx - 4, my - 1, 9, 3); ctx.fillRect(mx - 1, my - 4, 3, 9);
+    ctx.fillStyle = '#5ce65c'; ctx.fillRect(mx - 3, my, 7, 1); ctx.fillRect(mx, my - 3, 1, 7);
+  }
   if (joy) {
     const ox = joy.ox / SCALE, oy = joy.oy / SCALE;
     circle(ox, oy, 26, 'rgba(255,255,255,.08)', 'rgba(217,178,90,.5)');
@@ -2236,15 +2252,20 @@ addEventListener('keydown', e => {
   else if ((e.code === 'KeyF' || e.code === 'Tab') && G && G.state === 'play') { cycleSpeed(); e.preventDefault(); }
 });
 addEventListener('keyup', e => { keys.delete(e.code); heldAtOpen.delete(e.code); });
-addEventListener('blur', () => { keys.clear(); joy = null; });
+addEventListener('blur', () => { keys.clear(); joy = null; ms.held = false; });
+// Mouse: click somewhere and the hero walks there; hold the button and the hero follows the pointer.
+// Touch (the Deck's screen) keeps the drag-anywhere thumbstick.
+const ms = { held: false, sx: 0, sy: 0 };
+function screenToWorld(cx, cy) { const r = cv.getBoundingClientRect(); return [camX + (cx - r.left) / r.width * W, camY + (cy - r.top) / r.height * H]; }
 cv.addEventListener('pointerdown', e => {
   if (!G || G.state !== 'play') return;
+  if (e.pointerType === 'mouse') { if (e.button !== 0) return; ms.held = true; ms.sx = e.clientX; ms.sy = e.clientY; G.moveTo = screenToWorld(e.clientX, e.clientY); cv.setPointerCapture?.(e.pointerId); return; }
   const dpr = window.devicePixelRatio || 1;
   joy = { id: e.pointerId, ox: e.clientX * dpr, oy: e.clientY * dpr, x: e.clientX * dpr, y: e.clientY * dpr };
   cv.setPointerCapture?.(e.pointerId);
 });
-cv.addEventListener('pointermove', e => { if (joy && e.pointerId === joy.id) { const dpr = window.devicePixelRatio || 1; joy.x = e.clientX * dpr; joy.y = e.clientY * dpr; } });
-const endJoy = e => { if (joy && e.pointerId === joy.id) joy = null; };
+cv.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') { ms.sx = e.clientX; ms.sy = e.clientY; if (ms.held && G) G.moveTo = screenToWorld(e.clientX, e.clientY); return; } if (joy && e.pointerId === joy.id) { const dpr = window.devicePixelRatio || 1; joy.x = e.clientX * dpr; joy.y = e.clientY * dpr; } });
+const endJoy = e => { if (e.pointerType === 'mouse') { ms.held = false; return; } if (joy && e.pointerId === joy.id) joy = null; };
 cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
 function getPad() { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.connected) return p; return null; }
 function readMove() {
@@ -2260,6 +2281,13 @@ function readMove() {
     if (b(14)) x--; if (b(15)) x++; if (b(12)) y--; if (b(13)) y++;
   }
   if (joy) { const s = 40 * (window.devicePixelRatio || 1); x += (joy.x - joy.ox) / s; y += (joy.y - joy.oy) / s; }
+  if (x || y) { if (G) G.moveTo = null; return [x, y]; }        // keys, stick or touch take over from the mouse
+  if (G && G.moveTo) {
+    if (ms.held) G.moveTo = screenToWorld(ms.sx, ms.sy);         // camera moves with the hero, so re-aim each frame
+    const h = G.hero, dx = G.moveTo[0] - h.x, dy = G.moveTo[1] - h.y, d = Math.hypot(dx, dy);
+    if (d < 3) { if (!ms.held) G.moveTo = null; return [0, 0]; }
+    return [dx / d * Math.min(1, d / 8), dy / d * Math.min(1, d / 8)];
+  }
   return [x, y];
 }
 function pollPad(dt) {
@@ -2297,7 +2325,9 @@ function showMenu(html) {
 // Shrink a menu slightly when it would otherwise need scrolling (down to 75%; smaller screens scroll).
 function fitPanel() {
   const p = overlay.querySelector('.panel'); if (!p) return;
-  p.style.zoom = '';
+  p.style.zoom = ''; p.classList.remove('tight');
+  // Shrinking with zoom makes the pixel font uneven, so first try a tighter layout at full size.
+  if (overlay.scrollHeight > overlay.clientHeight + 1) p.classList.add('tight');
   let z = 1;
   for (let k = 0; k < 8 && overlay.scrollHeight > overlay.clientHeight + 1 && z > 0.75; k++) {
     z = Math.max(0.75, z * Math.min(0.99, overlay.clientHeight / overlay.scrollHeight)); p.style.zoom = z;
@@ -2386,7 +2416,7 @@ function showLevels(heroId) {
   const cards = LEVELS.map((L, i) => {
     const open = i <= meta.unlocked;
     return `<button class="opt card" data-act="start" data-id="${heroId}" data-level="${L.id}" ${open ? '' : 'disabled'}>
-      <span class="nm">${L.name}</span><span class="lv">${open ? (i ? 'Difficulty ' + '★'.repeat(i + 1) : 'Difficulty ★') : 'Locked'}</span>
+      <span class="nm">${L.name}</span><span class="lv">${open ? 'Difficulty: ' + ['easy', 'normal', 'hard', 'very hard'][Math.min(i, 3)] : 'Locked'}</span>
       <span class="ds">${open ? L.blurb : `Survive ${UNLOCK_T / 60} minutes in ${LEVELS[i - 1].name} to unlock.`}</span></button>`;
   }).join('');
   showMenu(`<h2>Choose a battlefield</h2><p class="sub">Playing as ${HEROES[heroId].name}</p><div class="cards">${cards}</div>
@@ -2409,7 +2439,7 @@ function showSettings(from, focus) {
   const keys = Object.keys(OPT_DEFS);
   const rows = keys.map(k => `<button class="opt" data-act="opt" data-k="${k}" data-from="${from}">${OPT_DEFS[k].label}: ${OPT_DEFS[k].fmt(cfg.opts[k])}</button>`).join('');
   const xfer = from === 'pause' ? '' : `<button class="opt" data-act="history">Run history</button><button class="opt" data-act="exportsave">Copy save code</button><button class="opt" data-act="importsave">Load save code</button>`;
-  showMenu(`<h2>Settings</h2><div class="opts">${rows}${xfer}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
+  showMenu(`<h2>Settings</h2><div class="opts set">${rows}${xfer}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
   if (focus) { sel = keys.indexOf(focus); highlight(); }
 }
 /* ---------- save codes: move your progress to another browser or device ---------- */
