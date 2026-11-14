@@ -1,9 +1,8 @@
 # Uploads the game to itch.io whenever a new version is published here.
 #
-# One-time setup (repository Settings on GitHub):
-#   Secrets and variables → Actions → Secrets:   BUTLER_API_KEY = an itch.io API key (itch.io → Settings → API keys)
-#   Secrets and variables → Actions → Variables: ITCH_GAME      = your-itch-username/your-game-slug
-# Without both, this workflow does nothing.
+# One-time setup: on GitHub, repository Settings → Secrets and variables → Actions → Secrets, add
+# BUTLER_API_KEY = an itch.io API key (itch.io → Settings → API keys). Without it, this workflow does nothing.
+# The game it uploads to is https://captmurdock.itch.io/tides-of-survival.
 name: Upload to itch.io
 on:
   push:
@@ -14,13 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-      ITCH_GAME: ${{ vars.ITCH_GAME }}
+      ITCH_GAME: captmurdock/tides-of-survival
     steps:
       - uses: actions/checkout@v4
       - name: Check setup
         id: setup
         run: |
-          if [ -z "$BUTLER_API_KEY" ] || [ -z "$ITCH_GAME" ]; then echo "itch.io upload not set up yet: add the BUTLER_API_KEY secret and ITCH_GAME variable."; echo "ready=no" >> "$GITHUB_OUTPUT"; else echo "ready=yes" >> "$GITHUB_OUTPUT"; fi
+          if [ -z "$BUTLER_API_KEY" ] || [ -z "$ITCH_GAME" ]; then echo "itch.io upload not set up yet: add the BUTLER_API_KEY secret."; echo "ready=no" >> "$GITHUB_OUTPUT"; else echo "ready=yes" >> "$GITHUB_OUTPUT"; fi
       - name: Build the upload
         if: steps.setup.outputs.ready == 'yes'
         run: mkdir build && cp index.html build/
