@@ -1,0 +1,2600 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Tides of Survival</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root{--gold:#d9b25a;--gold2:#8a6a2a;--stone:#2a2118;--stone2:#3b2f22;--ink:#f1e6c8;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;color:var(--ink);
+    font:15px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  canvas#c{position:fixed;inset:0;display:block;image-rendering:pixelated}
+  #pauseBtn{position:fixed;top:calc(env(safe-area-inset-top) + 34px);right:calc(env(safe-area-inset-right) + 8px);
+    width:40px;height:40px;border-radius:8px;border:2px solid var(--gold2);background:rgba(20,14,8,.7);color:var(--gold);
+    font-weight:900;font-size:16px;display:none;z-index:5}
+  #speedBtn{position:fixed;top:calc(env(safe-area-inset-top) + 34px);right:calc(env(safe-area-inset-right) + 54px);
+    height:40px;min-width:46px;border-radius:8px;border:2px solid var(--gold2);background:rgba(20,14,8,.7);color:var(--gold);
+    font-weight:900;font-size:14px;display:none;z-index:5}
+  #overlay.titled{background-size:cover;background-position:center top;image-rendering:pixelated;align-items:flex-end}
+  #overlay.titled .panel{background:linear-gradient(rgba(59,47,34,.9),rgba(36,27,18,.94));max-width:640px;padding:10px 14px;margin-bottom:2vh}
+  #overlay.titled .sub,#overlay.titled .help.long{display:none}
+  #overlay.titled h1{font-size:26px;margin:0 0 4px}
+  #overlay.titled .opts{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:8px}
+  #overlay.titled button.opt{min-width:180px;padding:8px 12px}
+  #overlay.titled .status{margin:4px auto 10px}
+  #overlay.wcmenu{padding:0;background:#000!important;align-items:center;justify-content:center;overflow:hidden}
+  .wcstage{position:relative;width:640px;height:480px;flex:none}
+  .wcstage>img.bg{position:absolute;left:0;top:0;width:640px;height:480px;image-rendering:pixelated}
+  .wcstage .wcbtns{position:absolute;left:203px;top:236px;width:224px;display:flex;flex-direction:column;gap:7px}
+  .wcstage button.opt{width:224px;height:28px;min-width:0;padding:0;border:0;border-radius:0;background:var(--btn) no-repeat;box-shadow:none;display:flex;align-items:center;justify-content:center}
+  .wcstage button.opt.sel,.wcstage button.opt:hover{box-shadow:none;outline:1px solid #e8c84a;outline-offset:0}
+  .wcstage button.opt:active{background-image:var(--btnp)}
+  .wcstage .ver{position:absolute;left:56px;top:452px}
+  .wcstage .note{position:absolute;left:180px;top:428px;width:270px;text-align:center;font:10px Georgia,serif;color:#3b2a14}
+  body.wcbtn .panel button.opt:not(.card){border:5px solid transparent;border-image:var(--btnb) 5 fill stretch;background:none;border-radius:0;box-shadow:none}
+  body.wcbtn .panel button.opt:not(.card).sel,body.wcbtn .panel button.opt:not(.card):hover{outline:1px solid #e8c84a}
+  body.wcbtn .panel button.opt:not(.card):active{border-image:var(--btnbp) 5 fill stretch}
+  body.wcbtn .panel button.opt:not(.card):disabled{border-image:var(--btnbg) 5 fill stretch}
+  #overlay.parch{background-color:#000;background-size:contain;background-repeat:no-repeat;background-position:center;image-rendering:pixelated}
+  #overlay.parch.bare{align-items:flex-start;padding-top:max(12px,calc(50vh - min(37.5vw,50vh) * 0.42))}
+  #overlay.parch.bare .panel{background:none;border:0;outline:0;box-shadow:none;max-width:420px}
+  #overlay.parch.bare .panel .sub{color:#3b2a14}
+  #overlay.parch .panel{background:linear-gradient(rgba(59,47,34,.94),rgba(36,27,18,.96))}
+  .cards.shop button.card{width:170px}
+  @media (max-height:860px){
+    #overlay{padding-top:6px;padding-bottom:6px}
+    .panel{padding:10px 16px}
+    h2{margin:0 0 .15em}
+    h3.side{margin:6px 0 5px}
+    .cards{gap:8px}
+    button.card{padding:7px 11px;gap:2px}
+    .card .ds{font-size:13px;line-height:1.25}
+    .opts{gap:7px}
+    .sub{margin-bottom:6px}
+  }
+  canvas.wct{image-rendering:pixelated;vertical-align:middle;display:inline-block;max-width:100%;height:auto}
+  body.wcfont .panel{font-family:Georgia,'Times New Roman',serif}
+  button.opt canvas.wct{margin:2px 0}
+  .pathrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+  .pathrow code{flex:1;min-width:0;word-break:break-all;user-select:all;-webkit-user-select:all}
+  .pathrow .muted{flex-basis:100%}
+  .lvlrow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+  .lvlrow button.opt{min-width:150px}
+  .loot{list-style:none;padding:0;margin:10px auto 16px;max-width:420px;text-align:left}
+  .loot li{padding:6px 10px;margin:4px 0;border:1px solid var(--gold2);border-radius:4px;background:rgba(0,0,0,.25);opacity:0;transform:translateY(6px);animation:lootIn .35s forwards}
+  .loot.fast li{animation-duration:.01s;animation-delay:0s!important}
+  @keyframes lootIn{to{opacity:1;transform:none}}
+  .chestgold{color:#ffd24a;font-weight:700}
+  #overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;
+    padding:calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 12px);
+    background:radial-gradient(ellipse at center,rgba(0,0,0,.45),rgba(0,0,0,.8));overflow:auto}
+  .panel{background:linear-gradient(#3b2f22,#241b12);border:3px solid var(--gold2);outline:2px solid #000;
+    box-shadow:inset 0 0 0 2px #5a4428,0 10px 40px #000;border-radius:6px;padding:18px 20px;max-width:760px;width:100%;text-align:center}
+  h1,h2{font-family:Cinzel,Georgia,serif;color:var(--gold);margin:.1em 0 .3em;text-shadow:0 2px 0 #000,0 0 12px rgba(217,178,90,.35)}
+  h1{font-size:clamp(28px,7vw,52px);letter-spacing:.04em}
+  h2{font-size:clamp(20px,5vw,30px)}
+  .sub{margin:0 0 12px;opacity:.85}
+  .status{font-size:13px;margin:8px auto 14px;padding:8px 10px;border:1px dashed var(--gold2);border-radius:4px;max-width:520px;opacity:.9}
+  .opts{display:flex;flex-direction:column;gap:10px;align-items:center}
+  button.opt{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:17px;color:var(--ink);cursor:pointer;
+    background:linear-gradient(#5b4730,#3a2c1c);border:2px solid var(--gold2);border-radius:5px;padding:10px 18px;min-width:220px}
+  button.opt.sel,button.opt:hover{border-color:var(--gold);color:#fff;box-shadow:0 0 0 2px rgba(217,178,90,.35),0 0 14px rgba(217,178,90,.35)}
+  .cards{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  button.card{min-width:0;width:200px;text-align:left;font-family:inherit;font-weight:400;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+  .card .nm{font-family:Cinzel,Georgia,serif;font-size:17px;color:var(--gold)}
+  .card .lv{font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.06em}
+  .card .lv.new{color:#8fe08a;opacity:1}
+  .card .ds{font-size:14px}
+  .help{font-size:13px;opacity:.8;margin-top:14px}
+  .fine{font-size:11px;opacity:.55;margin-top:10px}
+  .stats{display:grid;grid-template-columns:auto auto;gap:4px 16px;justify-content:center;margin:8px 0 16px;font-size:15px}
+  .stats b{color:var(--gold);text-align:right}
+  button.card.hero{width:330px}
+  .hrow{display:flex;gap:10px;align-items:center}
+  .hrow>span{display:flex;flex-direction:column}
+  canvas.hpic{width:48px;height:48px;image-rendering:pixelated;background:#140e08;border:1px solid var(--gold2);border-radius:4px;flex:none}
+  .lv.ally{color:#8fb8ff;opacity:1}.lv.horde{color:#ff8f7a;opacity:1}
+  .card .sig{font-size:13px;opacity:.9}
+  h3.side{font-family:Cinzel,Georgia,serif;margin:14px 0 8px;font-size:17px}
+  h3.side.ally{color:#8fb8ff}h3.side.horde{color:#ff8f7a}
+  @media (max-width:720px){button.card,button.card.hero{width:100%}}
+
+  /* Asset Lab */
+  #lab{position:fixed;inset:0;z-index:20;background:#17110b;display:none;flex-direction:column;user-select:text;-webkit-user-select:text;touch-action:auto;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  #lab header{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:2px solid var(--gold2);background:#241b12;flex-wrap:wrap}
+  #lab header h2{font-size:20px;margin:0;flex:1}
+  .lbtn{font:inherit;font-size:13px;color:var(--ink);background:#4a3a26;border:1px solid var(--gold2);border-radius:4px;padding:6px 10px;cursor:pointer}
+  .lbtn:hover{border-color:var(--gold)}
+  .lbtn.primary{background:#6b5226;border-color:var(--gold)}
+  #lab select,#lab input[type=number]{font:inherit;font-size:13px;background:#2b2116;color:var(--ink);border:1px solid var(--gold2);border-radius:4px;padding:4px}
+  #lab input[type=number]{width:56px}
+  #labBar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid #3b2f22;font-size:13px}
+  #labMain{flex:1;display:flex;min-height:0}
+  #labGrid{flex:1;overflow:auto;padding:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px;align-content:start}
+  .tile{background:#241b12;border:1px solid #3b2f22;border-radius:4px;padding:4px;cursor:pointer;text-align:center;font-size:11px}
+  .tile:hover,.tile.sel{border-color:var(--gold)}
+  .tile canvas{width:56px;height:56px;image-rendering:pixelated;background:#0d0a06;display:block;margin:0 auto 3px}
+  .tile .ico{width:56px;height:56px;margin:0 auto 3px;display:flex;align-items:center;justify-content:center;background:#0d0a06;font-size:12px;color:var(--gold)}
+  #labSide{width:min(440px,46vw);border-left:2px solid var(--gold2);overflow:auto;padding:12px;background:#1d160e;font-size:13px}
+  #labSide h3{font-family:Cinzel,Georgia,serif;color:var(--gold);margin:4px 0 8px;font-size:16px}
+  #labSide .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}
+  #labSide canvas{image-rendering:pixelated;max-width:100%;background:#0d0a06;border:1px solid #3b2f22}
+  .roleList{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center}
+  .roleList canvas{width:32px;height:32px}
+  .muted{opacity:.65}
+  .hint{background:#241b12;border-left:3px solid var(--gold2);padding:8px 10px;margin:8px 0;line-height:1.45}
+  code{background:#0d0a06;padding:1px 4px;border-radius:3px;font-size:12px}
+  @media (max-width:760px){#labMain{flex-direction:column}#labSide{width:auto;border-left:0;border-top:2px solid var(--gold2);max-height:52vh}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="pauseBtn" aria-label="Pause">II</button>
+<button id="speedBtn" aria-label="Game speed">1x</button>
+<div id="overlay"></div>
+
+<div id="lab">
+  <header>
+    <h2>Asset Lab</h2>
+    <button class="lbtn primary" id="labPick">Import game folder</button><input id="labDir" type="file" webkitdirectory directory multiple hidden>
+    <button class="lbtn primary" id="labReimport" hidden>Re-import from saved folder</button>
+    <label class="lbtn">Load single files<input id="labInput" type="file" multiple hidden></label>
+    <button class="lbtn" id="labAuto">Auto-assign</button>
+    <button class="lbtn" id="labForget">Forget loaded files</button>
+    <button class="lbtn" id="labClose">Done</button>
+  </header>
+  <div id="labBar">
+    File <select id="labFile"></select>
+    Show <select id="labFilter">
+      <option value="gfx">Sprites</option><option value="pal">Palettes</option><option value="wav">Sounds</option>
+      <option value="img">Images</option><option value="data">Other</option><option value="all">Everything</option>
+    </select>
+    <span id="labPalInfo" class="muted"></span>
+  </div>
+  <div id="labMain">
+    <div id="labGrid"></div>
+    <div id="labSide"></div>
+  </div>
+</div>
+
+<!-- ============ CORE: Warcraft II data formats ============ -->
+<script id="core">
+const Core = (() => {
+  const u16 = (d, o) => d[o] | (d[o + 1] << 8);
+  const u32 = (d, o) => (d[o] | (d[o + 1] << 8) | (d[o + 2] << 16) | (d[o + 3] << 24)) >>> 0;
+
+  // WAR archive: u32 magic, u16 entry count, u16 type, then u32 offsets.
+  function parseWar(buf) {
+    const d = new Uint8Array(buf);
+    if (d.length < 12) throw new Error('File is too small to be a WAR archive');
+    const magic = u32(d, 0), n = u16(d, 4), type = u16(d, 6);
+    const tableEnd = 8 + n * 4;
+    if (n < 1 || n > 8000 || tableEnd > d.length) throw new Error('Not a Warcraft II WAR archive');
+    const offs = [];
+    for (let i = 0; i < n; i++) offs.push(u32(d, 8 + i * 4));
+    const ok = o => o >= tableEnd && o + 4 <= d.length;
+    const sorted = [...new Set(offs.filter(ok))].sort((a, b) => a - b);
+    if (!sorted.length) throw new Error('WAR archive has no readable entries');
+    const nextOf = o => { let lo = 0, hi = sorted.length; while (lo < hi) { const m = (lo + hi) >> 1; if (sorted[m] <= o) lo = m + 1; else hi = m; } return lo < sorted.length ? sorted[lo] : d.length; };
+    const entries = offs.map((o, i) => ok(o) ? { index: i, offset: o, end: nextOf(o) } : null);
+    return { magic, type, count: n, entries, bytes: d, cache: new Map(), kinds: new Map() };
+  }
+
+  // LZSS-style decompression with a 4 KB ring buffer (as documented by Wargus' wartool).
+  function lzDecode(d, p, end, len) {
+    const out = new Uint8Array(len), ring = new Uint8Array(4096);
+    let op = 0, bi = 0;
+    while (op < len && p < end) {
+      let fl = d[p++];
+      for (let b = 0; b < 8 && op < len; b++) {
+        if (fl & 1) {
+          if (p >= end) return out;
+          const v = d[p++]; out[op++] = v; ring[bi++ & 0xFFF] = v;
+        } else {
+          if (p + 1 >= end) return out;
+          const w = d[p] | (d[p + 1] << 8); p += 2;
+          let cnt = (w >> 12) + 3, o = w & 0xFFF;
+          while (cnt-- > 0 && op < len) { const v = ring[o++ & 0xFFF]; out[op++] = v; ring[bi++ & 0xFFF] = v; }
+        }
+        fl >>= 1;
+      }
+    }
+    return out;
+  }
+
+  function getEntry(war, i) {
+    if (war.cache.has(i)) return war.cache.get(i);
+    const e = war.entries[i];
+    if (!e) return null;
+    const d = war.bytes;
+    const hdr = u32(d, e.offset);
+    const len = hdr & 0xFFFFFF, flags = hdr >>> 24;
+    let out;
+    if (flags & 0x20) out = lzDecode(d, e.offset + 4, e.end, len);
+    else out = d.slice(e.offset + 4, Math.min(e.offset + 4 + len, e.end));
+    war.cache.set(i, out);
+    return out;
+  }
+  function safeEntry(war, i) { try { return getEntry(war, i); } catch (e) { return null; } }
+
+  // Unit/missile sprite ("GFU"): u16 count, u16 maxW, u16 maxH, then 8-byte frame headers.
+  function frameHeader(d, i) {
+    const b = 6 + i * 8;
+    let w = d[b + 2], off = u32(d, b + 4);
+    if (off & 0x80000000) { w += 256; off &= 0x7FFFFFFF; }
+    return { x: d[b], y: d[b + 1], w, h: d[b + 3], off };
+  }
+  function isGfu(d) {
+    if (!d || d.length < 14) return false;
+    const n = u16(d, 0), mw = u16(d, 2), mh = u16(d, 4);
+    if (n < 1 || n > 2000 || mw < 1 || mw > 512 || mh < 1 || mh > 512) return false;
+    if (6 + n * 8 > d.length) return false;
+    let real = 0;
+    for (let i = 0; i < n; i++) {
+      const f = frameHeader(d, i);
+      if (!f.w || !f.h) continue;
+      if (f.x + f.w > mw + 1 || f.y + f.h > mh + 1) return false;
+      if (f.off < 6 + n * 8 || f.off + f.h * 2 > d.length) return false;
+      real++;
+    }
+    return real > 0;
+  }
+  function decodeGfuFrame(d, i, mw, mh) {
+    const px = new Int16Array(mw * mh).fill(-1);
+    try {
+      const f = frameHeader(d, i);
+      for (let y = 0; y < f.h; y++) {
+        const ty = f.y + y; if (ty >= mh) break;
+        let sp = f.off + u16(d, f.off + y * 2), x = 0, guard = 0;
+        const put = (xx, v) => { const tx = f.x + xx; if (tx < mw) px[ty * mw + tx] = v; };
+        while (x < f.w && sp < d.length && guard++ < 4096) {
+          const c = d[sp++];
+          if (c & 0x80) x += c & 0x7F;
+          else if (c & 0x40) { const n = c & 0x3F, v = d[sp++]; for (let k = 0; k < n; k++) put(x + k, v); x += n; }
+          else { const n = c & 0x3F; for (let k = 0; k < n; k++) put(x + k, d[sp++]); x += n; }
+        }
+      }
+    } catch (e) { /* leave the frame partly drawn */ }
+    return px;
+  }
+  function decodeGfu(d) {
+    const n = u16(d, 0), w = u16(d, 2), h = u16(d, 4), frames = [];
+    for (let i = 0; i < n; i++) frames.push(decodeGfuFrame(d, i, w, h));
+    return { count: n, w, h, frames };
+  }
+
+  // Raw image: u16 width, u16 height, then width*height palette indices.
+  function isImg(d) { if (!d || d.length < 5) return false; const w = u16(d, 0), h = u16(d, 2); return w > 0 && h > 0 && w <= 2048 && h <= 2048 && d.length === 4 + w * h; }
+  function decodeImg(d) { const w = u16(d, 0), h = u16(d, 2); const px = new Int16Array(w * h); for (let i = 0; i < w * h; i++) px[i] = d[4 + i]; return { count: 1, w, h, frames: [px] }; }
+
+  function classify(d) {
+    if (!d || d.length < 4) return 'data';
+    if (d[0] === 0x52 && d[1] === 0x49 && d[2] === 0x46 && d[3] === 0x46) return 'wav';
+    if (d.length === 768) return 'pal';
+    if (isGfu(d)) return 'gfx';
+    if (isImg(d)) return 'img';
+    return 'data';
+  }
+  function kindOf(war, i) {
+    if (war.kinds.has(i)) return war.kinds.get(i);
+    const k = war.entries[i] ? classify(safeEntry(war, i)) : 'none';
+    war.kinds.set(i, k); return k;
+  }
+
+  // Palettes are 256 RGB triplets, usually 6-bit VGA values.
+  function toPalette(d) {
+    const p = new Uint8Array(768); let max = 0;
+    for (let i = 0; i < 768; i++) max = Math.max(max, d[i]);
+    for (let i = 0; i < 768; i++) p[i] = max < 64 ? (d[i] << 2) | (d[i] >> 4) : d[i];
+    return p;
+  }
+  function greyPalette() { const p = new Uint8Array(768); for (let i = 0; i < 256; i++) p[i * 3] = p[i * 3 + 1] = p[i * 3 + 2] = i; return p; }
+
+  /* ---------- PKWARE DCL "explode" (port of zlib's contrib/blast) ---------- */
+  const Blast = (() => {
+    const LITLEN = [11, 124, 8, 7, 28, 7, 188, 13, 76, 4, 10, 8, 12, 10, 12, 10, 8, 23, 8, 9, 7, 6, 7, 8, 7, 6, 55, 8, 23, 24, 12, 11, 7, 9, 11, 12, 6, 7, 22, 5,
+      7, 24, 6, 11, 9, 6, 7, 22, 7, 11, 38, 7, 9, 8, 25, 11, 8, 11, 9, 12, 8, 12, 5, 38, 5, 38, 5, 11, 7, 5, 6, 21, 6, 10, 53, 8, 7, 24, 10, 27,
+      44, 253, 253, 253, 252, 252, 252, 13, 12, 45, 12, 45, 12, 61, 12, 45, 44, 173];
+    const LENLEN = [2, 35, 36, 53, 38, 23], DISTLEN = [2, 20, 53, 230, 247, 151, 248];
+    const BASE = [3, 2, 4, 5, 6, 7, 8, 9, 10, 12, 16, 24, 40, 72, 136, 264], EXTRA = [0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8];
+    function construct(rep) {
+      const length = [];
+      for (const r of rep) { let left = (r >> 4) + 1; while (left--) length.push(r & 15); }
+      const count = new Int16Array(14), offs = new Int16Array(14), symbol = new Int16Array(length.length);
+      for (const l of length) count[l]++;
+      for (let l = 1; l < 13; l++) offs[l + 1] = offs[l] + count[l];
+      for (let s = 0; s < length.length; s++) if (length[s]) symbol[offs[length[s]]++] = s;
+      return { count, symbol };
+    }
+    const litC = construct(LITLEN), lenC = construct(LENLEN), distC = construct(DISTLEN);
+    function explode(src, outLen) {
+      let p = 0, buf = 0, cnt = 0;
+      const bits = n => {
+        while (cnt < n) { if (p >= src.length) throw new Error('explode: out of input'); buf |= src[p++] << cnt; cnt += 8; }
+        const v = buf & ((1 << n) - 1); buf >>>= n; cnt -= n; return v;
+      };
+      const decode = h => {
+        let code = 0, first = 0, index = 0;
+        for (let l = 1; l <= 13; l++) {
+          code |= bits(1) ^ 1;
+          const c = h.count[l];
+          if (code < first + c) return h.symbol[index + (code - first)];
+          index += c; first += c; first <<= 1; code <<= 1;
+        }
+        throw new Error('explode: bad code');
+      };
+      const lit = bits(8), dict = bits(8);
+      if (lit > 1 || dict < 4 || dict > 6) throw new Error('explode: bad header');
+      const out = new Uint8Array(outLen); let op = 0;
+      while (op < outLen) {
+        if (bits(1)) {
+          const sym = decode(lenC); let len = BASE[sym] + bits(EXTRA[sym]);
+          if (len === 519) break;
+          const sh = len === 2 ? 2 : dict;
+          const dist = (decode(distC) << sh) + bits(sh) + 1;
+          if (dist > op) throw new Error('explode: distance too far back');
+          while (len-- > 0 && op < outLen) { out[op] = out[op - dist]; op++; }
+        } else out[op++] = lit ? decode(litC) : bits(8);
+      }
+      return out;
+    }
+    return { explode };
+  })();
+
+  /* ---------- MPQ archives (Battle.net Edition keeps its data in War2Dat.mpq) ---------- */
+  const CT = (() => {
+    const t = new Uint32Array(0x500); let seed = 0x00100001;
+    for (let i = 0; i < 256; i++) {
+      let idx = i;
+      for (let j = 0; j < 5; j++) {
+        seed = (seed * 125 + 3) % 0x2AAAAB; const t1 = (seed & 0xFFFF) << 16;
+        seed = (seed * 125 + 3) % 0x2AAAAB; t[idx] = (t1 | (seed & 0xFFFF)) >>> 0; idx += 256;
+      }
+    }
+    return t;
+  })();
+  function hashStr(s, type) {
+    let s1 = 0x7FED7FED, s2 = 0xEEEEEEEE; s = s.toUpperCase();
+    for (let i = 0; i < s.length; i++) {
+      const ch = s.charCodeAt(i) & 0xFF;
+      s1 = (CT[type * 256 + ch] ^ ((s1 + s2) >>> 0)) >>> 0;
+      s2 = (ch + s1 + s2 + (s2 << 5) + 3) >>> 0;
+    }
+    return s1;
+  }
+  function decrypt(a, key) {
+    let seed = 0xEEEEEEEE; key >>>= 0;
+    for (let i = 0; i < a.length; i++) {
+      seed = (seed + CT[0x400 + (key & 0xFF)]) >>> 0;
+      const ch = (a[i] ^ ((key + seed) >>> 0)) >>> 0; a[i] = ch;
+      key = ((((~key) << 0x15) + 0x11111111) | (key >>> 0x0B)) >>> 0;
+      seed = (ch + seed + (seed << 5) + 3) >>> 0;
+    }
+    return a;
+  }
+  function readU32s(d, off, n) { const a = new Uint32Array(n); for (let i = 0; i < n; i++) a[i] = u32(d, off + i * 4); return a; }
+  function decryptBytes(b, key) {
+    const n = b.length >> 2; const a = decrypt(readU32s(b, 0, n), key);
+    for (let i = 0; i < n; i++) { const v = a[i]; b[i * 4] = v & 255; b[i * 4 + 1] = (v >>> 8) & 255; b[i * 4 + 2] = (v >>> 16) & 255; b[i * 4 + 3] = v >>> 24; }
+  }
+  const F = { IMPLODE: 0x100, COMPRESS: 0x200, ENC: 0x10000, FIX: 0x20000, SINGLE: 0x1000000, EXISTS: 0x80000000 };
+  function parseMpq(buf) {
+    const d = new Uint8Array(buf); let base = -1;
+    for (let o = 0; o + 32 <= d.length; o += 512) if (d[o] === 0x4D && d[o + 1] === 0x50 && d[o + 2] === 0x51 && d[o + 3] === 0x1A) { base = o; break; }
+    if (base < 0) throw new Error('Not an MPQ archive');
+    const h = readU32s(d, base, 8), shift = h[3] >>> 16;
+    const ht = decrypt(readU32s(d, base + h[4], h[6] * 4), hashStr('(hash table)', 3));
+    const bt = decrypt(readU32s(d, base + h[5], h[7] * 4), hashStr('(block table)', 3));
+    const hashes = [], blocks = [];
+    for (let i = 0; i < h[6]; i++) hashes.push({ a: ht[i * 4], b: ht[i * 4 + 1], block: ht[i * 4 + 3] });
+    for (let i = 0; i < h[7]; i++) blocks.push({ pos: bt[i * 4], csize: bt[i * 4 + 1], fsize: bt[i * 4 + 2], flags: bt[i * 4 + 3] });
+    return { d, base, sectorSize: 512 << shift, hashes, blocks };
+  }
+  function mpqFind(m, name) {
+    const n = m.hashes.length; if (!n) return -1;
+    const a = hashStr(name, 1), b = hashStr(name, 2);
+    let i = hashStr(name, 0) % n;
+    for (let k = 0; k < n; k++, i = (i + 1) % n) {
+      const e = m.hashes[i];
+      if (e.block === 0xFFFFFFFF) return -1;
+      if (e.a === a && e.b === b && e.block < m.blocks.length) return e.block;
+    }
+    return -1;
+  }
+  // Recover a file's key from its encrypted sector table (method from StormLib's DetectFileKeyBySectorSize).
+  function mpqDetectKey(m, b) {
+    const pos = m.base + b.pos, ns = Math.ceil(b.fsize / m.sectorSize);
+    if (pos + 8 > m.d.length) return 0;
+    const enc = readU32s(m.d, pos, 2), want0 = (ns + 1) * 4;
+    const k12 = ((enc[0] ^ want0) - 0xEEEEEEEE) >>> 0;
+    for (let i = 0; i < 256; i++) {
+      let k1 = (k12 - CT[0x400 + i]) >>> 0, k2 = (0xEEEEEEEE + CT[0x400 + (k1 & 0xFF)]) >>> 0;
+      const d0 = (enc[0] ^ ((k1 + k2) >>> 0)) >>> 0;
+      if (d0 !== want0) continue;
+      const fileKey = (k1 + 1) >>> 0;
+      // confirm by decrypting the whole table and checking that it is sane
+      const t = decrypt(readU32s(m.d, pos, ns + 1), k1);
+      let ok = t[0] === want0;
+      for (let j = 1; ok && j <= ns; j++) if (t[j] < t[j - 1] || t[j] > b.csize) ok = false;
+      if (ok) return fileKey;
+    }
+    return 0;
+  }
+  // Uncompressed but encrypted: guess the key from the WAR magic number in the first word, then sanity-check the WAR table.
+  function mpqDetectWarKey(m, b) {
+    const pos = m.base + b.pos, n0 = Math.min(b.fsize, m.sectorSize) >> 2;
+    if (n0 < 3 || pos + n0 * 4 > m.d.length) return 0;
+    const e0 = u32(m.d, pos);
+    for (let magic = 0x18; magic <= 0x1F; magic++) {
+      const x = ((e0 ^ magic) - 0xEEEEEEEE) >>> 0;
+      for (let i = 0; i < 256; i++) {
+        const k = (x - CT[0x400 + i]) >>> 0; if ((k & 0xFF) !== i) continue;
+        const w = decrypt(readU32s(m.d, pos, n0), k);
+        if (w[0] !== magic) continue;
+        const cnt = w[1] & 0xFFFF;
+        if (cnt < 1 || 2 + cnt > n0 && 8 + cnt * 4 > b.fsize) continue;
+        let ok = true;
+        for (let j = 0; j < Math.min(cnt, n0 - 2) && ok; j++) { const o = w[2 + j]; if (o !== 0 && o !== 0xFFFFFFFF && (o < 8 + cnt * 4 || o > b.fsize)) ok = false; }
+        if (ok) return k;
+      }
+    }
+    return 0;
+  }
+
+  /* ---------- Blizzard audio compression: adaptive Huffman + IMA ADPCM (ported from StormLib by Ladislav Zezula) ---------- */
+  const HUFF_DIST = ["0a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002", "5416160d0c08060506050603040403050e0b141313090b0605040302030202020d070906060403020403030303030202090604040404030203020202020302040803040709050303030302020203020203020202020202020201010102010202060a0808060704030404020204020303040307070906040303020102020202020a0202030202010102020206030502030201010101010101010101020301010102010101010101020404040709080c02010101010101010101010101020101030401020405010101010101010201010104010101010102010101010101010101020101010101010103010101010101010201010101010102020101020202064b", "0000000000000000000327000023000000000000000000000000000000000000ff0101010101010102020101060e10040608050404030302020303010102010101040204020202010104010102030302030103060401010101010102010201010129071612400a0a112501031710262a100123232f10060702090101010101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "ff0b07050b020202060202010402010309010101030401010201010102010101050101010d0101010101010101010101020101030101010101010102010101010a0402010603020101010101030101010502030403030302010101020102030301030101020501010403050103010303020104030a06010101010101010101010202010a0205010102070217010501010e010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010106020104050101020101010102010101010101010101010101010101010101010101010101010101070101020101010102010101010101010201010101010111", "fffb989a848563643e3e222213131817000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "fff19d9e9a9b9a9793938c8e868880827c7c7273696b5f6055564a4b404137372f2f272721211b1c1717131310100d0d0b0b0909080807070605050404041918000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "c3cbf541ff7bf7210000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000bfccf240fd7cf72200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007a46000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "c3d9ef3df97ce91efdabf12cfc5bfe17000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000bdd9ec3df57de81dfbaef02cfb5cff18000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000706c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "bac5da33e36dd818e594da23df4ad110eeafe42cea5ade15f487e921f643fc120000000000000000000000000000000000000000000000000000000000000000b0c7d833e36bd618e795d823db49d011e9b2e22be85cdd15f187e720f744ff1300000000000000000000000000000000000000000000000000000000000000005f9e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"].map(h => { const a = new Uint8Array(256); for (let i = 0; i < 256; i++) a[i] = parseInt(h.substr(i * 2, 2), 16); return a; });
+  function huffDecompress(src, outLen) {
+    let p = 0, buf = 0, cnt = 0;
+    const get1 = () => { if (cnt === 0) { if (p >= src.length) return -1; buf = src[p++]; cnt = 8; } const v = buf & 1; buf >>>= 1; cnt--; return v; };
+    const get8 = () => { if (cnt < 8) { if (p >= src.length) return -1; buf |= src[p++] << cnt; cnt += 8; } const v = buf & 0xFF; buf >>>= 8; cnt -= 8; return v; };
+    const head = { weight: 0 }; head.next = head.prev = head;
+    const byByte = new Array(258).fill(null); let used = 0;
+    const remove = it => { if (it.next) { it.prev.next = it.next; it.next.prev = it.prev; it.next = it.prev = null; } };
+    const link = (a, b) => { b.next = a.next; b.prev = a.next.prev; a.next.prev = b; a.next = b; };
+    const insert = (it, after, at) => { remove(it); at = at || head; if (after) link(at, it); else link(at.prev, it); };
+    const findHE = (it, w) => { if (it) { while (it !== head) { if (it.weight >= w) return it; it = it.prev; } } return head; };
+    const create = (v, w, after) => { if (used >= 515) return null; used++; const it = { next: null, prev: null, value: v, weight: w, parent: null, childLo: null }; insert(it, after, null); return it; };
+    const fixup = (it, maxW) => { if (it.weight < maxW) { const h = findHE(head.prev, it.weight); remove(it); link(h, it); } else maxW = it.weight; return maxW; };
+    const incW = it => {
+      for (; it; it = it.parent) {
+        it.weight++;
+        const h = findHE(it.prev, it.weight), hi = h.next;
+        if (hi !== it) {
+          remove(hi); link(it, hi); remove(it); link(h, it);
+          const lo = hi.parent.childLo;
+          let par = it.parent;
+          if (par.childLo === it) par.childLo = hi;
+          if (lo === hi) hi.parent.childLo = it;
+          par = it.parent; it.parent = hi.parent; hi.parent = par;
+        }
+      }
+    };
+    const branch = (v1, v2) => {
+      const last = head.prev, hi = create(v1, last.weight, false); if (!hi) return false;
+      hi.parent = last; byByte[v1] = hi;
+      const lo = create(v2, 0, false); if (!lo) return false;
+      lo.parent = last; last.childLo = lo; byByte[v2] = lo; incW(lo); return true;
+    };
+    const decode = () => { if (head.next === head) return -1; let it = head.next; while (it.childLo) { const b = get1(); if (b < 0) return -1; it = b ? it.childLo.prev : it.childLo; } return it.value; };
+    const type = get8();
+    if (type < 0 || (type & 0x0F) >= 9) throw new Error('huffman: bad data type');
+    const dist = HUFF_DIST[type & 0x0F], sparse = type === 0;
+    let maxW = 0;
+    for (let i = 0; i < 256; i++) if (dist[i]) { byByte[i] = create(i, dist[i], true); maxW = fixup(byByte[i], maxW); }
+    byByte[256] = create(256, 1, false); byByte[257] = create(257, 1, false);
+    let lo = head.prev;
+    while (lo !== head) {
+      const hi = lo.prev; if (hi === head) break;
+      const n = create(0, hi.weight + lo.weight, true); if (!n) break;
+      lo.parent = n; hi.parent = n; n.childLo = lo; maxW = fixup(n, maxW); lo = hi.prev;
+    }
+    const out = new Uint8Array(outLen); let op = 0, v;
+    while ((v = decode()) !== 0x100) {
+      if (v < 0) break;
+      if (v === 0x101) { v = get8(); if (v < 0) break; if (!branch(head.prev.value, v)) break; if (!sparse) incW(byByte[v]); }
+      if (op >= outLen) break;
+      out[op++] = v;
+      if (sparse) incW(byByte[v]);
+    }
+    return out.subarray(0, op);
+  }
+  const ADPCM_NEXT = [-1, 0, -1, 4, -1, 2, -1, 6, -1, 1, -1, 5, -1, 3, -1, 7, -1, 1, -1, 5, -1, 3, -1, 7, -1, 2, -1, 4, -1, 6, -1, 8];
+  const ADPCM_STEP = [7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107, 118, 130, 143,
+    157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066,
+    2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899, 15289, 16818, 18500,
+    20350, 22385, 24623, 27086, 29794, 32767];
+  function adpcmDecompress(src, outLen, ch) {
+    const out = new Uint8Array(outLen); let op = 0, ip = 0;
+    const rb = () => ip < src.length ? src[ip++] : -1;
+    const rw = () => { if (src.length - ip < 2) return null; const v = (src[ip] | (src[ip + 1] << 8)) << 16 >> 16; ip += 2; return v; };
+    const ww = v => { if (outLen - op < 2) return false; out[op++] = v & 255; out[op++] = (v >> 8) & 255; return true; };
+    const pred = [0, 0], step = [0x2C, 0x2C];
+    rb(); const shift = rb(); if (shift < 0) return out.subarray(0, op);
+    for (let i = 0; i < ch; i++) { const s = rw(); if (s === null) return out.subarray(0, op); pred[i] = s; if (!ww(s)) return out.subarray(0, op); }
+    let ci = ch - 1, e;
+    while ((e = rb()) >= 0) {
+      ci = (ci + 1) % ch;
+      if (e === 0x80) { if (step[ci]) step[ci]--; if (!ww(pred[ci])) break; }
+      else if (e === 0x81) { step[ci] += 8; if (step[ci] > 0x58) step[ci] = 0x58; ci = (ci + 1) % ch; }
+      else {
+        const si = step[ci], ss = ADPCM_STEP[si];
+        let d = ss >> shift;
+        if (e & 1) d += ss; if (e & 2) d += ss >> 1; if (e & 4) d += ss >> 2; if (e & 8) d += ss >> 3; if (e & 0x10) d += ss >> 4; if (e & 0x20) d += ss >> 5;
+        let pv = pred[ci];
+        if (e & 0x40) { pv -= d; if (pv <= -32768) pv = -32768; } else { pv += d; if (pv >= 32767) pv = 32767; }
+        pred[ci] = pv;
+        if (!ww(pv)) break;
+        const ns = si + ADPCM_NEXT[e & 0x1F]; step[ci] = ns < 0 ? 0 : ns > 88 ? 88 : ns;
+      }
+    }
+    return out.subarray(0, op);
+  }
+  function decompSector(s, flags, want) {
+    if (flags & F.IMPLODE) return Blast.explode(s, want);
+    const mask = s[0]; let data = s.subarray(1);
+    if (mask & ~0xC9) throw new Error('Unsupported MPQ compression 0x' + mask.toString(16));
+    if (mask & 0x08) data = Blast.explode(data, want);
+    if (mask & 0x01) data = huffDecompress(data, want);
+    if (mask & 0x80) data = adpcmDecompress(data, want, 2);
+    else if (mask & 0x40) data = adpcmDecompress(data, want, 1);
+    if (data.length < want) { const o = new Uint8Array(want); o.set(data); data = o; }
+    return data;
+  }
+  function mpqRead(m, bi, name) {
+    const b = m.blocks[bi];
+    if (!b || !(b.flags & F.EXISTS)) return null;
+    const pos = m.base + b.pos, out = new Uint8Array(b.fsize), comp = b.flags & (F.IMPLODE | F.COMPRESS);
+    let key = 0;
+    if (b.flags & F.ENC) {
+      if (name) { key = hashStr(name.replace(/^.*[\\/]/, ''), 3); if (b.flags & F.FIX) key = ((key + b.pos) ^ b.fsize) >>> 0; }
+      else if (comp && !(b.flags & F.SINGLE)) key = mpqDetectKey(m, b);
+      else if (!comp) key = mpqDetectWarKey(m, b);
+      if (!key) throw new Error('Encrypted file with unknown name');
+    }
+    if (b.flags & F.SINGLE) {
+      const s = m.d.slice(pos, pos + b.csize); if (b.flags & F.ENC) decryptBytes(s, key);
+      out.set((comp && b.csize < b.fsize ? decompSector(s, b.flags, b.fsize) : s).subarray(0, b.fsize)); return out;
+    }
+    const ss = m.sectorSize, ns = Math.ceil(b.fsize / ss);
+    let offs;
+    if (comp) { offs = readU32s(m.d, pos, ns + 1); if (b.flags & F.ENC) decrypt(offs, (key - 1) >>> 0); }
+    else { offs = new Uint32Array(ns + 1); for (let i = 0; i <= ns; i++) offs[i] = Math.min(i * ss, b.fsize); }
+    for (let i = 0; i < ns; i++) {
+      const want = Math.min(ss, b.fsize - i * ss);
+      let s = m.d.slice(pos + offs[i], pos + offs[i + 1]);
+      if (b.flags & F.ENC) decryptBytes(s, (key + i) >>> 0);
+      if (comp && s.length < want) s = decompSector(s, b.flags, want);
+      out.set(s.subarray(0, want), i * ss);
+    }
+    return out;
+  }
+  const WC2_NAMES = ['maindat.war', 'rezdat.war', 'snddat.war', 'strdat.war', 'sfxdat.sud', 'muddat.cud', 'war2dat.war'];
+  // Returns [{name, data}] for every file that is itself a WAR-style archive.
+  function mpqExtractWars(buf, log = () => {}) {
+    const m = parseMpq(buf), named = new Map();
+    const lf = mpqFind(m, '(listfile)');
+    if (lf >= 0) { try { for (const n of new TextDecoder().decode(mpqRead(m, lf, '(listfile)')).split(/[\r\n;]+/)) { const t = n.trim(); if (t) { const bi = mpqFind(m, t); if (bi >= 0) named.set(bi, t); } } } catch (e) {} }
+    for (const n of WC2_NAMES) for (const pre of ['', 'data\\', 'war2dat\\']) { const bi = mpqFind(m, pre + n); if (bi >= 0 && !named.has(bi)) named.set(bi, pre + n); }
+    const out = [];
+    for (let i = 0; i < m.blocks.length; i++) {
+      const b = m.blocks[i]; if (!(b.flags & F.EXISTS) || b.fsize < 12) continue;
+      const name = named.get(i);
+      let data = null;
+      try { data = mpqRead(m, i, name); } catch (e) { if (name) { try { data = mpqRead(m, i); } catch (e2) {} } }
+      if (!data) { log(`skipped block ${i}${name ? ' (' + name + ')' : ''}`); continue; }
+      const magic = u32(data, 0);
+      if (magic < 0x18 || magic > 0x1F) continue;
+      try { parseWar(data.buffer); } catch (e) { continue; }
+      out.push({ name: (name ? name.replace(/^.*[\\/]/, '') : `FILE${String(i).padStart(4, '0')}.WAR`).toUpperCase(), data });
+    }
+    return out;
+  }
+
+  return { u16, u32, parseWar, lzDecode, getEntry, safeEntry, isGfu, decodeGfu, decodeGfuFrame, isImg, decodeImg, classify, kindOf, toPalette, greyPalette,
+    explode: Blast.explode, huffDecompress, adpcmDecompress, hashStr, decrypt, parseMpq, mpqFind, mpqRead, mpqDetectKey, mpqExtractWars };
+})();
+if (typeof module !== 'undefined') module.exports = Core;
+</script>
+
+<!-- ============ DATA: tables shared by the game and its tests ============ -->
+<script id="data">
+const GameData = (() => {
+// Animation rows inside MAINDAT.WAR unit sheets (5 frames per row), checked frame by frame against the game data.
+// atk = attack rows, die = death rows, walk = walking rows when they are not simply 0-4.
+const rr = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+const ANIM = {
+  45: { atk: rr(5, 8), die: rr(9, 11) }, 46: { atk: rr(5, 8), die: rr(9, 11) }, 51: { atk: rr(5, 8), die: rr(9, 13) }, 52: { atk: rr(5, 8), die: rr(9, 13) },
+  53: { atk: rr(5, 6), die: rr(7, 9) }, 54: { atk: rr(5, 8), die: rr(9, 11) }, 55: { atk: rr(5, 8), die: rr(9, 15) }, 58: { atk: rr(5, 8), die: rr(9, 12) },
+  33: { walk: [0, 2, 3, 5], die: [7, 10, 12] }, 34: { walk: [0, 2, 3, 5], die: [7, 10, 12, 14] }, 35: { atk: rr(4, 6), die: rr(7, 12) }, 36: { atk: [4], die: rr(5, 9) } };
+// Portrait icons (46x38) in MAINDAT.WAR entry 356.
+const ICON_ENTRY = 356, HERO_ICONS = { lothar: 32, uther: 34, alleria: 187, khadgar: 195, grom: 186, zuljin: 35, chogall: 36, teron: 189 };
+/* ---------- levels and permanent upgrades ---------- */
+// Each level uses one of the game's tilesets: palette, megatiles, minitiles and tile table entries in MAINDAT.WAR.
+const LEVELS = [
+  { id: 'forest', name: 'Elwynn Forest', blurb: 'Rolling forest and lakes. A good place to start.', ts: [2, 3, 4, 5], ground: '#34501f',
+    bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.35, forestLakes: 4, trees: 0.5, rocks: 0.9, dark: 0.3, camps: 0.75 }, hp: 1, mix: {} },
+  { id: 'winter', name: 'Alterac Mountains', blurb: 'Frozen lakes and snowbound pines. Tougher foes march here.', ts: [18, 19, 20, 21], ground: '#b9c4cc',
+    bld: { pal: 18, human: [134, 146, 169, 142, 144, 138, 150], orc: [135, 147, 170, 143, 145, 139, 151] }, gen: { clearings: 20, rmin: 10, rmax: 17, lane: 1.2, loops: 0.4, lakes: 0.3, forestLakes: 3, trees: 0.53, rocks: 0.86, dark: 0.3, camps: 0.75 }, hp: 1.3, mix: { tank: 1.5 } },
+  { id: 'waste', name: 'Khaz Modan Wastes', blurb: 'Scorched badlands and rocky ridges. Swarms come thick and fast.', ts: [10, 11, 12, 13], ground: '#6b5434',
+    bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1.1, loops: 0.45, lakes: 0.2, forestLakes: 2, trees: 0.55, rocks: 0.7, dark: 0.35, camps: 0.75 }, hp: 1.6, mix: { fast: 1.8 } },
+  { id: 'swamp', name: 'Swamp of Sorrows', blurb: 'Murky water and twisted trees. Only the hardiest survive.', ts: [438, 439, 440, 441], ground: '#3f4a2a',
+    bld: { pal: 438, human: [479, 491, 80, 487, 489, 483, 495], orc: [480, 492, 81, 488, 490, 484, 496] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.55, forestLakes: 6, trees: 0.5, rocks: 0.9, dark: 0.35, camps: 0.75 }, hp: 2, mix: { ranged: 1.6, tank: 1.3 } },
+];
+const UNLOCK_T = 600; // surviving 10 minutes unlocks the next level
+const UPGRADES = {
+  might:   { name: 'Might', desc: '+5% damage', max: 5, cost: 120 },
+  armour:  { name: 'Armour', desc: '+1 armour', max: 3, cost: 200 },
+  maxhp:   { name: 'Vitality', desc: '+10% maximum health', max: 3, cost: 120 },
+  regen:   { name: 'Recovery', desc: '+0.2 health per second', max: 5, cost: 100 },
+  magnet:  { name: 'Magnet', desc: '+15% pickup range', max: 2, cost: 90 },
+  speed:   { name: 'Swiftness', desc: '+5% movement speed', max: 2, cost: 120 },
+  haste:   { name: 'Haste', desc: '4% faster attacks', max: 2, cost: 250 },
+  growth:  { name: 'Growth', desc: '+8% experience', max: 5, cost: 110 },
+  greed:   { name: 'Greed', desc: '+15% gold', max: 5, cost: 80 },
+  reroll:  { name: 'Fortune', desc: '+1 reroll each run', max: 3, cost: 150 },
+  revival: { name: 'Revival', desc: 'Come back once per run with half health', max: 1, cost: 600 },
+};
+const xpFor = l => 3 + l * 3 + Math.floor(l * l * 0.2);
+function decodeFont(d) {
+  if (!d || d.length < 12 || String.fromCharCode(d[0], d[1], d[2], d[3]) !== 'FONT') return null;
+  const n = d[5] - 32, mw = d[6], mh = d[7], glyphs = [];
+  for (let i = 0; i < n; i++) {
+    const o = Core.u32(d, 8 + i * 4); if (!o || o + 4 > d.length) { glyphs.push(null); continue; }
+    const w = d[o], h = d[o + 1], xo = d[o + 2], yo = d[o + 3], px = new Uint8Array(w * h).fill(255);
+    let p = o + 4, x = 0, y = 0;
+    out: while (p < d.length) {
+      const c = d[p++]; x += c >> 3;
+      while (x >= w) { x -= w; if (++y >= h) break out; }
+      px[y * w + x] = c & 7;
+      if (++x >= w) { x -= w; if (++y >= h) break; }
+    }
+    glyphs.push({ w, h, xo, yo, px, cache: {} });
+  }
+  return { mw, mh, glyphs };
+}
+  return { ANIM, ICON_ENTRY, HERO_ICONS, LEVELS, UNLOCK_T, UPGRADES, xpFor, decodeFont };
+})();
+if (typeof module !== 'undefined') module.exports = GameData;
+</script>
+
+<!-- ============ TERRAIN: map generation (pure, testable) ============ -->
+<script id="terrain">
+const Terrain = (() => {
+/* ---------- terrain: real Warcraft II tilesets ---------- */
+// Terrain types, arranged so each tile only ever mixes two neighbouring types, as Warcraft II's transition tiles expect.
+const TT = { DW: 0, W: 1, C: 2, G: 3, DG: 4, F: 5, R: 6 };
+const T_SOLID = [2, 1, 3, 5, 6, 7, 8];               // record in the tileset table for each type
+const T_PRI = [1, 4, 5, 6, 3, 3, 2];                  // when two cells clash, the lower priority one gives way
+const T_BLOCK = [1, 1, 0, 0, 0, 1, 1];                // water, forest and rock block movement
+const T_EDGES = [[0, 1], [1, 2], [2, 3], [3, 4], [3, 5], [2, 6]];
+const T_PAIR = {};                                    // 'a,b' -> [mixed group, first type]
+[[0, 1, 1], [1, 2, 2], [6, 2, 4], [2, 3, 5], [4, 3, 6], [5, 3, 7]].forEach(([a, b, g]) => { T_PAIR[a + ',' + b] = T_PAIR[b + ',' + a] = [g, a]; });
+// Quadrant mask (UL=1, UR=2, LL=4, LR=8 marking the first type) to the pattern number used by the tile table.
+const T_MASK2P = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+const T_NEXT = (() => { // next step from type a toward type b along the type graph
+  const n = 7, adj = Array.from({ length: n }, () => []), nx = Array.from({ length: n }, () => new Int8Array(n).fill(-1)), dist = Array.from({ length: n }, () => new Int8Array(n).fill(99));
+  for (const [a, b] of T_EDGES) { adj[a].push(b); adj[b].push(a); }
+  for (let s = 0; s < n; s++) {
+    dist[s][s] = 0; const q = [s];
+    while (q.length) { const v = q.shift(); for (const w of adj[v]) if (dist[s][w] === 99) { dist[s][w] = dist[s][v] + 1; nx[s][w] = v === s ? w : nx[s][v]; q.push(w); } }
+  }
+  return { nx, dist };
+})();
+const TN = 128, TM = TN * 2;                         // map period in tiles and half-tiles
+const ihash = (x, y, s) => { let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(s, 2246822519); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; };
+function pnoise(x, y, cell, seed) { // periodic value noise over the half-tile grid
+  const per = TM / cell, gx = x / cell, gy = y / cell, xi = Math.floor(gx), yi = Math.floor(gy), xf = gx - xi, yf = gy - yi;
+  const m = v => ((v % per) + per) % per, hv = (a, b) => ihash(m(a), m(b), seed) / 4294967296, sm = t => t * t * (3 - 2 * t);
+  const v00 = hv(xi, yi), v10 = hv(xi + 1, yi), v01 = hv(xi, yi + 1), v11 = hv(xi + 1, yi + 1), u = sm(xf), v = sm(yf);
+  return v00 + (v10 - v00) * u + (v01 - v00) * v + (v00 - v10 - v01 + v11) * u * v;
+}
+const fbm = (x, y, seed) => pnoise(x, y, 32, seed) * 0.55 + pnoise(x, y, 16, seed + 7) * 0.3 + pnoise(x, y, 8, seed + 13) * 0.15;
+const tmod = (v, n) => ((v % n) + n) % n;
+
+function buildTerrain(LV, seed, enemySide, opts = {}) {
+  const TAU = Math.PI * 2, bldSize = opts.bldSize || (() => null);
+  // Modelled on the stock Warcraft II maps: forest is the background, and open ground is a connected
+  // network of clearings joined by grassy lanes, with dirt roads, lakes ringed by dirt, and bases in the clearings.
+  const g = LV.gen, q = new Uint8Array(TM * TM), blk = new Uint8Array(TM * TM);
+  const I = (x, y) => tmod(y, TM) * TM + tmod(x, TM);
+  let rs = (seed >>> 0) || 1; const R = () => { rs ^= rs << 13; rs ^= rs >>> 17; rs ^= rs << 5; return (rs >>> 0) / 4294967296; };
+  const tdx = (a, b) => tmod(a - b + TN / 2, TN) - TN / 2;
+  // 1. Clearings, the first one at the start position.
+  const pts = [{ x: 0, y: 0, r: 11, start: true }];
+  for (let k = 0; pts.length < g.clearings && k < 4000; k++) {
+    const p = { x: R() * TN, y: R() * TN, r: g.rmin + R() * (g.rmax - g.rmin) };
+    if (pts.every(o => Math.hypot(tdx(p.x, o.x), tdx(p.y, o.y)) > o.r + p.r + 5)) pts.push(p);
+  }
+  const n = pts.length, D = (a, b) => Math.hypot(tdx(pts[a].x, pts[b].x), tdx(pts[a].y, pts[b].y));
+  // 2. Lanes: a spanning tree so everything connects, plus a few loops so you can circle round.
+  const edges = [], used = new Set([0]);
+  while (used.size < n) { let best = null; for (const a of used) for (let b = 0; b < n; b++) if (!used.has(b)) { const d = D(a, b); if (!best || d < best[2]) best = [a, b, d]; } used.add(best[1]); edges.push(best); }
+  for (let a = 0; a < n; a++) {
+    const near = [...Array(n).keys()].filter(b => b !== a).sort((x, y) => D(a, x) - D(a, y)).slice(0, 3);
+    for (const b of near) if (R() < g.loops && D(a, b) < 48 && !edges.some(e => (e[0] === a && e[1] === b) || (e[0] === b && e[1] === a))) edges.push([a, b, D(a, b)]);
+  }
+  const segs = edges.map(([a, b]) => ({ a, b, ax: pts[a].x, ay: pts[a].y, dx: tdx(pts[b].x, pts[a].x), dy: tdx(pts[b].y, pts[a].y), w: g.lane * (3.6 + R() * 2.6), road: R() < 0.65 }));
+  // 3. Lakes: in some clearings, and a few on their own in the forest.
+  const lakes = [];
+  pts.forEach((p, i) => { if (i && R() < g.lakes) { const a = R() * TAU, d = R() * p.r * 0.35; lakes.push({ x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, r: 2.2 + R() * Math.min(3.2, p.r * 0.35), host: i }); } });
+  for (let k = 0; k < g.forestLakes; k++) lakes.push({ x: R() * TN, y: R() * TN, r: 2.5 + R() * 3.5, host: -1 });
+  for (const L of lakes) if (L.host >= 0) pts[L.host].lake = L;
+  // 4. Classify every half-tile.
+  for (let hy = 0; hy < TM; hy++) for (let hx = 0; hx < TM; hx++) {
+    const wx = (pnoise(hx, hy, 16, seed + 11) - 0.5) * 5, wy = (pnoise(hx, hy, 16, seed + 12) - 0.5) * 5;
+    const px = hx / 2 + 0.25 + wx, py = hy / 2 + 0.25 + wy, edge = (pnoise(hx, hy, 8, seed + 13) - 0.5) * 3;
+    let dc = 1e9; for (const p of pts) { const d = Math.hypot(tdx(px, p.x), tdx(py, p.y)) - p.r; if (d < dc) dc = d; }
+    let dl = 1e9, droad = 1e9;
+    for (const sg of segs) {
+      const rx = tdx(px, sg.ax), ry = tdx(py, sg.ay), L2 = sg.dx * sg.dx + sg.dy * sg.dy, t = Math.max(0, Math.min(1, (rx * sg.dx + ry * sg.dy) / L2));
+      const d = Math.hypot(rx - sg.dx * t, ry - sg.dy * t); if (d - sg.w < dl) dl = d - sg.w; if (sg.road && d < droad) droad = d;
+    }
+    // Away from the clearings and lanes, trees grow in clumps rather than one solid forest.
+    const clump = pnoise(hx, hy, 8, seed + 19) * 0.65 + pnoise(hx, hy, 4, seed + 20) * 0.35, near = Math.min(dc, dl);
+    let t = near < edge ? TT.G : clump > g.trees + Math.max(0, 6 - near) * 0.025 ? TT.F : TT.G;
+    if (t === TT.G) {
+      if (droad < 0.55 + (pnoise(hx, hy, 8, seed + 14) - 0.5) * 0.5) t = TT.C;
+      else if (pnoise(hx, hy, 32, seed + 15) * 0.7 + pnoise(hx, hy, 8, seed + 16) * 0.3 > 1 - g.dark) t = TT.DG;
+      const rk = pnoise(hx, hy, 16, seed + 17) * 0.75 + pnoise(hx, hy, 4, seed + 18) * 0.25;
+      if (Math.min(dc, dl) > -2.5 && rk > g.rocks) t = rk > g.rocks + 0.05 ? TT.R : TT.C;
+    }
+    for (const L of lakes) {
+      const d = Math.hypot(tdx(hx / 2 + 0.25 + wx * 0.9, L.x), tdx(hy / 2 + 0.25 + wy * 0.9, L.y)) - L.r;
+      if (d < -1.6) { t = TT.DW; break; } if (d < 0) { t = TT.W; break; } if (d < 1.1 && t !== TT.W) t = TT.C;
+    }
+    q[hy * TM + hx] = t;
+  }
+  // Keep the start clear.
+  for (let y = -16; y <= 16; y++) for (let x = -16; x <= 16; x++) if (x * x + y * y <= 196) { const i = I(x, y); if (T_BLOCK[q[i]]) q[i] = TT.G; }
+  // 5. Settle clashes so every 2x2 block holds at most two neighbouring types.
+  for (let pass = 0; pass < 12; pass++) {
+    let changed = 0;
+    for (let y = 0; y < TM; y++) for (let x = 0; x < TM; x++) {
+      const i = y * TM + x, t = q[i];
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const u = q[I(x + dx, y + dy)];
+        if (T_NEXT.dist[t][u] > 1 && (T_PRI[t] < T_PRI[u] || (T_PRI[t] === T_PRI[u] && t < u))) { q[i] = T_NEXT.nx[t][u]; changed++; dy = 2; break; }
+      }
+    }
+    if (!changed) break;
+  }
+  for (let i = 0; i < q.length; i++) blk[i] = T_BLOCK[q[i]];
+  // 6. Bases, laid out like the scenario maps: hall in the middle, farms in touching pairs, barracks and other
+  // buildings a tile or two apart, the lumber mill on the forest edge, and towers where the lanes come in.
+  const occ = new Uint8Array(TN * TN), tileFree = (tx, ty) => { for (let k = 0; k < 4; k++) if (blk[I(tx * 2 + (k & 1), ty * 2 + (k >> 1))]) return false; return !occ[tmod(ty, TN) * TN + tmod(tx, TN)]; };
+  const fits = (tx, ty, w, h, gap) => { for (let y = ty - gap; y < ty + h + gap; y++) for (let x = tx - gap; x < tx + w + gap; x++) if (!tileFree(x, y)) return false; return true; };
+  const forestNear = (tx, ty, w, h) => { let c = 0; for (let y = ty - 3; y < ty + h + 3; y++) for (let x = tx - 3; x < tx + w + 3; x++) if (q[I(x * 2, y * 2)] === TT.F) c++; return c; };
+  const camps = [];
+  pts.forEach((p, i) => {
+    if (p.start || p.r < 8) return;
+    if (R() > g.camps) return;
+    const enemy = R() < 0.65, side = enemy ? enemySide : (enemySide === 'orc' ? 'human' : 'orc');
+    const c = { id: camps.length, cx: Math.round(p.x), cy: Math.round(p.y), enemy, side, blds: [] };
+    const sz = bldSize;
+    const put = (kind, tx, ty) => { const entry = LV.bld[side][kind], s2 = sz(entry); if (!s2) return null; const b = { entry, kind, tx, ty, w: s2[0], h: s2[1] }; c.blds.push(b); for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) occ[tmod(ty + y, TN) * TN + tmod(tx + x, TN)] = 1; return b; };
+    const spiral = (cx, cy, maxR, test) => { for (let r = 0; r <= maxR; r++) for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (Math.max(Math.abs(x), Math.abs(y)) === r && test(cx + x, cy + y)) return [cx + x, cy + y]; return null; };
+    const place = (kind, nearX, nearY, gap = 1, prefer) => {
+      const s2 = sz(LV.bld[side][kind]); if (!s2) return null;
+      let pos;
+      if (prefer) { let best = null; const pr = Math.ceil(p.r); for (let y = -pr; y <= pr; y++) for (let x = -pr; x <= pr; x++) { const tx = c.cx + x, ty = c.cy + y; if (x * x + y * y > (p.r - 1) ** 2 || !fits(tx, ty, s2[0], s2[1], gap)) continue; const sc = prefer(tx, ty, s2[0], s2[1]); if (!best || sc > best[2]) best = [tx, ty, sc]; } pos = best; }
+      else pos = spiral(Math.round(nearX - s2[0] / 2), Math.round(nearY - s2[1] / 2), Math.ceil(p.r), (tx, ty) => Math.hypot(tx + s2[0] / 2 - c.cx, ty + s2[1] / 2 - c.cy) < p.r - 1 && fits(tx, ty, s2[0], s2[1], gap));
+      return pos ? put(kind, pos[0], pos[1]) : null;
+    };
+    if (enemy) {
+      const hall = place(3, c.cx, c.cy); if (!hall) return;
+      const hx = hall.tx + hall.w / 2, hy = hall.ty + hall.h / 2;
+      place(4, hx, hy, 1, (tx, ty, w, h) => forestNear(tx, ty, w, h) * 2 - Math.hypot(tx - hx, ty - hy));
+      place(1, hx + 4, hy + 3);
+      let f = place(0, hx - 4, hy + 4); if (f) place(0, f.tx + f.w, f.ty, 0) || place(0, f.tx, f.ty + f.h, 0);
+      if (p.r > 10) { f = place(0, hx + 4, hy - 4); if (f) place(0, f.tx + f.w, f.ty, 0); place(5, hx - 4, hy - 4); }
+      for (const sg of segs) if (sg.a === i || sg.b === i) {
+        const sgn = sg.a === i ? 1 : -1, L = Math.hypot(sg.dx, sg.dy), ux = sg.dx / L * sgn, uy = sg.dy / L * sgn;
+        place(2, Math.round(p.x + ux * (p.r - 2)), Math.round(p.y + uy * (p.r - 2)), 0);
+      }
+    } else {
+      const f = place(0, c.cx - 3, c.cy - 2); if (f) place(0, f.tx + f.w, f.ty, 0);
+      place(4, c.cx, c.cy, 1, (tx, ty, w, h) => forestNear(tx, ty, w, h) * 2 - Math.hypot(tx - c.cx, ty - c.cy));
+      place(2, c.cx + 3, c.cy + 3);
+    }
+    if (c.blds.length < 2) { for (const b of c.blds) for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) occ[tmod(b.ty + y, TN) * TN + tmod(b.tx + x, TN)] = 0; return; }
+    for (const b of c.blds) for (let y = 0; y < b.h * 2; y++) for (let x = 0; x < b.w * 2; x++) blk[I(b.tx * 2 + x, b.ty * 2 + y)] = 2;
+    // The supply cache sits on open ground in the clearing.
+    const spot = spiral(c.cx, c.cy, 6, (tx, ty) => tileFree(tx, ty)); if (spot) { c.cx = spot[0]; c.cy = spot[1]; }
+    camps.push(c);
+  });
+  // Pick the megatile for each tile from its four quadrants.
+  const ts = { recs: opts.recs || [] }, tiles = new Uint16Array(TN * TN);
+  const pick = (list, h) => list.length ? (h % 100 < 55 ? list[0] : list[h % list.length]) : 0;
+  for (let ty = 0; ty < TN; ty++) for (let tx = 0; tx < TN; tx++) {
+    const a = [q[I(tx * 2, ty * 2)], q[I(tx * 2 + 1, ty * 2)], q[I(tx * 2, ty * 2 + 1)], q[I(tx * 2 + 1, ty * 2 + 1)]], hh = ihash(tx, ty, seed + 9);
+    const kinds = [...new Set(a)];
+    let m = 0;
+    if (kinds.length === 1) m = pick(ts.recs[T_SOLID[a[0]]] || [], hh);
+    else if (kinds.length === 2 && T_PAIR[kinds[0] + ',' + kinds[1]]) {
+      const [grp, first] = T_PAIR[kinds[0] + ',' + kinds[1]];
+      const mask = (a[0] === first) | (a[1] === first) << 1 | (a[2] === first) << 2 | (a[3] === first) << 3;
+      m = pick(ts.recs[16 * grp + T_MASK2P[mask]] || [], hh);
+    }
+    if (!m) m = pick(ts.recs[T_SOLID[Math.max(...a.map(t => T_PRI[t] * 8 + t)) & 7]] || ts.recs[5] || [], hh);
+    tiles[ty * TN + tx] = m;
+  }
+  return { LV, seed, q, blk, tiles, camps, chunks: new Map() };
+}
+
+  return { TT, T_SOLID, T_PRI, T_BLOCK, T_PAIR, T_MASK2P, T_NEXT, TN, TM, ihash, pnoise, tmod, buildTerrain };
+})();
+if (typeof module !== 'undefined') module.exports = Terrain;
+</script>
+
+<!-- ============ GAME ============ -->
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const cv = $('#c'), ctx = cv.getContext('2d');
+const overlay = $('#overlay'), pauseBtn = $('#pauseBtn'), speedBtn = $('#speedBtn');
+const SPEEDS = [1, 1.5, 2];
+function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedBtn.textContent = cfg.opts.speed + 'x'; }
+function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedBtn.textContent = cfg.opts.speed + 'x'; if (G && G.state === 'play') banner(`Game speed ${cfg.opts.speed}x`); }
+const RUN_LEN = 15 * 60;
+const TAU = Math.PI * 2;
+const { ANIM, ICON_ENTRY, HERO_ICONS, LEVELS, UNLOCK_T, UPGRADES, xpFor, decodeFont } = GameData;
+const { TT, TN, TM, tmod } = Terrain;
+// Seeded maps: add ?seed=123 to the page address to replay the same map.
+const SEED_PARAM = (() => { try { const v = new URLSearchParams(location.search).get('seed'); return v === null ? null : (parseInt(v, 10) | 0); } catch (e) { return null; } })();
+function buildTerrain(LV, seed, side) {
+  return Terrain.buildTerrain(LV, seed, side, { recs: A.tilesets[LV.id].recs, bldSize: e => { const sp = A.bldSpr && A.bldSpr[e]; return sp ? [Math.round(sp.width / 32), Math.round(sp.height / 32)] : null; } });
+}
+let W = 400, H = 240, SCALE = 1, camX = 0, camY = 0;
+
+/* ---------- storage ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+let cfg = store.get('tos_cfg', null) || { roles: {}, sounds: {}, palette: null };
+cfg.roles ||= {}; cfg.sounds ||= {};
+cfg.opts = Object.assign({ speed: 1, music: 0.6, sfx: 0.8, nums: true, quickChest: false }, cfg.opts || {});
+const saveCfg = () => store.set('tos_cfg', cfg);
+let best = store.get('tos_best', { time: 0, kills: 0, level: 0 });
+
+const DB = {
+  db: null,
+  async open() {
+    try {
+      this.db = await new Promise((res, rej) => {
+        const r = indexedDB.open('tides_of_survival', 3);
+        r.onupgradeneeded = () => { const d = r.result; for (const st of ['files', 'music', 'handles']) if (!d.objectStoreNames.contains(st)) d.createObjectStore(st, { keyPath: 'name' }); };
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+      });
+    } catch (e) { this.db = null; }
+  },
+  req(mode, fn, store = 'files') {
+    if (!this.db) return Promise.resolve(null);
+    return new Promise(res => {
+      try { const t = this.db.transaction(store, mode); const r = fn(t.objectStore(store)); t.oncomplete = () => res(r && r.result); t.onerror = () => res(null); }
+      catch (e) { res(null); }
+    });
+  },
+  put(name, buf) { return this.req('readwrite', s => s.put({ name, buf })); },
+  all() { return this.req('readonly', s => s.getAll()); },
+  clear() { return Promise.all([this.req('readwrite', s => s.clear()), this.req('readwrite', s => s.clear(), 'music')]); }, // keeps the remembered folder
+  putMusic(rec) { return this.req('readwrite', s => s.put(rec), 'music'); },
+  getMusic(name) { return this.req('readonly', s => s.get(name), 'music'); },
+  musicNames() { return this.req('readonly', s => s.getAllKeys(), 'music'); }
+};
+
+/* ---------- assets ---------- */
+const ROLES = [
+  ['hero', 'Hero (default for all)'],
+  ['hero_lothar', 'Hero: Anduin Lothar'], ['hero_uther', 'Hero: Uther Lightbringer'], ['hero_alleria', 'Hero: Alleria Windrunner'], ['hero_khadgar', 'Hero: Khadgar'],
+  ['hero_grom', 'Hero: Grom Hellscream'], ['hero_zuljin', "Hero: Zul'jin"], ['hero_chogall', "Hero: Cho'gall"], ['hero_teron', 'Hero: Teron Gorefiend'], ['basic', 'Horde enemy: grunt'], ['fast', 'Horde enemy: fast (sappers)'], ['tank', 'Horde enemy: tank (ogre)'],
+  ['ranged', 'Horde enemy: ranged (axethrower)'], ['boss', 'Horde boss (dragon)'], ['eshot', 'Horde enemy missile'],
+  ['ally_basic', 'Alliance enemy: footman'], ['ally_fast', 'Alliance enemy: fast (dwarves)'], ['ally_tank', 'Alliance enemy: tank (knight)'],
+  ['ally_ranged', 'Alliance enemy: ranged (archer)'], ['ally_boss', 'Alliance boss (gryphon rider)'], ['ally_eshot', 'Alliance enemy missile'],
+  ['proj', 'Missile: arrow'], ['bolt', 'Missile: ballista bolt'], ['rune', 'Rune'],
+  ['axe', 'Missile: thrown axe'], ['fire', 'Missile: fireball'], ['coil', 'Missile: death coil'], ['boom', 'Explosion'], ['gem', 'XP pickup']
+];
+const SOUND_ROLES = [['s_hit', 'Enemy hit'], ['s_die', 'Orc dies'], ['s_die_ally', 'Human dies'], ['s_hurt', 'Hero hurt'], ['s_level', 'Level up'], ['s_boom', 'Explosion'],
+  ['s_sword', 'Sword swing'], ['s_bow', 'Bow shot'], ['s_axe', 'Axe throw'], ['s_fire', 'Fireball hit'], ['s_coil', 'Death coil'], ['s_start', 'Run start']];
+// Entry numbers inside MAINDAT.WAR (TOME.1 in the Battle.net Edition), from the Wargus project's extraction table.
+const AUTO_PALETTE = 2;
+const unitR = (e, r1 = 4) => ({ e, mode: 'dir5', r0: 0, r1 });
+const AUTO_ROLES = {
+  hero: unitR(45), hero_lothar: unitR(51), hero_uther: unitR(51), hero_alleria: unitR(53), hero_khadgar: unitR(55),
+  hero_grom: unitR(46), hero_zuljin: unitR(54), hero_chogall: unitR(52), hero_teron: unitR(58),
+  basic: unitR(46), fast: unitR(34), tank: unitR(52), ranged: unitR(54), boss: unitR(36, 3),
+  ally_basic: unitR(45), ally_fast: unitR(33), ally_tank: unitR(51), ally_ranged: unitR(53), ally_boss: unitR(35, 3),
+  proj: { e: 339, mode: 'dir5', r0: 0, r1: 0 }, bolt: { e: 338, mode: 'dir5', r0: 0, r1: 0 }, axe: { e: 340, mode: 'dir5', r0: 0, r1: 2 },
+  fire: { e: 327, mode: 'dir5', r0: 0, r1: 0 }, coil: { e: 334, mode: 'dir5', r0: 0, r1: 5 }, eshot: { e: 340, mode: 'dir5', r0: 0, r1: 2 },
+  ally_eshot: { e: 339, mode: 'dir5', r0: 0, r1: 0 }, boom: { e: 347, mode: 'cycle', r0: 0, r1: 19 }, rune: { e: 335, mode: 'cycle', r0: 0, r1: 3 },
+};
+const SWING = 0.45, HSWING = 0.35;
+// Sound files inside War2Dat.mpq (paths from the Wargus project).
+const MPQ_SOUNDS = [['s_hit', 'Gamesfx\\misc\\bowhit.wav'], ['s_hurt', 'Gamesfx\\misc\\punch.wav'], ['s_die', 'Gamesfx\\orc\\odead.wav'], ['s_die_ally', 'Gamesfx\\human\\hdead.wav'],
+  ['s_level', 'Gamesfx\\misc\\hrescue.wav'], ['s_boom', 'Gamesfx\\misc\\explode.wav'], ['s_sword', 'Gamesfx\\misc\\sword1.wav'], ['s_bow', 'Gamesfx\\misc\\bowfire.wav'],
+  ['s_axe', 'Gamesfx\\misc\\axe.wav'], ['s_fire', 'Gamesfx\\misc\\firehit.wav'], ['s_coil', 'Gamesfx\\spells\\dethcoil.wav'], ['s_start', 'Gamesfx\\misc\\orescue.wav']];
+function findMain() { return warNames().find(n => /(^|\/)MAINDAT\.WAR$/.test(n)); }
+// Fill in roles from the known table. force = overwrite the user's own choices too.
+function autoAssign(force) {
+  const main = findMain(); let n = 0;
+  if (main) {
+    const war = A.wars[main];
+    if ((force || !cfg.palette || !A.wars[cfg.palette.file]) && Core.kindOf(war, AUTO_PALETTE) === 'pal') cfg.palette = { file: main, entry: AUTO_PALETTE };
+    for (const [role, r] of Object.entries(AUTO_ROLES)) {
+      const cur = cfg.roles[role];
+      if (!force && cur && A.wars[cur.file]) continue;
+      if (Core.kindOf(war, r.e) !== 'gfx') continue;
+      cfg.roles[role] = { file: main, entry: r.e, mode: r.mode, r0: r.r0, r1: r.r1, auto: true }; n++;
+    }
+  }
+  const snd = warNames().find(x => /(^|\/)SOUNDS\.WAR$/.test(x));
+  if (snd) {
+    const war = A.wars[snd];
+    MPQ_SOUNDS.forEach(([role], i) => {
+      const cur = cfg.sounds[role];
+      if (!force && cur && A.wars[cur.file]) return;
+      const name = war.names && war.names[i];
+      const idx = war.names ? war.names.indexOf(role) : -1;
+      if (idx >= 0 && Core.kindOf(war, idx) === 'wav') { cfg.sounds[role] = { file: snd, entry: idx }; n++; }
+    });
+  }
+  saveCfg(); return n;
+}
+// Pack loose files into an uncompressed WAR so the rest of the game can treat them like any archive.
+function packWar(items) {
+  const n = items.length, head = 8 + n * 4; let size = head; for (const it of items) size += 4 + it.data.length;
+  const out = new Uint8Array(size), dv = new DataView(out.buffer);
+  dv.setUint32(0, 0x19, true); dv.setUint16(4, n, true); dv.setUint16(6, 0, true);
+  let p = head;
+  items.forEach((it, i) => { dv.setUint32(8 + i * 4, p, true); dv.setUint32(p, it.data.length, true); out.set(it.data, p + 4); p += 4 + it.data.length; });
+  return out.buffer;
+}
+const A = { wars: {}, sprites: {}, pal: Core.greyPalette(), palSrc: null, actx: null, sbuf: {}, lastPlay: {}, active: 0 };
+
+function addWar(name, buf) {
+  const war = Core.parseWar(buf);
+  war.name = name; A.wars[name] = war;
+  if (/(^|\/)SOUNDS\.WAR$/.test(name)) war.names = MPQ_SOUNDS.map(x => x[0]).slice(0, war.count);
+  return war;
+}
+function warNames() {
+  return Object.keys(A.wars).sort((a, b) => (b.includes('MAIN') - a.includes('MAIN')) || a.localeCompare(b));
+}
+function resolvePalette() {
+  const p = cfg.palette;
+  if (p && A.wars[p.file]) { const d = Core.safeEntry(A.wars[p.file], p.entry); if (d && d.length >= 768) { A.palSrc = p; return Core.toPalette(d); } }
+  for (const n of warNames()) {
+    const w = A.wars[n];
+    for (let i = 0; i < w.count; i++) {
+      if (!w.entries[i]) continue;
+      const e = w.entries[i];
+      if (e.end - e.offset > 2200) continue; // palettes are small; skip big entries quickly
+      const d = Core.safeEntry(w, i);
+      if (d && d.length === 768) { A.palSrc = { file: n, entry: i, auto: true }; return Core.toPalette(d); }
+    }
+  }
+  A.palSrc = null; return Core.greyPalette();
+}
+function frameImage(px, w, h, pal) {
+  const id = new ImageData(w, h), o = id.data;
+  for (let i = 0; i < w * h; i++) {
+    const v = px[i]; if (v < 0) continue;
+    o[i * 4] = pal[v * 3]; o[i * 4 + 1] = pal[v * 3 + 1]; o[i * 4 + 2] = pal[v * 3 + 2]; o[i * 4 + 3] = 255;
+  }
+  return id;
+}
+function buildAtlas(g, pal, cols) {
+  cols = Math.max(1, Math.min(cols, g.count));
+  const rows = Math.ceil(g.count / cols);
+  const c = document.createElement('canvas'); c.width = g.w * cols; c.height = g.h * rows;
+  const x = c.getContext('2d');
+  g.frames.forEach((px, i) => x.putImageData(frameImage(px, g.w, g.h, pal), (i % cols) * g.w, Math.floor(i / cols) * g.h));
+  return { canvas: c, fw: g.w, fh: g.h, count: g.count, cols };
+}
+function decodeAny(d) { if (Core.isGfu(d)) return Core.decodeGfu(d); if (Core.isImg(d)) return Core.decodeImg(d); return null; }
+function rebuildSprites() {
+  A.pal = resolvePalette(); A.sprites = {}; A.tilesets = {}; A.bldSpr = {};
+  for (const [role, r] of Object.entries(cfg.roles)) {
+    const war = A.wars[r.file]; if (!war) continue;
+    const d = Core.safeEntry(war, r.entry); if (!d) continue;
+    let g = null; try { g = decodeAny(d) || (r.force ? Core.decodeGfu(d) : null); } catch (e) {}
+    if (!g) continue;
+    const at = buildAtlas(g, A.pal, r.mode === 'dir5' ? 5 : 10);
+    const an = (r.mode || 'dir5') === 'dir5' && /(^|\/)MAINDAT\.WAR$/.test(r.file) ? ANIM[r.entry] : null;
+    A.sprites[role] = { ...at, mode: r.mode || 'dir5', r0: r.r0 ?? 0, r1: r.r1 ?? 4, walk: an && an.walk, atk: an && an.atk, die: an && an.die };
+  }
+  loadFonts();
+  A.titleUrl = null;
+  const tmain = findMain();
+  if (tmain) {
+    const ti = Core.safeEntry(A.wars[tmain], 299), tp = Core.safeEntry(A.wars[tmain], 300);
+    if (ti && tp && Core.isImg(ti) && tp.length >= 768) {
+      try { const im = Core.decodeImg(ti), c = document.createElement('canvas'); c.width = im.w; c.height = im.h; c.getContext('2d').putImageData(frameImage(im.frames[0], im.w, im.h, Core.toPalette(tp)), 0, 0); A.titleUrl = c.toDataURL(); } catch (e) {}
+    }
+  }
+  buildMenuArt();
+  A.icons = {};
+  const main = findMain(), icd = main && Core.safeEntry(A.wars[main], ICON_ENTRY);
+  if (icd && Core.isGfu(icd)) {
+    const n = Core.u16(icd, 0), iw = Core.u16(icd, 2), ih = Core.u16(icd, 4);
+    for (const [id, ix] of Object.entries(HERO_ICONS)) {
+      if (ix >= n) continue;
+      const c = document.createElement('canvas'); c.width = iw; c.height = ih;
+      try { c.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(icd, ix, iw, ih), iw, ih, A.pal), 0, 0); A.icons[id] = c; } catch (e) {}
+    }
+  }
+  A.sbuf = {};
+  resize();
+}
+function assetSummary() {
+  const files = warNames().length, sprites = Object.keys(A.sprites).length, sounds = Object.keys(cfg.sounds).filter(k => A.wars[cfg.sounds[k].file]).length;
+  if (!files) return 'No Warcraft II files loaded, so you\'ll see placeholder shapes. Open the Asset Lab and load <b>TOME.1</b> and <b>War2Dat.mpq</b> from your own copy of the game.';
+  const extra = (mu.names.size ? `, ${mu.names.size} music tracks` : '') + (A.wars['GAMESFX/VOICES.WAR'] ? ', hero voices' : '');
+  return `Using your Warcraft II files: ${sprites} sprite${sprites === 1 ? '' : 's'}, ${sounds} sound${sounds === 1 ? '' : 's'}${extra}.` + (sprites ? '' : ' Assign some sprites in the Asset Lab.')
+    + (mu.names.size ? '' : ' Re-import your game folder to add the music.');
+}
+
+/* ---------- menu art from REZDAT.WAR (TOME.2): background and buttons ---------- */
+function rawGfuFrame(d, i, P) { // uncompressed frames, used by the menu widgets
+  const b = 6 + i * 8; let w = d[b + 2], off = Core.u32(d, b + 4); const h = d[b + 3];
+  if (off & 0x80000000) { w += 256; off &= 0x7FFFFFFF; }
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const id = new ImageData(w, h);
+  for (let k = 0; k < w * h; k++) { const v = d[off + k]; if (v === 255 || v === undefined) continue; id.data[k * 4] = P[v * 3]; id.data[k * 4 + 1] = P[v * 3 + 1]; id.data[k * 4 + 2] = P[v * 3 + 2]; id.data[k * 4 + 3] = 255; }
+  c.getContext('2d').putImageData(id, 0, 0); return c;
+}
+function buildMenuArt() {
+  A.menuBg = null; A.menuBg2 = null; A.btn = null;
+  const rez = warNames().find(n => /(^|\/)REZDAT\.WAR$/.test(n)); document.body.classList.remove('wcbtn');
+  if (!rez) return;
+  const war = A.wars[rez], pd = Core.safeEntry(war, 14);
+  try {
+    const bg = Core.safeEntry(war, 13);
+    const toCanvas = (d, p) => { const im = Core.decodeImg(d), c = document.createElement('canvas'); c.width = im.w; c.height = im.h; c.getContext('2d').putImageData(frameImage(im.frames[0], im.w, im.h, Core.toPalette(p)), 0, 0); return c; };
+    const toUrl = (d, p) => toCanvas(d, p).toDataURL();
+    if (pd && bg && Core.isImg(bg)) { const c = toCanvas(bg, pd); if (c.width === 640) retitleLogo(c); A.menuBg = c.toDataURL(); }
+    const bg2 = Core.safeEntry(war, 15), pd2 = Core.safeEntry(war, 16);
+    A.menuBg2 = bg2 && pd2 && Core.isImg(bg2) ? toUrl(bg2, pd2) : A.menuBg;
+    const bd = Core.safeEntry(war, 1);
+    if (pd && bd && Core.u16(bd, 0) >= 18) {
+      const P = Core.toPalette(pd), url = i => rawGfuFrame(bd, i, P).toDataURL();
+      A.btn = { gray: url(15), normal: url(16), pressed: url(17) };
+      const r = document.documentElement.style;
+      r.setProperty('--btn', `url(${A.btn.normal})`); r.setProperty('--btnp', `url(${A.btn.pressed})`);
+      r.setProperty('--btnb', `url(${A.btn.normal})`); r.setProperty('--btnbp', `url(${A.btn.pressed})`); r.setProperty('--btnbg', `url(${A.btn.gray})`);
+      document.body.classList.add('wcbtn');
+    }
+  } catch (e) { console.warn('menu art', e); }
+}
+// Rewrite "Tides of Darkness" on the logo's ribbon as "Tides of Survival": paint the ribbon over the old word
+// using each row's own colours, then letter the new word in the game's font in the ribbon's ink.
+function retitleLogo(c) {
+  const x0 = 186, x1 = 305, y0 = 104, y1 = 127, g = c.getContext('2d'), id = g.getImageData(x0, y0, x1 - x0, y1 - y0), d = id.data, w = x1 - x0;
+  const ink = (r, gg, b) => r < 110 || (r < 132 && r - gg < 50 && b < 45);
+  for (let y = 0; y < y1 - y0; y++) {
+    const m = new Uint8Array(w);
+    for (let x = 0; x < w; x++) { const o = (y * w + x) * 4; if (ink(d[o], d[o + 1], d[o + 2])) m[Math.max(0, x - 1)] = m[x] = m[Math.min(w - 1, x + 1)] = 1; }
+    if (y < 4 || y > 21) m.fill(0); // keep the ribbon's own top and bottom edges
+    const dark = x => m[x] === 1;
+    for (let x = 0; x < w; x++) {
+      if (!dark(x)) continue;
+      let l = x; while (l > 0 && dark(l)) l--; let r = x; while (r < w - 1 && dark(r)) r++;
+      const okL = !dark(l), okR = !dark(r), t = okL && okR ? (x - l) / (r - l) : okL ? 0 : 1, a = (y * w + (okL ? l : r)) * 4, b = (y * w + (okR ? r : l)) * 4, o = (y * w + x) * 4;
+      if (!okL && !okR) continue;
+      for (let k = 0; k < 3; k++) d[o + k] = Math.round(d[a + k] * (1 - t) + d[b + k] * t);
+    }
+  }
+  g.putImageData(id, x0, y0);
+  for (const key of ['large', 'game']) {
+    const f = fonts[key]; if (!f) continue;
+    const word = 'SURVIVAL', tw = fontWidth(f, word); if (tw > 116) continue;
+    fontDraw(g, f, word, Math.round(245 - tw / 2), Math.round(117 - f.mh / 2), 'ink'); break;
+  }
+}
+function fitStage() { const st = overlay.querySelector('.wcstage'); if (st) st.style.zoom = Math.min(innerWidth / 640, innerHeight / 480); }
+addEventListener('resize', fitStage);
+
+/* ---------- audio ---------- */
+function ensureAudio() {
+  if (!A.actx) { try { A.actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } }
+  if (A.actx.state === 'suspended') A.actx.resume().catch(() => {});
+  if (mu.want && !mu.cur && !mu.pending && mu.names.size) { const k = mu.want; mu.kind = null; playMusic(k); }
+  for (const [role, s] of Object.entries(cfg.sounds)) {
+    if (A.sbuf[role] !== undefined) continue;
+    const war = A.wars[s.file]; if (!war) continue;
+    const d = Core.safeEntry(war, s.entry); if (!d) continue;
+    A.sbuf[role] = null;
+    A.actx.decodeAudioData(d.slice().buffer).then(b => { A.sbuf[role] = b; }).catch(() => {});
+  }
+}
+function playBuffer(b, vol = 0.45) {
+  if (!A.actx || !b || A.active > 10) return;
+  const src = A.actx.createBufferSource(), g = A.actx.createGain();
+  g.gain.value = vol * cfg.opts.sfx; src.buffer = b; src.connect(g).connect(A.actx.destination);
+  A.active++; src.onended = () => A.active--; src.start();
+}
+function sfx(role, gap = 0.06) {
+  const b = A.sbuf[role]; if (!b) return;
+  const now = performance.now() / 1000;
+  if (now - (A.lastPlay[role] || 0) < gap) return;
+  A.lastPlay[role] = now; playBuffer(b, role === 's_hit' ? 0.25 : 0.45);
+}
+
+/* ---------- music: read straight out of Install.mpq ---------- */
+// Track paths inside the Battle.net Edition's Install.mpq (from the Wargus project's extraction table).
+const MUSIC = {
+  HUMAN1: 'Music\\HUMAN1.WAV', HUMAN2: 'Music\\HUMAN2.WAV', HUMAN3: 'Music\\HUMAN3.WAV', HUMAN4: 'Music\\HUMAN4.WAV', HUMAN5: 'Music\\HUMAN5.WAV', HUMAN6: 'Music\\HUMAN6.WAV',
+  ORC1: 'Music\\ORC1.WAV', ORC2: 'Music\\ORC2.WAV', ORC3: 'Music\\ORC3.WAV', ORC4: 'Music\\ORC4.WAV', ORC5: 'Music\\ORC5.WAV', ORC6: 'Music\\ORC6.WAV',
+  HWARROOM: 'Music\\HWARROOM.WAV', OWARROOM: 'Music\\OWARROOM.WAV', HVICTORY: 'Music\\HVICTORY.WAV', OVICTORY: 'Music\\OVICTORY.WAV', HDEFEAT: 'Music\\HDEFEAT.WAV', ODEFEAT: 'Music\\ODEFEAT.WAV',
+};
+const mu = { names: new Set(), cache: new Map(), gain: null, cur: null, kind: null, list: [], idx: 0, want: null, duck: false, token: 0 };
+function playlistFor(kind) {
+  const horde = G && G.HD.side === 'Horde', pre = horde ? 'ORC' : 'HUMAN', p1 = horde ? 'O' : 'H';
+  if (kind === 'menu') return ['OWARROOM'];
+  if (kind === 'battle') { const a = [1, 2, 3, 4, 5, 6].map(i => pre + i).sort(() => Math.random() - 0.5); return a; }
+  if (kind === 'victory') return [p1 + 'VICTORY'];
+  if (kind === 'defeat') return [p1 + 'DEFEAT'];
+  return [];
+}
+function musicVolume() { if (mu.gain && A.actx) mu.gain.gain.setTargetAtTime(cfg.opts.music * (mu.duck ? 0.35 : 1), A.actx.currentTime, 0.15); }
+function musicDuck(v) { mu.duck = v; musicVolume(); }
+async function loadTrack(id) {
+  if (mu.cache.has(id)) return mu.cache.get(id);
+  const rec = await DB.getMusic(id); if (!rec || !A.actx) return null;
+  let wav; try { wav = Core.mpqRead({ d: new Uint8Array(rec.buf), base: -rec.b.pos, sectorSize: rec.sectorSize, blocks: [rec.b] }, 0, MUSIC[id]); } catch (e) { console.warn('music decode', id, e); return null; }
+  let buf; try { buf = await A.actx.decodeAudioData(wav.buffer.slice(wav.byteOffset, wav.byteOffset + wav.byteLength)); } catch (e) { console.warn('music audio', id, e); return null; }
+  mu.cache.set(id, buf); while (mu.cache.size > 3) mu.cache.delete(mu.cache.keys().next().value);
+  return buf;
+}
+function playMusic(kind) {
+  mu.want = kind;
+  if (!A.actx || !mu.names.size) return;
+  if (mu.kind === kind && mu.cur) return;
+  mu.kind = kind; mu.list = playlistFor(kind).filter(id => mu.names.has(id)); mu.idx = 0;
+  stopMusic(); if (mu.list.length) nextTrack();
+}
+function stopMusic() {
+  const c = mu.cur; mu.cur = null; mu.token++;
+  if (c) { try { c.g.gain.setTargetAtTime(0, A.actx.currentTime, 0.25); c.src.stop(A.actx.currentTime + 1.2); } catch (e) {} }
+}
+async function nextTrack() {
+  const tok = ++mu.token, id = mu.list[mu.idx % mu.list.length]; mu.idx++;
+  mu.pending = true; const buf = await loadTrack(id); mu.pending = false;
+  if (tok !== mu.token || !buf) return;
+  if (!mu.gain) { mu.gain = A.actx.createGain(); mu.gain.connect(A.actx.destination); musicVolume(); }
+  const src = A.actx.createBufferSource(), g = A.actx.createGain();
+  src.buffer = buf; g.gain.value = 0; g.gain.setTargetAtTime(1, A.actx.currentTime, 0.3); src.connect(g).connect(mu.gain);
+  const loop = mu.kind === 'menu'; src.loop = loop;
+  src.onended = () => { if (mu.cur && mu.cur.src === src && !loop && (mu.kind === 'battle')) { mu.cur = null; nextTrack(); } };
+  src.start(); mu.cur = { src, g, id };
+  if (mu.kind === 'battle') loadTrack(mu.list[mu.idx % mu.list.length]); // decode the next one in advance
+}
+// Read only the music out of a large MPQ File, using slices so the whole archive never sits in memory.
+async function mpqFileMusic(file, onProgress) {
+  const rd = async (a, b) => new Uint8Array(await file.slice(a, b).arrayBuffer());
+  const head = await rd(0, Math.min(file.size, 1 << 20)); let base = -1;
+  for (let o = 0; o + 32 <= head.length; o += 512) if (head[o] === 0x4D && head[o + 1] === 0x50 && head[o + 2] === 0x51 && head[o + 3] === 0x1A) { base = o; break; }
+  if (base < 0) throw new Error('not an MPQ archive');
+  const u32s = (d, n) => { const a = new Uint32Array(n); for (let i = 0; i < n; i++) a[i] = Core.u32(d, i * 4); return a; };
+  const h = u32s(head.subarray(base), 8), sectorSize = 512 << (h[3] >>> 16);
+  const ht = Core.decrypt(u32s(await rd(base + h[4], base + h[4] + h[6] * 16), h[6] * 4), Core.hashStr('(hash table)', 3));
+  const bt = Core.decrypt(u32s(await rd(base + h[5], base + h[5] + h[7] * 16), h[7] * 4), Core.hashStr('(block table)', 3));
+  const find = name => {
+    const n = h[6], a = Core.hashStr(name, 1), b = Core.hashStr(name, 2); let i = Core.hashStr(name, 0) % n;
+    for (let k = 0; k < n; k++, i = (i + 1) % n) { const bl = ht[i * 4 + 3]; if (bl === 0xFFFFFFFF) return -1; if (ht[i * 4] === a && ht[i * 4 + 1] === b && bl < h[7]) return bl; }
+    return -1;
+  };
+  let found = 0;
+  for (const [id, path] of Object.entries(MUSIC)) {
+    const bi = find(path); if (bi < 0) continue;
+    const b = { pos: bt[bi * 4], csize: bt[bi * 4 + 1], fsize: bt[bi * 4 + 2], flags: bt[bi * 4 + 3] };
+    if (!(b.flags & 0x80000000)) continue;
+    const buf = (await rd(base + b.pos, base + b.pos + b.csize)).buffer;
+    await DB.putMusic({ name: id, buf, b, sectorSize }); mu.names.add(id); found++;
+    onProgress && onProgress(found);
+  }
+  return found;
+}
+
+/* ---------- unit voices from the GameSFX folder ---------- */
+const VOICE_DIRS = { lothar: 'Knight', uther: 'Paladin', alleria: 'Aleria', khadgar: 'Khadgar', grom: 'Grom', zuljin: 'Troll', chogall: 'Ogremage', teron: 'Teron' };
+const VOICE_KIND = [['what', /what\d*\.wav$/i], ['yes', /ye?s+(sir|sr|r)\d*\.wav$/i], ['pissed', /piss/i], ['ready', /ready\.wav$/i]];
+const vo = { last: 0, buf: new Map() };
+function heroVoice(kind, chance = 1, heroId) {
+  heroId ||= G && G.heroId; if (!heroId || Math.random() > chance) return;
+  const war = A.wars['GAMESFX/VOICES.WAR']; if (!war || !war.names || !A.actx) return;
+  const now = performance.now(); if (now - vo.last < 1200) return;
+  let idx = war.names.map((n, i) => n === heroId + ':' + kind ? i : -1).filter(i => i >= 0);
+  if (!idx.length && kind === 'ready') idx = war.names.map((n, i) => n === heroId + ':yes' ? i : -1).filter(i => i >= 0);
+  if (!idx.length) return;
+  vo.last = now;
+  const i = idx[Math.floor(Math.random() * idx.length)];
+  if (vo.buf.has(i)) return playBuffer(vo.buf.get(i), 0.7);
+  const d = Core.safeEntry(war, i); if (!d) return;
+  A.actx.decodeAudioData(d.slice().buffer).then(b => { vo.buf.set(i, b); playBuffer(b, 0.7); }).catch(() => {});
+}
+
+/* ---------- items ---------- */
+const WEAPONS = {
+  sword:   { name: "Footman's Blade", desc: 'Sweeps the ground in front of you.', up: ['+damage', '+reach', 'Also strikes behind you', '+damage, +reach'] },
+  arrows:  { name: 'Elven Arrows', desc: 'Fires at the nearest enemies.', up: ['+1 arrow', '+damage', '+1 arrow', 'Arrows pierce 2 more'] },
+  axes:    { name: 'Troll Axes', desc: 'Spinning axes fly out and return, cutting everything.', up: ['+damage', '+1 axe', '+damage', '+1 axe'] },
+  aura:    { name: 'Holy Aura', desc: 'Sears enemies who come close.', up: ['+radius', '+damage', '+radius', '+damage, +radius'] },
+  fireball:{ name: 'Fireball', desc: 'Hurls fire that explodes on a distant foe.', up: ['+damage', '+1 fireball', '+blast radius', '+1 fireball'] },
+  ballista:{ name: 'Ballista', desc: 'A heavy bolt that pierces everything in a line.', up: ['+damage', '+damage', 'Also fires behind you', '+damage'] },
+  runes:   { name: 'Runes', desc: 'Lays explosive runes on the ground around you.', up: ['+1 rune', '+damage', '+1 rune', '+damage, +1 rune'] },
+  coil:    { name: 'Death Coil', desc: 'A seeking bolt of shadow that heals you when it hits.', up: ['+damage', '+1 coil', '+damage, more healing', '+1 coil'] },
+};
+const HEROES = {
+  lothar:  { name: 'Anduin Lothar', side: 'Alliance', unit: 'Knight', col: '#3f6fd1', start: 'sword', hp: 140, speed: 78, armour: 1,
+             sig: 'Lion of Azeroth', sigDesc: '+15% damage and 1 armour.', might: 1.15 },
+  uther:   { name: 'Uther Lightbringer', side: 'Alliance', unit: 'Paladin', col: '#e6e2c8', start: 'aura', hp: 130, speed: 72, armour: 0,
+             sig: 'Holy Light', sigDesc: 'Heals 1 health every second.', regen: 1 },
+  alleria: { name: 'Alleria Windrunner', side: 'Alliance', unit: 'Elven Archer', col: '#5fbf5a', start: 'arrows', hp: 90, speed: 84, armour: 0,
+             sig: 'Eagle Eye', sigDesc: '10% faster attacks and +30% pickup range.', haste: 0.9, magnet: 1.3 },
+  khadgar: { name: 'Khadgar', side: 'Alliance', unit: 'Mage', col: '#b06fe0', start: 'fireball', hp: 80, speed: 72, armour: 0,
+             sig: 'Arcane Mastery', sigDesc: '+25% area of effect and 10% faster attacks.', area: 1.25, haste: 0.9 },
+  grom:    { name: 'Grom Hellscream', side: 'Horde', unit: 'Grunt', col: '#c0392b', start: 'sword', hp: 150, speed: 72, armour: 0,
+             sig: 'Battle Fury', sigDesc: '+30% damage while below half health.', fury: true },
+  zuljin:  { name: "Zul'jin", side: 'Horde', unit: 'Troll Axethrower', col: '#3fb3a8', start: 'axes', hp: 100, speed: 82, armour: 0,
+             sig: 'Troll Regeneration', sigDesc: 'Heals 0.8 health every second.', regen: 0.8 },
+  chogall: { name: "Cho'gall", side: 'Horde', unit: 'Ogre-Mage', col: '#d07a2c', start: 'runes', hp: 170, speed: 62, armour: 1,
+             sig: 'Bloodlust', sigDesc: '+20% damage and 1 armour, but slow.', might: 1.2 },
+  teron:   { name: 'Teron Gorefiend', side: 'Horde', unit: 'Death Knight', col: '#6a8a6a', start: 'coil', hp: 100, speed: 76, armour: 0,
+             sig: 'Unholy Hunger', sigDesc: 'Every kill heals 0.3 health.', killHeal: 0.3 },
+};
+const PASSIVES = {
+  armour:  { name: 'Plate Armour', desc: 'Take 1 less damage per hit.' },
+  boots:   { name: 'Swift Boots', desc: '+10% movement speed.' },
+  heal:    { name: 'Healing', desc: 'Regenerate 0.4 health per second.' },
+  magnet:  { name: 'Gold Mine', desc: '+30% pickup range.' },
+  might:   { name: 'Bloodlust', desc: '+12% damage.' },
+  haste:   { name: 'Haste', desc: '8% faster attacks.' },
+  area:    { name: 'Whirlwind', desc: '+12% area of effect.' },
+  vitality:{ name: 'Ogre Strength', desc: '+25 maximum health.' },
+};
+const MAX_LVL = 5, MAX_SLOTS = 6;
+
+let meta = store.get('tos_meta', null) || { gold: 0, spent: 0, ups: {}, unlocked: 0, last: null };
+meta.ups ||= {};
+const saveMeta = () => store.set('tos_meta', meta);
+const up = id => meta.ups[id] || 0;
+const upCost = id => UPGRADES[id].cost * (up(id) + 1);
+const goldMul = () => 1 + 0.15 * up('greed');
+function addGold(v) { if (G) G.gold += Math.round(v); }
+
+/* ---------- enemies ---------- */
+const ET = {
+  basic:  { hp: 8, spd: 34, dmg: 5, r: 7, xp: 1, col: '#b8432f' },
+  fast:   { hp: 5, spd: 64, dmg: 4, r: 6, xp: 1, col: '#c9883a' },
+  tank:   { hp: 50, spd: 22, dmg: 14, r: 10, xp: 6, col: '#6f8f33' },
+  ranged: { hp: 12, spd: 30, dmg: 8, r: 7, xp: 3, col: '#8f55b5', range: 115 },
+  boss:   { hp: 1800, spd: 32, dmg: 28, r: 16, xp: 0, col: '#e0322a' },
+};
+
+/* ---------- run state ---------- */
+let G = null, attract = 0;
+function newRun(heroId, levelId) {
+  const HD = HEROES[heroId] || HEROES.lothar, LV = LEVELS.find(l => l.id === levelId) || LEVELS[0];
+  store.set('tos_hero', heroId); meta.last = { hero: heroId, level: LV.id }; saveMeta();
+  G = { heroId, HD, LV,
+    t: 0, kills: 0, spawnAcc: 0, bossNext: 240, swarmNext: 95, pending: 0, state: 'play', banner: null,
+    hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
+    weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: []
+  };
+  addItem('w', HD.start); recalc(); G.hero.hp = G.hero.maxHp;
+  G.revives = up('revival'); G.rerolls = 1 + up('reroll');
+  if (typeof startLevel === 'function') startLevel();
+  ensureAudio(); sfx('s_start'); playMusic('battle'); heroVoice('ready', 1);
+  hideMenu(); showHudBtns(true);
+}
+function addItem(kind, id) {
+  if (kind === 'w') { const w = G.weapons[id] || (G.weapons[id] = { lvl: 0, cd: 0.3, tick: 0 }); w.lvl++; }
+  else if (kind === 'p') { G.passives[id] = (G.passives[id] || 0) + 1; if (id === 'vitality') G.hero.hp += 25; recalc(); }
+  else if (kind === 'gold') { G.hero.hp = Math.min(G.hero.maxHp, G.hero.hp + 40); }
+}
+function recalc() {
+  const h = G.hero, p = id => G.passives[id] || 0;
+  const HD = G.HD;
+  h.armour = HD.armour + p('armour'); h.speed = HD.speed * (1 + 0.1 * p('boots')); h.regen = (HD.regen || 0) + 0.4 * p('heal'); h.magnet = (HD.magnet || 1) * (1 + 0.3 * p('magnet'));
+  h.might = (HD.might || 1) * (1 + 0.12 * p('might')); h.haste = (HD.haste || 1) * (1 - 0.08 * p('haste')); h.area = (HD.area || 1) * (1 + 0.12 * p('area')); h.maxHp = HD.hp + 25 * p('vitality');
+  h.might *= 1 + 0.05 * up('might'); h.armour += up('armour'); h.maxHp = Math.round(h.maxHp * (1 + 0.1 * up('maxhp'))); h.regen += 0.2 * up('regen');
+  h.magnet *= 1 + 0.15 * up('magnet'); h.speed *= 1 + 0.05 * up('speed'); h.haste *= 1 - 0.04 * up('haste');
+  h.hp = Math.min(h.hp, h.maxHp);
+}
+function gainXp(v) {
+  const h = G.hero; h.xp += v * (1 + 0.08 * up('growth'));
+  while (h.xp >= h.next) { h.xp -= h.next; h.level++; h.next = xpFor(h.level); G.pending++; }
+}
+
+// Decode a tileset's megatiles (32x32, built from 8x8 minitiles) into one atlas canvas.
+function loadTileset(LV) {
+  A.tilesets ||= {};
+  if (A.tilesets[LV.id]) { A.bldSpr = A.tilesets[LV.id].bldSpr; return A.tilesets[LV.id]; }
+  const main = findMain(); if (!main) return null;
+  const war = A.wars[main], [pe, me, ne, te] = LV.ts;
+  const pal = Core.safeEntry(war, pe), mega = Core.safeEntry(war, me), mini = Core.safeEntry(war, ne), tab = Core.safeEntry(war, te);
+  if (!pal || !mega || !mini || !tab) return null;
+  const P = Core.toPalette(pal), n = mega.length >> 5, cols = 32, rows = Math.ceil(n / cols);
+  const c = document.createElement('canvas'); c.width = cols * 32; c.height = rows * 32;
+  const id = new ImageData(c.width, c.height), o = id.data;
+  for (let t = 0; t < n; t++) {
+    const bx = (t % cols) * 32, by = Math.floor(t / cols) * 32;
+    for (let k = 0; k < 16; k++) {
+      const v = Core.u16(mega, t * 32 + k * 2), off = (v & 0xFFFC) * 16, fx = v & 2, fy = v & 1, qx = bx + (k & 3) * 8, qy = by + (k >> 2) * 8;
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+        const ci = mini[off + (fy ? 7 - y : y) * 8 + (fx ? 7 - x : x)], p = ((qy + y) * c.width + qx + x) * 4;
+        o[p] = P[ci * 3]; o[p + 1] = P[ci * 3 + 1]; o[p + 2] = P[ci * 3 + 2]; o[p + 3] = 255;
+      }
+    }
+  }
+  c.getContext('2d').putImageData(id, 0, 0);
+  const recs = []; for (let r = 0; r * 42 + 42 <= tab.length; r++) { const l = []; for (let k = 0; k < 16; k++) { const v = Core.u16(tab, r * 42 + k * 2); if (v) l.push(v); } recs.push(l); }
+  // Building sprites for this level, drawn with the level's own palette.
+  const bp = Core.toPalette(Core.safeEntry(war, LV.bld.pal) || pal);
+  A.bldSpr = {};
+  for (const e of [...LV.bld.human, ...LV.bld.orc]) {
+    const d = Core.safeEntry(war, e); if (!d || !Core.isGfu(d)) continue;
+    const w = Core.u16(d, 2), h = Core.u16(d, 4), bc = document.createElement('canvas'); bc.width = w; bc.height = h;
+    bc.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(d, 0, w, h), w, h, bp), 0, 0); A.bldSpr[e] = bc;
+  }
+  return (A.tilesets[LV.id] = { atlas: c, cols, recs, bldSpr: A.bldSpr });
+}
+const CHUNK = 8;
+function terrainChunk(T, cx, cy) {
+  const key = cx + ',' + cy; let c = T.chunks.get(key);
+  if (c) { T.chunks.delete(key); T.chunks.set(key, c); return c; }
+  const ts = A.tilesets[T.LV.id]; c = document.createElement('canvas'); c.width = c.height = CHUNK * 32;
+  const x = c.getContext('2d');
+  for (let ty = 0; ty < CHUNK; ty++) for (let tx = 0; tx < CHUNK; tx++) {
+    const m = T.tiles[tmod(cy * CHUNK + ty, TN) * TN + tmod(cx * CHUNK + tx, TN)];
+    x.drawImage(ts.atlas, (m % ts.cols) * 32, Math.floor(m / ts.cols) * 32, 32, 32, tx * 32, ty * 32, 32, 32);
+  }
+  T.chunks.set(key, c); if (T.chunks.size > 60) T.chunks.delete(T.chunks.keys().next().value);
+  return c;
+}
+// Is the world point blocked? Units walk on half-tile cells (16 px).
+function solidAt(x, y) { const T = G && G.terrain; if (!T) return false; return T.blk[tmod(Math.floor(y / 16), TM) * TM + tmod(Math.floor(x / 16), TM)] !== 0; }
+function footBlocked(x, y, r) { return solidAt(x, y + 4) || solidAt(x - r, y + 4) || solidAt(x + r, y + 4) || solidAt(x, y + 4 - r * 0.6) || solidAt(x, y + 4 + r * 0.6); }
+
+/* ---------- camps ---------- */
+function startLevel() {
+  G.terrain = null; G.camps = new Map(); G.props = [];
+  if (!loadTileset(G.LV)) return;
+  try { G.terrain = buildTerrain(G.LV, SEED_PARAM ?? ((Math.random() * 1e9) | 0), G.HD.side === 'Horde' ? 'human' : 'orc'); } catch (e) { console.error(e); G.terrain = null; }
+}
+function updateCamps(dt) {
+  const T = G.terrain; if (!T) return;
+  const h = G.hero, P = TN * 32;
+  for (const c of T.camps) {
+    const wx = c.cx * 32 + 16, wy = c.cy * 32 + 16, kx = Math.round((h.x - wx) / P), ky = Math.round((h.y - wy) / P);
+    const d = Math.hypot(h.x - wx - kx * P, h.y - wy - ky * P), key = c.id + ':' + kx + ':' + ky;
+    let st = G.camps.get(key);
+    if (d < 900) {
+      if (!st) { st = { key, c, ox: kx * P, oy: ky * P, dead: new Set(), chest: false, ents: [], spawnT: 2, live: false, warned: false }; G.camps.set(key, st); }
+      if (!st.live) activateCamp(st);
+      const alive = c.enemy && st.ents.some(e => !e.dead);
+      if (alive && d < 560) {
+        if (!st.warned) { st.warned = true; banner(`An enemy ${c.side === 'orc' ? 'orc' : 'human'} camp! Destroy it for gold.`); }
+        st.spawnT -= dt;
+        if (st.spawnT <= 0) {
+          st.spawnT = 5.5;
+          const live = st.ents.filter(e => !e.dead);
+          for (let i = 0; i < 2 + (G.t > 300); i++) { const b = live[Math.floor(Math.random() * live.length)], a = rnd(0, TAU), x = b.x + Math.cos(a) * (b.r + 14), y = b.y + Math.sin(a) * (b.r + 14); if (!footBlocked(x, y, 4)) spawnEnemy(Math.random() < 0.7 ? 'basic' : 'fast', x, y); }
+        }
+      }
+    } else if (st && st.live && d > 1300) deactivateCamp(st);
+  }
+}
+function activateCamp(st) {
+  st.live = true; st.ents = [];
+  st.c.blds.forEach((b, i) => {
+    if (st.dead.has(i)) return;
+    const spr = A.bldSpr[b.entry], x = st.ox + b.tx * 32 + b.w * 16, y = st.oy + b.ty * 32 + b.h * 16;
+    if (st.c.enemy) {
+      const hp = (150 + 150 * (b.kind === 3)) * (1 + G.t / 300) * G.LV.hp;
+      const e = { type: 'bld', static: true, x, y, hp, maxHp: hp, r: Math.min(b.w, b.h) * 13, spr, camp: st, idx: i, kind: b.kind, flash: 0, kx: 0, ky: 0, dir: 4, t: 0, atkT: 0, swing: 0, xp: 5, dmg: 0, spd: 0 };
+      G.enemies.push(e); st.ents.push(e);
+    } else { const pr = { x, y, spr, camp: st }; G.props.push(pr); st.ents.push(pr); }
+  });
+  if (!st.c.enemy && !st.chest) { const gm = { x: st.ox + st.c.cx * 32 + 16, y: st.oy + st.c.cy * 32 + 16, chest: 'camp', camp: st }; G.gems.push(gm); st.ents.push(gm); }
+}
+function deactivateCamp(st) {
+  st.live = false; for (const e of st.ents) e.gone = true; st.ents = [];
+  G.enemies = G.enemies.filter(e => !e.gone); G.props = G.props.filter(p => !p.gone); G.gems = G.gems.filter(g => !g.gone);
+}
+function buildingDestroyed(e) {
+  e.camp.dead.add(e.idx);
+  G.fx.push({ k: 'boom', x: e.x, y: e.y, r: e.r * 1.5, t: 0, life: 0.6 }); sfx('s_boom', 0.05);
+  for (let i = 0; i < 3 + (e.kind === 3) * 4; i++) G.gems.push({ x: e.x + rnd(-e.r, e.r), y: e.y + rnd(-e.r, e.r), coin: Math.round(rnd(3, 7) * goldMul()) });
+  G.gems.push({ x: e.x, y: e.y, v: e.xp });
+  if (e.camp.ents.every(b => b.dead)) { G.gems.push({ x: e.x, y: e.y + 6, chest: 'camp' }); banner('Camp destroyed! It left a supply cache.'); }
+}
+
+/* ---------- spatial grid ---------- */
+const CELL = 24, grid = new Map();
+const gk = (cx, cy) => (cx + 50000) * 100000 + (cy + 50000);
+function buildGrid() {
+  grid.clear();
+  for (const e of G.enemies) { const k = gk(Math.floor(e.x / CELL), Math.floor(e.y / CELL)); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(e); }
+}
+function query(x, y, r, cb) {
+  const x0 = Math.floor((x - r) / CELL), x1 = Math.floor((x + r) / CELL), y0 = Math.floor((y - r) / CELL), y1 = Math.floor((y + r) / CELL);
+  for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) { const a = grid.get(gk(cx, cy)); if (a) for (const e of a) if (!e.dead) cb(e); }
+}
+const dirOf = (x, y) => (Math.round(Math.atan2(x, -y) / (Math.PI / 4)) + 8) % 8;
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+/* ---------- spawning ---------- */
+function spawnEnemy(type, x, y) {
+  const t = G.t, T = ET[type], h = G.hero;
+  if (x === undefined) {
+    const d = Math.hypot(W, H) / 2 + 24;
+    for (let k = 0; k < 10; k++) { const a = rnd(0, TAU); x = h.x + Math.cos(a) * d; y = h.y + Math.sin(a) * d; if (type === 'boss' || !footBlocked(x, y, 6)) break; }
+  } else if (type !== 'boss' && footBlocked(x, y, 4)) return;
+  const hpMul = (1 + t / 240 + (t / 360) ** 2) * G.LV.hp;
+  G.enemies.push({ type, x, y, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (1 + Math.min(0.3, t / 3000)) * rnd(0.92, 1.08),
+    dmg: T.dmg * (1 + t / 600), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0, shootT: rnd(1, 3), dir: 4, t: rnd(0, 5) });
+}
+function pickType(t) {
+  const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 110 ? 0.25 : 0, tank: t > 170 ? Math.min(0.55, 0.1 + t / 1500) : 0 };
+  for (const k in w) w[k] *= G.LV.mix[k] || 1;
+  let s = 0; for (const k in w) s += w[k];
+  let r = Math.random() * s; for (const k in w) { r -= w[k]; if (r <= 0) return k; }
+  return 'basic';
+}
+function spawn(dt) {
+  const t = G.t;
+  G.spawnAcc += (0.7 + t / 50) * dt;
+  while (G.spawnAcc >= 1) { G.spawnAcc--; if (G.enemies.length < 330) spawnEnemy(pickType(t)); }
+  if (t >= G.bossNext) { G.bossNext += 240; spawnEnemy('boss'); banner(G.HD.side === 'Horde' ? 'A gryphon rider swoops in!' : 'A dragon approaches!'); }
+  if (t >= G.swarmNext) {
+    G.swarmNext += 100; const h = G.hero, d = Math.hypot(W, H) / 2 + 10;
+    for (let i = 0; i < 26; i++) { const a = i / 26 * TAU; spawnEnemy('fast', h.x + Math.cos(a) * d, h.y + Math.sin(a) * d); }
+    banner(G.HD.side === 'Horde' ? 'Dwarven demolition squads close in!' : 'Goblin sappers close in!');
+  }
+}
+function banner(text) { G.banner = { text, t: 3 }; }
+
+/* ---------- combat ---------- */
+function hitEnemy(e, dmg, kx = 0, ky = 0) {
+  if (e.dead) return;
+  const h = G.hero;
+  const dealt = dmg * h.might * (G.HD.fury && h.hp < h.maxHp / 2 ? 1.3 : 1);
+  e.hp -= dealt; e.flash = 0.1;
+  if (cfg.opts.nums && dealt < 9000 && G.numCount < 70) { G.numCount++; G.fx.push({ k: 'num', x: e.x + rnd(-4, 4), y: e.y - e.r - 4, v: Math.max(1, Math.round(dealt)), t: 0, life: 0.6 }); }
+  if (e.type !== 'boss' && !e.static) { e.kx += kx; e.ky += ky; }
+  sfx('s_hit');
+  if (e.hp <= 0 && e.static) { e.dead = true; buildingDestroyed(e); return; }
+  if (e.hp <= 0) { e.dead = true; G.kills++; drop(e); addCorpse(e); if (e.type === 'boss') sfx(G.HD.side === 'Horde' && A.sbuf.s_die_ally ? 's_die_ally' : 's_die', 0); if (G.HD.killHeal) h.hp = Math.min(h.maxHp, h.hp + G.HD.killHeal); }
+}
+function addCorpse(e) {
+  G.corpses.push({ role: foeRole(e.type), x: e.x, y: e.y, dir: e.dir, t: 0, r: e.r, boss: e.type === 'boss' });
+  if (G.corpses.length > 160) G.corpses.shift();
+}
+function corpseLife(c) { const s = A.sprites[c.role]; return (s && s.die ? s.die.length * DIE_STEP : 0.4) + (c.boss ? 4 : 1.6); }
+function drawCorpse(c) {
+  const s = A.sprites[c.role], dur = s && s.die ? s.die.length * DIE_STEP : 0.4;
+  const a = c.t < dur ? 1 : Math.max(0, 1 - (c.t - dur) / (corpseLife(c) - dur));
+  if (a <= 0) return;
+  ctx.globalAlpha = a;
+  if (!(s && s.die && drawSprite(c.role, c.x, c.y, c.dir, 0, false, null, c.t))) circle(c.x - camX, c.y - camY, c.r * 0.8, 'rgba(90,10,6,.6)');
+  ctx.globalAlpha = 1;
+}
+function drop(e) {
+  if (e.type === 'boss') { G.gems.push({ x: e.x, y: e.y, chest: 'boss' }); banner('The boss dropped a treasure chest!'); return; }
+  if (Math.random() < 0.012) G.gems.push({ x: e.x + rnd(-4, 4), y: e.y + rnd(-4, 4), meat: true });
+  if (Math.random() < 0.035 + 0.02 * (e.type === 'tank')) G.gems.push({ x: e.x + rnd(-5, 5), y: e.y + rnd(-5, 5), coin: Math.round((e.type === 'tank' ? 5 : 2) * goldMul()) });
+  G.gems.push({ x: e.x, y: e.y, v: e.xp });
+  if (G.gems.length > 420) { const g = G.gems.shift(); if (g.v) gainXp(g.v); }
+}
+function hurtHero(d) {
+  const h = G.hero; h.hp -= Math.max(1, d - h.armour); h.hurtT = 0.15; sfx('s_hurt', 0.25);
+}
+function explode(s) {
+  G.fx.push({ k: 'boom', x: s.x, y: s.y, r: s.er, t: 0, life: 0.4 }); sfx(s.k === 'fire' && A.sbuf.s_fire ? 's_fire' : 's_boom', 0.08);
+  query(s.x, s.y, s.er + 16, e => { const dx = e.x - s.x, dy = e.y - s.y, d = Math.hypot(dx, dy) || 1; if (d < s.er + e.r) hitEnemy(e, s.dmg, dx / d * 90, dy / d * 90); });
+}
+function nearest(n, maxD) {
+  const h = G.hero, arr = [];
+  for (const e of G.enemies) { const d = (e.x - h.x) ** 2 + (e.y - h.y) ** 2; if (d < maxD * maxD) arr.push([d, e]); }
+  arr.sort((a, b) => a[0] - b[0]);
+  return arr.slice(0, n).map(a => a[1]);
+}
+const CD = { coil: 1.2, sword: 1.0, arrows: 0.75, axes: 1.8, fireball: 2.4, ballista: 2.8, runes: 3.2 };
+function fire(id, l) {
+  const h = G.hero, ar = h.area;
+  if (id === 'sword') {
+    const range = (30 + 4 * l + (l >= 5 ? 6 : 0)) * ar, dmg = 14 + 6 * (l - 1), arc = 2.2;
+    const dirs = [h.face]; if (l >= 4) dirs.push(h.face + Math.PI);
+    for (const a of dirs) {
+      G.fx.push({ k: 'arc', a, r: range, arc, t: 0, life: 0.18 });
+      query(h.x, h.y, range + 12, e => {
+        const dx = e.x - h.x, dy = e.y - h.y, d = Math.hypot(dx, dy) || 1;
+        if (d > range + e.r) return;
+        let da = Math.atan2(dy, dx) - a; da = Math.atan2(Math.sin(da), Math.cos(da));
+        if (Math.abs(da) <= arc / 2 || d < e.r + 6) hitEnemy(e, dmg, dx / d * 140, dy / d * 140);
+      });
+    }
+  } else if (id === 'arrows') {
+    const n = 1 + (l >= 2) + (l >= 4), dmg = 10 + 3 * (l - 1) + (l >= 3 ? 3 : 0), pierce = l >= 5 ? 3 : 1;
+    const ts = nearest(n, 260);
+    for (let i = 0; i < n; i++) {
+      const t = ts[i % Math.max(1, ts.length)];
+      const a = t ? Math.atan2(t.y - h.y, t.x - h.x) : h.face + (i - (n - 1) / 2) * 0.2;
+      G.shots.push({ k: 'arrow', role: 'proj', x: h.x, y: h.y, vx: Math.cos(a) * 230, vy: Math.sin(a) * 230, dmg, pierce, life: 1.4, r: 3 });
+    }
+  } else if (id === 'axes') {
+    const n = 1 + (l >= 3) + (l >= 5), dmg = 12 + 4 * (l - 1) + (l >= 4 ? 4 : 0);
+    for (let i = 0; i < n; i++) {
+      const a = h.face + (i - (n - 1) / 2) * 0.55;
+      G.shots.push({ k: 'axe', role: 'axe', x: h.x, y: h.y, vx: Math.cos(a) * 210, vy: Math.sin(a) * 210, dmg, pierce: Infinity, life: 2.2, r: 6 * ar, hitCd: new Map() });
+    }
+  } else if (id === 'fireball') {
+    const n = 1 + (l >= 3) + (l >= 5), dmg = 22 + 8 * (l - 1), er = (22 + (l >= 4 ? 8 : 0)) * ar;
+    const pool = G.enemies.filter(e => Math.abs(e.x - h.x) < W / 2 && Math.abs(e.y - h.y) < H / 2);
+    for (let i = 0; i < n; i++) {
+      const t = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+      const tx = t ? t.x : h.x + Math.cos(h.face) * 90, ty = t ? t.y : h.y + Math.sin(h.face) * 90;
+      const a = Math.atan2(ty - h.y, tx - h.x);
+      G.shots.push({ k: 'fire', role: 'fire', x: h.x, y: h.y, tx, ty, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, dmg, er, pierce: 1, life: 2.5, r: 4 });
+    }
+  } else if (id === 'ballista') {
+    const dmg = 40 + 15 * (l - 1) + (l >= 5 ? 15 : 0), dirs = [h.face]; if (l >= 4) dirs.push(h.face + Math.PI);
+    for (const a of dirs) G.shots.push({ k: 'bolt', role: 'bolt', x: h.x, y: h.y, vx: Math.cos(a) * 270, vy: Math.sin(a) * 270, dmg, pierce: Infinity, life: 1.5, r: 5 });
+  } else if (id === 'coil') {
+    const n = 2 + (l >= 3) + (l >= 5), dmg = 14 + 5 * (l - 1) + (l >= 4 ? 6 : 0), heal = l >= 4 ? 2 : 1;
+    const ts = nearest(n, 300);
+    for (let i = 0; i < n; i++) {
+      const a = h.face + (i - (n - 1) / 2) * 0.9;
+      G.shots.push({ k: 'coil', role: 'coil', x: h.x, y: h.y, vx: Math.cos(a) * 120, vy: Math.sin(a) * 120, dmg, heal, pierce: 1, life: 3, r: 4, target: ts[i % Math.max(1, ts.length)] || null });
+    }
+  } else if (id === 'runes') {
+    const n = 2 + (l >= 2) + (l >= 4) + (l >= 5), dmg = 30 + 10 * (l - 1) + (l >= 3 ? 10 : 0);
+    for (let i = 0; i < n; i++) {
+      const a = rnd(0, TAU), d = rnd(18, 75);
+      G.shots.push({ k: 'rune', x: h.x + Math.cos(a) * d, y: h.y + Math.sin(a) * d, vx: 0, vy: 0, dmg, er: 26 * ar, life: 9, arm: 0.4, r: 8, pierce: 1 });
+    }
+  }
+}
+function updateWeapons(dt) {
+  const h = G.hero;
+  for (const id in G.weapons) {
+    const w = G.weapons[id];
+    if (id === 'aura') {
+      w.tick -= dt;
+      if (w.tick <= 0) {
+        w.tick = 0.4; const r = (26 + 5 * w.lvl + (w.lvl >= 5 ? 5 : 0)) * h.area, dmg = 3 + 2 * w.lvl;
+        query(h.x, h.y, r + 12, e => { if (Math.hypot(e.x - h.x, e.y - h.y) < r + e.r) hitEnemy(e, dmg); });
+      }
+      continue;
+    }
+    w.cd -= dt;
+    if (w.cd <= 0) {
+      fire(id, w.lvl); w.cd = CD[id] * h.haste;
+      const tg = ['sword', 'axes', 'ballista'].includes(id) ? null : nearest(1, 300)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
+      h.atkT = HSWING; h.atkDir = dirOf(Math.cos(a), Math.sin(a)); const snd = { sword: 's_sword', arrows: 's_bow', axes: 's_axe', coil: 's_coil', ballista: 's_bow' }[id]; if (snd) sfx(snd, 0.1); }
+  }
+}
+function updateShots(dt) {
+  const h = G.hero;
+  for (const s of G.shots) {
+    s.age = (s.age || 0) + dt; s.life -= dt;
+    if (s.life <= 0) { if (s.k === 'fire') explode(s); s.dead = true; continue; }
+    if (s.k === 'rune') {
+      s.arm -= dt; if (s.arm > 0) continue;
+      let trig = false; query(s.x, s.y, 14, e => { if (!trig && Math.hypot(e.x - s.x, e.y - s.y) < e.r + 6) trig = true; });
+      if (trig) { explode(s); s.dead = true; }
+      continue;
+    }
+    if (s.k === 'axe' && s.age > 0.45) {
+      const dx = h.x - s.x, dy = h.y - s.y, d = Math.hypot(dx, dy) || 1;
+      s.vx += dx / d * 520 * dt; s.vy += dy / d * 520 * dt;
+      const sp = Math.hypot(s.vx, s.vy); if (sp > 260) { s.vx *= 260 / sp; s.vy *= 260 / sp; }
+      if (d < 9) { s.dead = true; continue; }
+    }
+    if (s.k === 'coil') {
+      if (!s.target || s.target.dead) s.target = nearest(1, 300)[0] || null;
+      if (s.target) {
+        const dx = s.target.x - s.x, dy = s.target.y - s.y, d = Math.hypot(dx, dy) || 1;
+        s.vx += dx / d * 900 * dt; s.vy += dy / d * 900 * dt;
+        const sp = Math.hypot(s.vx, s.vy); if (sp > 210) { s.vx *= 210 / sp; s.vy *= 210 / sp; }
+      }
+    }
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    if (s.k === 'fire' && Math.hypot(s.tx - s.x, s.ty - s.y) < 6) { explode(s); s.dead = true; continue; }
+    query(s.x, s.y, s.r + 18, e => {
+      if (s.dead) return;
+      const dx = e.x - s.x, dy = e.y - s.y; if (dx * dx + dy * dy > (e.r + s.r) ** 2) return;
+      if (s.k === 'fire') { explode(s); s.dead = true; return; }
+      if (s.hitCd) { const last = s.hitCd.get(e); if (last !== undefined && s.age - last < 0.4) return; s.hitCd.set(e, s.age); }
+      else { s.hitSet ||= new Set(); if (s.hitSet.has(e)) return; s.hitSet.add(e); }
+      const sp = Math.hypot(s.vx, s.vy) || 1;
+      hitEnemy(e, s.dmg, s.vx / sp * 70, s.vy / sp * 70);
+      if (s.heal) h.hp = Math.min(h.maxHp, h.hp + s.heal);
+      if (--s.pierce <= 0) s.dead = true;
+    });
+  }
+  G.shots = G.shots.filter(s => !s.dead);
+  for (const s of G.eshots) {
+    s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
+    if (Math.hypot(h.x - s.x, h.y - s.y) < 7) { hurtHero(s.dmg); s.dead = true; }
+    if (s.life <= 0) s.dead = true;
+  }
+  G.eshots = G.eshots.filter(s => !s.dead);
+}
+function updateEnemies(dt) {
+  const h = G.hero, far = Math.hypot(W, H) * 0.75;
+  for (const e of G.enemies) {
+    if (e.dead) continue;
+    if (e.static) { e.flash -= dt; continue; }
+    e.t += dt; e.flash -= dt; e.atkT -= dt; e.swing -= dt;
+    let dx = h.x - e.x, dy = h.y - e.y; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+    let sp = e.spd;
+    if (e.type === 'ranged') {
+      if (d < e.range * 0.75) sp = -e.spd * 0.6; else if (d < e.range) sp = 0;
+      e.shootT -= dt;
+      if (e.shootT <= 0 && d < e.range * 1.3) { e.shootT = 2.6; e.swing = SWING; G.eshots.push({ x: e.x, y: e.y, vx: dx * 95, vy: dy * 95, dmg: e.dmg, life: 3, dir: dirOf(dx, dy) }); }
+    }
+    let vx = dx * sp, vy = dy * sp;
+    if (G.terrain && e.type !== 'boss' && sp && !footBlocked(e.x, e.y, e.r * 0.5)) {
+      const look = Math.sign(sp) * 7, r = e.r * 0.5;
+      if (footBlocked(e.x + dx * look, e.y + dy * look, r)) {
+        e.side ||= Math.random() < 0.5 ? 1 : -1; let ok = false;
+        for (const k of [1, 2, 3, 4, -1, -2, -3, -4]) {
+          const a = Math.atan2(dy, dx) + k * e.side * 0.55, cx = Math.cos(a), cy = Math.sin(a);
+          if (!footBlocked(e.x + cx * look, e.y + cy * look, r)) { vx = cx * Math.abs(sp); vy = cy * Math.abs(sp); if (sp < 0) { vx = -vx; vy = -vy; } ok = true; if (k < 0) e.side = -e.side; break; }
+        }
+        if (!ok) { vx = vy = 0; }
+      }
+      const nx = e.x + vx * dt + e.kx * dt, ny = e.y + vy * dt + e.ky * dt;
+      if (!footBlocked(nx, e.y, r)) e.x = nx; if (!footBlocked(e.x, ny, r)) e.y = ny;
+    } else { e.x += vx * dt + e.kx * dt; e.y += vy * dt + e.ky * dt; }
+    const damp = Math.max(0, 1 - dt * 9); e.kx *= damp; e.ky *= damp;
+    e.dir = dirOf(dx, dy);
+    query(e.x, e.y, e.r * 2, o => {
+      if (o === e) return;
+      const sx = e.x - o.x, sy = e.y - o.y, dd = sx * sx + sy * sy, rr = (e.r + o.r) * 0.8;
+      if (dd < rr * rr && dd > 0.0001) { const dl = Math.sqrt(dd), p = (rr - dl) * 0.25, px = e.x + sx / dl * p, py = e.y + sy / dl * p; if (e.type === 'boss' || !G.terrain || !footBlocked(px, py, e.r * 0.5) || footBlocked(e.x, e.y, e.r * 0.5)) { e.x = px; e.y = py; } }
+    });
+    if (d < e.r + 7 && e.atkT <= 0) { hurtHero(e.dmg); e.atkT = 1.0; e.swing = SWING; }
+    if (d > far && e.type !== 'boss') { // wrap stragglers back in front of the hero
+      const a = Math.atan2(-dy, -dx) + Math.PI + rnd(-0.8, 0.8), r = Math.hypot(W, H) / 2 + 20;
+      e.x = h.x + Math.cos(a) * r; e.y = h.y + Math.sin(a) * r;
+      for (let k = 0; k < 8 && G.terrain && footBlocked(e.x, e.y, 6); k++) { const a2 = rnd(0, TAU); e.x = h.x + Math.cos(a2) * r; e.y = h.y + Math.sin(a2) * r; }
+    }
+  }
+  G.enemies = G.enemies.filter(e => !e.dead);
+}
+function updateGems(dt) {
+  const h = G.hero, mr = 34 * h.magnet;
+  for (const g of G.gems) {
+    const dx = h.x - g.x, dy = h.y - g.y, d = Math.hypot(dx, dy) || 1;
+    if (g.pull || d < mr) { g.pull = true; const sp = 240 * dt; g.x += dx / d * Math.min(sp, d); g.y += dy / d * Math.min(sp, d); }
+    if (d < 8) {
+      g.dead = true;
+      if (g.v) gainXp(g.v);
+      else if (g.meat) h.hp = Math.min(h.maxHp, h.hp + 25);
+      else if (g.chest) { G.chestQueue.push(g.chest === true ? 'boss' : g.chest); if (g.camp) g.camp.chest = true; }
+      else if (g.coin) addGold(g.coin);
+    }
+  }
+  G.gems = G.gems.filter(g => !g.dead);
+}
+function update(dt) {
+  const h = G.hero; G.t += dt;
+  let [mx, my] = readMove(); const ml = Math.hypot(mx, my);
+  if (ml > 1) { mx /= ml; my /= ml; }
+  const hs = h.speed, hnx = h.x + mx * hs * dt, hny = h.y + my * hs * dt, stuck = footBlocked(h.x, h.y, 5);
+  if (stuck || !footBlocked(hnx, h.y, 5)) h.x = hnx; if (stuck || !footBlocked(h.x, hny, 5)) h.y = hny;
+  if (ml > 0.15) { h.face = Math.atan2(my, mx); h.dir = dirOf(mx, my); h.moveT += dt; }
+  h.hp = Math.min(h.maxHp, h.hp + h.regen * dt); h.hurtT -= dt; h.atkT -= dt;
+  spawn(dt); updateCamps(dt); buildGrid(); updateEnemies(dt); buildGrid(); updateWeapons(dt); updateShots(dt); updateGems(dt);
+  for (const f of G.fx) f.t += dt; G.fx = G.fx.filter(f => f.t < f.life); G.numCount = 0; for (const f of G.fx) if (f.k === 'num') G.numCount++;
+  for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
+  if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
+  if (h.hp <= 0) {
+    if (G.revives > 0) { G.revives--; h.hp = h.maxHp * 0.5; banner('Revived!'); sfx('s_level', 0); for (const e of G.enemies) if (!e.static && Math.hypot(e.x - h.x, e.y - h.y) < 120) hitEnemy(e, 9999); }
+    else { G.state = 'dying'; G.dieT = 0; showHudBtns(false); joy = null; sfx('s_hurt', 0); return; }
+  }
+  if (G.t >= RUN_LEN) return endRun(true);
+  if (G.chestQueue.length) openChest(G.chestQueue.shift());
+  else if (G.pending > 0) openLevelUp();
+}
+
+/* ---------- drawing ---------- */
+function hash(x, y) { let h = Math.imul(x, 374761393) + Math.imul(y, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
+function drawGround() {
+  const T = G && G.terrain;
+  if (T) {
+    const S = CHUNK * 32, x0 = Math.floor(camX / S), y0 = Math.floor(camY / S);
+    for (let cy = y0; cy <= Math.floor((camY + H) / S); cy++) for (let cx = x0; cx <= Math.floor((camX + W) / S); cx++) ctx.drawImage(terrainChunk(T, cx, cy), Math.round(cx * S - camX), Math.round(cy * S - camY));
+    return;
+  }
+  drawGrassFallback();
+}
+function drawGrassFallback() {
+  ctx.fillStyle = G ? G.LV.ground : '#34501f'; ctx.fillRect(0, 0, W, H);
+  const T = 32, x0 = Math.floor(camX / T), y0 = Math.floor(camY / T);
+  for (let tx = x0; tx <= x0 + Math.ceil(W / T) + 1; tx++) for (let ty = y0; ty <= y0 + Math.ceil(H / T) + 1; ty++) {
+    const hv = hash(tx, ty), sx = Math.round(tx * T - camX), sy = Math.round(ty * T - camY);
+    if (hv % 3 === 0) { ctx.fillStyle = '#2d4719'; ctx.fillRect(sx + (hv >> 4) % 16, sy + (hv >> 8) % 16, 14, 10); }
+    if (hv % 5 === 0) { ctx.fillStyle = '#3f5f27'; ctx.fillRect(sx + (hv >> 6) % 24, sy + (hv >> 11) % 24, 2, 3); ctx.fillRect(sx + (hv >> 9) % 24 + 3, sy + (hv >> 13) % 24, 2, 2); }
+    if (hv % 29 === 0) { ctx.fillStyle = '#6b6555'; ctx.fillRect(sx + 10, sy + 12, 6, 4); ctx.fillStyle = '#8a8370'; ctx.fillRect(sx + 11, sy + 12, 3, 2); }
+    if (hv % 53 === 0) { // little tree
+      ctx.fillStyle = '#4a3219'; ctx.fillRect(sx + 14, sy + 18, 3, 6);
+      ctx.fillStyle = '#1f3a12'; ctx.beginPath(); ctx.arc(sx + 15.5, sy + 14, 8, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#2b4d18'; ctx.beginPath(); ctx.arc(sx + 13, sy + 11, 4, 0, TAU); ctx.fill();
+    }
+    if (hv % 97 === 1) { ctx.fillStyle = '#b3a27a'; ctx.fillRect(sx + 4, sy + 26, 18, 2); }
+  }
+}
+const DIE_STEP = 0.13;
+function spriteFrame(s, dir, t, atkP, dieT) {
+  let fi, flip = false;
+  if (s.mode === 'dir5') {
+    const col = dir <= 4 ? dir : 8 - dir; flip = dir > 4;
+    let row;
+    if (dieT != null && s.die) row = s.die[Math.min(s.die.length - 1, Math.floor(dieT / DIE_STEP))];
+    else if (atkP != null && s.atk) row = s.atk[Math.min(s.atk.length - 1, Math.floor(atkP * s.atk.length))];
+    else if (s.walk) row = s.walk[Math.floor(t * 7) % s.walk.length];
+    else { const rows = Math.max(1, s.r1 - s.r0 + 1); row = s.r0 + (Math.floor(t * 7) % rows); }
+    fi = row * 5 + col;
+  } else {
+    const a = Math.min(s.r0, s.count - 1), b = Math.min(Math.max(s.r1, a), s.count - 1);
+    fi = a + (Math.floor(t * 8) % (b - a + 1));
+  }
+  return { fi: ((fi % s.count) + s.count) % s.count, flip };
+}
+function drawSprite(role, x, y, dir, t, flash, atkP, dieT) {
+  const s = A.sprites[role]; if (!s) return false;
+  const { fi, flip } = spriteFrame(s, dir, t, atkP, dieT);
+  const sx = (fi % s.cols) * s.fw, sy = Math.floor(fi / s.cols) * s.fh;
+  const dx = Math.round(x - camX - s.fw / 2), dy = Math.round(y - camY - s.fh / 2);
+  const a0 = ctx.globalAlpha;
+  if (flash) ctx.globalAlpha = a0 * 0.55;
+  if (flip) { ctx.save(); ctx.translate(dx + s.fw, dy); ctx.scale(-1, 1); ctx.drawImage(s.canvas, sx, sy, s.fw, s.fh, 0, 0, s.fw, s.fh); ctx.restore(); }
+  else ctx.drawImage(s.canvas, sx, sy, s.fw, s.fh, dx, dy, s.fw, s.fh);
+  ctx.globalAlpha = a0;
+  return true;
+}
+function circle(x, y, r, fill, stroke) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); } }
+function foeRole(r) { const k = (G.HD.side === 'Horde' ? 'ally_' : '') + r; return A.sprites[k] ? k : r; }
+function drawBuilding(e) {
+  const x = Math.round(e.x - camX), y = Math.round(e.y - camY), sp = e.spr;
+  if (sp) { if (e.flash > 0) ctx.globalAlpha = 0.6; ctx.drawImage(sp, x - sp.width / 2, y - sp.height / 2); ctx.globalAlpha = 1; }
+  else { ctx.fillStyle = '#6b4518'; ctx.fillRect(x - e.r, y - e.r, e.r * 2, e.r * 2); }
+  if (e.maxHp && e.hp < e.maxHp) { const bw = 30; ctx.fillStyle = '#000'; ctx.fillRect(x - bw / 2 - 1, y - (sp ? sp.height / 2 : e.r) - 5, bw + 2, 4); ctx.fillStyle = '#c92a1e'; ctx.fillRect(x - bw / 2, y - (sp ? sp.height / 2 : e.r) - 4, bw * Math.max(0, e.hp / e.maxHp), 2); }
+}
+function drawEnemy(e) {
+  if (e.static) return drawBuilding(e);
+  const x = e.x - camX, y = e.y - camY;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y + e.r * 0.8, e.r, e.r * 0.4, 0, 0, TAU); ctx.fill();
+  if (drawSprite(foeRole(e.type), e.x, e.y, e.dir, e.t, e.flash > 0, e.swing > 0 ? 1 - e.swing / SWING : null)) return;
+  const T = ET[e.type];
+  circle(x, y, e.r, e.flash > 0 ? '#fff' : T.col, '#1a0d08');
+  const a = Math.atan2(G.hero.y - e.y, G.hero.x - e.x);
+  ctx.fillStyle = '#ffe3a0'; ctx.fillRect(Math.round(x + Math.cos(a) * e.r * 0.5) - 1, Math.round(y + Math.sin(a) * e.r * 0.5) - 1, 2, 2);
+  if (e.type === 'boss') { ctx.fillStyle = '#7a1410'; ctx.beginPath(); ctx.moveTo(x - e.r, y); ctx.lineTo(x - e.r * 2, y - e.r); ctx.lineTo(x - e.r * 0.6, y - e.r * 0.4); ctx.moveTo(x + e.r, y); ctx.lineTo(x + e.r * 2, y - e.r); ctx.lineTo(x + e.r * 0.6, y - e.r * 0.4); ctx.fill(); }
+}
+function drawHero() {
+  const h = G.hero, x = h.x - camX, y = h.y - camY;
+  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(x, y + 7, 8, 3, 0, 0, TAU); ctx.fill();
+  const swing = h.atkT > 0 ? 1 - h.atkT / HSWING : null, dying = G.state === 'dying' || (G.state === 'over' && !G.won);
+  if (!drawSprite(A.sprites['hero_' + G.heroId] ? 'hero_' + G.heroId : 'hero', h.x, h.y, swing != null ? h.atkDir : h.dir, h.moveT, h.hurtT > 0 && !dying, dying ? null : swing, dying ? G.dieT : null)) {
+    circle(x, y, 7, h.hurtT > 0 ? '#fff' : G.HD.col, G.HD.side === 'Horde' ? '#8a1c12' : '#d9b25a');
+    ctx.fillStyle = '#d9b25a'; ctx.beginPath();
+    ctx.moveTo(x + Math.cos(h.face) * 11, y + Math.sin(h.face) * 11);
+    ctx.lineTo(x + Math.cos(h.face + 2.5) * 5, y + Math.sin(h.face + 2.5) * 5);
+    ctx.lineTo(x + Math.cos(h.face - 2.5) * 5, y + Math.sin(h.face - 2.5) * 5); ctx.fill();
+  }
+  if (dying) return;
+  const bw = 20; ctx.fillStyle = '#000'; ctx.fillRect(Math.round(x - bw / 2) - 1, Math.round(y + 12), bw + 2, 4);
+  ctx.fillStyle = '#7d1a12'; ctx.fillRect(Math.round(x - bw / 2), Math.round(y + 13), bw, 2);
+  ctx.fillStyle = '#3fd04a'; ctx.fillRect(Math.round(x - bw / 2), Math.round(y + 13), Math.max(0, Math.round(bw * h.hp / h.maxHp)), 2);
+}
+function drawShot(s) {
+  const x = s.x - camX, y = s.y - camY, dir = dirOf(s.vx, s.vy);
+  if (s.k === 'rune') {
+    if (A.sprites.rune && drawSprite('rune', s.x, s.y, 0, s.age, false)) return;
+    const p = s.arm > 0 ? 0.4 : 0.7 + Math.sin(s.age * 6) * 0.3;
+    ctx.strokeStyle = `rgba(255,90,40,${p})`; ctx.lineWidth = 1;
+    ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * TAU * 2 / 5; const px = x + Math.cos(a) * 6, py = y + Math.sin(a) * 6; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.closePath(); ctx.stroke();
+    return;
+  }
+  if (drawSprite(s.role, s.x, s.y, s.k === 'axe' ? Math.floor(s.age * 16) % 8 : dir, s.age, false)) return;
+  if (s.k === 'arrow' || s.k === 'bolt') {
+    const sp = Math.hypot(s.vx, s.vy) || 1, L = s.k === 'bolt' ? 12 : 7;
+    ctx.strokeStyle = s.k === 'bolt' ? '#d8c08a' : '#e8dcc0'; ctx.lineWidth = s.k === 'bolt' ? 2 : 1;
+    ctx.beginPath(); ctx.moveTo(x - s.vx / sp * L, y - s.vy / sp * L); ctx.lineTo(x, y); ctx.stroke();
+  } else if (s.k === 'axe') {
+    const a = s.age * 18; ctx.strokeStyle = '#c9c9c9'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x - Math.cos(a) * 5, y - Math.sin(a) * 5); ctx.lineTo(x + Math.cos(a) * 5, y + Math.sin(a) * 5); ctx.stroke();
+    circle(x + Math.cos(a) * 5, y + Math.sin(a) * 5, 2, '#e6e6e6');
+  } else if (s.k === 'fire') { circle(x, y, 4, '#ff8a1f'); circle(x, y, 2, '#fff1a0'); }
+  else if (s.k === 'coil') { circle(x, y, 4, '#1c2a14', '#7cff5a'); circle(x, y, 1.5, '#b8ff9a'); }
+}
+function drawFx(f) {
+  const h = G.hero, p = f.t / f.life;
+  if (f.k === 'arc') {
+    const x = h.x - camX, y = h.y - camY;
+    ctx.strokeStyle = `rgba(255,248,220,${1 - p})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, f.r * (0.7 + 0.3 * p), f.a - f.arc / 2, f.a + f.arc / 2); ctx.stroke();
+  } else if (f.k === 'num') {
+    ctx.globalAlpha = Math.min(1, 2.2 * (1 - p));
+    txt(String(f.v), Math.round(f.x - camX), Math.round(f.y - camY - 10 * p), 7, f.v >= 40 ? '#ffd24a' : '#fff', 'center');
+    ctx.globalAlpha = 1;
+  } else if (f.k === 'boom') {
+    const s = A.sprites.boom;
+    if (s) { const fi = Math.min(s.count - 1, Math.floor(p * s.count)); ctx.drawImage(s.canvas, (fi % s.cols) * s.fw, Math.floor(fi / s.cols) * s.fh, s.fw, s.fh, Math.round(f.x - camX - s.fw / 2), Math.round(f.y - camY - s.fh / 2), s.fw, s.fh); return; }
+    circle(f.x - camX, f.y - camY, f.r * (0.4 + 0.6 * p), `rgba(255,${140 - 100 * p | 0},30,${0.75 * (1 - p)})`);
+  }
+}
+/* ---------- Warcraft II bitmap fonts (MAINDAT.WAR entries 279-283) ---------- */
+const FONT_E = { title: 280, large: 281, game: 282, small: 283 };
+const FONT_COL = { // colour ramps from the Wargus project's font definitions
+  yellow: [[252, 248, 240], [244, 224, 32], [208, 192, 28], [168, 140, 16], [92, 48, 0], [0, 0, 0], [108, 108, 108]],
+  white: [[252, 248, 240], [252, 248, 240], [252, 248, 240], [252, 248, 240], [108, 108, 108], [0, 0, 0], [0, 0, 0]],
+  grey: [[192, 192, 192], [192, 192, 192], [180, 180, 180], [168, 168, 168], [108, 108, 108], [0, 0, 0], [0, 0, 0]],
+  ink: [[101, 60, 28], [65, 32, 32], [65, 32, 32], [81, 40, 32], [36, 16, 16], [117, 52, 20], [117, 52, 20]],
+  red: [[255, 200, 180], [220, 40, 20], [164, 0, 0], [124, 0, 0], [68, 4, 0], [0, 0, 0], [0, 0, 0]],
+};
+const fonts = {};
+function loadFonts() {
+  for (const k in fonts) delete fonts[k];
+  const main = findMain(); if (!main) return;
+  for (const [k, e] of Object.entries(FONT_E)) { try { const f = decodeFont(Core.safeEntry(A.wars[main], e)); if (f) fonts[k] = f; } catch (err) {} }
+  document.body.classList.toggle('wcfont', !!fonts.game);
+}
+function glyphCanvas(g, scheme) {
+  let c = g.cache[scheme]; if (c) return c;
+  c = document.createElement('canvas'); c.width = Math.max(1, g.w); c.height = Math.max(1, g.h);
+  const id = new ImageData(c.width, c.height), ramp = FONT_COL[scheme] || FONT_COL.white;
+  for (let i = 0; i < g.px.length; i++) { const v = g.px[i]; if (v === 255) continue; const rgb = ramp[Math.min(v, ramp.length - 1)]; id.data[i * 4] = rgb[0]; id.data[i * 4 + 1] = rgb[1]; id.data[i * 4 + 2] = rgb[2]; id.data[i * 4 + 3] = 255; }
+  c.getContext('2d').putImageData(id, 0, 0); return (g.cache[scheme] = c);
+}
+const fontAdv = (f, ch) => { const g = f.glyphs[ch - 32]; return g && g.w ? g.xo + g.w : Math.ceil(f.mw / 3); };
+function fontWidth(f, str) { let w = 0; for (const ch of str) w += fontAdv(f, ch.charCodeAt(0)); return w; }
+function fontDraw(x2, f, str, x, y, scheme) {
+  for (const ch of str) { const code = ch.charCodeAt(0), g = f.glyphs[code - 32]; if (g && g.w) x2.drawImage(glyphCanvas(g, scheme), x + g.xo, y + g.yo); x += fontAdv(f, code); }
+}
+// Turn a piece of text into a crisp image of the game's own font, for menus.
+function fontImage(str, key, scheme, scale) {
+  const f = fonts[key]; if (!f) return null;
+  const c = document.createElement('canvas'); c.width = Math.max(1, fontWidth(f, str)); c.height = f.mh;
+  const x = c.getContext('2d'); fontDraw(x, f, str, 0, 0, scheme);
+  c.className = 'wct'; c.style.width = c.width * scale + 'px'; c.setAttribute('aria-hidden', 'true');
+  return c;
+}
+const WC_RULES = [['h1', 'title', 'yellow', 1], ['h2', 'large', 'yellow', 1.5], ['h3.side', 'game', 'yellow', 1.5], ['button.opt:not(.card)', 'game', 'yellow', 1.5], ['.card .nm', 'game', 'yellow', 1.4]];
+function wcify(root) {
+  if (!fonts.game) return;
+  for (const [selr, key, scheme, sc] of WC_RULES) root.querySelectorAll(selr).forEach(el => {
+    if (el.dataset.wc || el.children.length && !(el.children.length === 1 && el.firstElementChild.tagName === 'B')) return;
+    const text = el.textContent.replace(/\s+/g, ' ').trim(); if (!text) return;
+    const img = fontImage(text, key, el.closest('button')?.disabled ? 'grey' : scheme, el.closest('.wcstage') ? 1 : sc); if (!img) return;
+    el.dataset.wc = '1'; el.setAttribute('aria-label', text); el.textContent = ''; el.appendChild(img);
+  });
+}
+function txt(s, x, y, size, col, align = 'left') {
+  const f = fonts[size <= 7 ? 'small' : 'game'];
+  if (f) {
+    const scheme = /^#(f[0-9a-f]e|fff|e8d|a8c|ff?f)/i.test(col) && !/^#ffd/i.test(col) ? 'white' : 'yellow', w = fontWidth(f, s);
+    const x0 = Math.round(align === 'center' ? x - w / 2 : align === 'right' ? x - w : x);
+    fontDraw(ctx, f, s, x0, Math.round(y), scheme); return;
+  }
+  ctx.font = `bold ${size}px system-ui,sans-serif`; ctx.textAlign = align; ctx.textBaseline = 'top';
+  ctx.fillStyle = '#000'; ctx.fillText(s, x + 1, y + 1); ctx.fillStyle = col; ctx.fillText(s, x, y);
+}
+function fmtTime(t) { t = Math.max(0, Math.floor(t)); return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; }
+function drawHud() {
+  const h = G.hero;
+  ctx.fillStyle = '#120c06'; ctx.fillRect(0, 0, W, 6);
+  ctx.fillStyle = '#4a86e8'; ctx.fillRect(1, 1, Math.round((W - 2) * Math.min(1, h.xp / h.next)), 4);
+  txt(`Lv ${h.level}`, 6, 9, 9, '#d9b25a');
+  txt(fmtTime(G.t), W / 2, 9, 11, '#f1e6c8', 'center');
+  if (W < 320) txt(`${G.kills} kills  ${G.gold} gold`, W / 2, 22, 8, '#f1e6c8', 'center');
+  else { txt(`${G.kills} kills`, W - 60, 9, 9, '#f1e6c8', 'right'); txt(`${G.gold} gold`, W - 60, 20, 8, '#ffd24a', 'right'); }
+  let y = 22;
+  for (const id in G.weapons) { txt(`${WEAPONS[id].name} ${G.weapons[id].lvl}`, 6, y, 7, '#e8d9b0'); y += 9; }
+  for (const id in G.passives) { txt(`${PASSIVES[id].name} ${G.passives[id]}`, 6, y, 7, '#a8c4e0'); y += 9; }
+  const boss = G.enemies.find(e => e.type === 'boss');
+  if (boss) {
+    const bw = Math.min(200, W - 120), bx = (W - bw) / 2;
+    ctx.fillStyle = '#000'; ctx.fillRect(bx - 1, 24, bw + 2, 6); ctx.fillStyle = '#c92a1e'; ctx.fillRect(bx, 25, bw * Math.max(0, boss.hp / boss.maxHp), 4);
+  }
+  if (G.banner) { ctx.globalAlpha = Math.min(1, G.banner.t); txt(G.banner.text, W / 2, H * 0.28, 13, '#ffd27a', 'center'); ctx.globalAlpha = 1; }
+  if (joy) {
+    const ox = joy.ox / SCALE, oy = joy.oy / SCALE;
+    circle(ox, oy, 26, 'rgba(255,255,255,.08)', 'rgba(217,178,90,.5)');
+    const dx = joy.x - joy.ox, dy = joy.y - joy.oy, l = Math.hypot(dx, dy), m = Math.min(l, 40 * (window.devicePixelRatio || 1));
+    circle(ox + (l ? dx / l * m : 0) / SCALE, oy + (l ? dy / l * m : 0) / SCALE, 10, 'rgba(217,178,90,.5)');
+  }
+}
+function render() {
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0); ctx.imageSmoothingEnabled = false;
+  if (!G) { camX = attract * 12 - W / 2; camY = attract * 5 - H / 2; drawGround(); return; }
+  const h = G.hero; camX = Math.round(h.x - W / 2); camY = Math.round(h.y - H / 2);
+  drawGround();
+  if (G.weapons.aura) { const r = (26 + 5 * G.weapons.aura.lvl + (G.weapons.aura.lvl >= 5 ? 5 : 0)) * h.area; circle(h.x - camX, h.y - camY, r, 'rgba(255,236,150,.10)', 'rgba(255,236,150,.35)'); }
+  for (const c of G.corpses) drawCorpse(c);
+  for (const s of G.shots) if (s.k === 'rune') drawShot(s);
+  for (const g of G.gems) {
+    const x = Math.round(g.x - camX), y = Math.round(g.y - camY);
+    if (x < -10 || y < -10 || x > W + 10 || y > H + 10) continue;
+    if (g.chest) { ctx.fillStyle = '#6b4518'; ctx.fillRect(x - 6, y - 4, 12, 8); ctx.fillStyle = '#e7c04a'; ctx.fillRect(x - 6, y - 1, 12, 2); ctx.fillRect(x - 1, y - 4, 2, 8); continue; }
+    if (g.coin) { circle(x, y, 3, '#e7c04a', '#6b4518'); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x - 1, y - 2, 1, 2); continue; }
+    if (g.meat) { circle(x, y, 3, '#b84a3a', '#3a1208'); ctx.fillStyle = '#eee'; ctx.fillRect(x + 2, y - 3, 3, 2); continue; }
+    if (A.sprites.gem && drawSprite('gem', g.x, g.y, 0, attract, false)) continue;
+    ctx.fillStyle = g.v >= 5 ? '#ffd24a' : g.v >= 3 ? '#5ee08a' : '#5aa8ff';
+    ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x + 2, y); ctx.lineTo(x, y + 3); ctx.lineTo(x - 2, y); ctx.fill();
+  }
+  const list = G.enemies.filter(e => Math.abs(e.x - h.x) < W / 2 + 90 && Math.abs(e.y - h.y) < H / 2 + 90);
+  for (const p of G.props) if (Math.abs(p.x - h.x) < W / 2 + 90 && Math.abs(p.y - h.y) < H / 2 + 90) list.push(p);
+  list.push(null);
+  const sy = e => e ? e.y + (e.spr ? e.spr.height / 2 - 10 : 0) : h.y;
+  list.sort((a, b) => sy(a) - sy(b));
+  for (const e of list) !e ? drawHero() : e.spr && !e.type ? drawBuilding(e) : drawEnemy(e);
+  for (const s of G.shots) if (s.k !== 'rune') drawShot(s);
+  for (const s of G.eshots) { if (!drawSprite(foeRole('eshot'), s.x, s.y, s.dir, attract, false)) circle(s.x - camX, s.y - camY, 2.5, '#9be04a', '#203a08'); }
+  for (const f of G.fx) drawFx(f);
+  drawHud();
+}
+
+/* ---------- input ---------- */
+const keys = new Set();
+let joy = null, pad = { prev: [], navT: 0 };
+addEventListener('keydown', e => {
+  if (labOpen) { if (e.code === 'Escape') closeLab(); return; }
+  keys.add(e.code);
+  if (menuOpen()) { menuKey(e.code); if (['ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault(); return; }
+  if (e.code === 'Escape' || e.code === 'KeyP') pauseRun();
+  else if ((e.code === 'KeyF' || e.code === 'Tab') && G && G.state === 'play') { cycleSpeed(); e.preventDefault(); }
+});
+addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('blur', () => { keys.clear(); joy = null; });
+cv.addEventListener('pointerdown', e => {
+  if (!G || G.state !== 'play') return;
+  const dpr = window.devicePixelRatio || 1;
+  joy = { id: e.pointerId, ox: e.clientX * dpr, oy: e.clientY * dpr, x: e.clientX * dpr, y: e.clientY * dpr };
+  cv.setPointerCapture?.(e.pointerId);
+});
+cv.addEventListener('pointermove', e => { if (joy && e.pointerId === joy.id) { const dpr = window.devicePixelRatio || 1; joy.x = e.clientX * dpr; joy.y = e.clientY * dpr; } });
+const endJoy = e => { if (joy && e.pointerId === joy.id) joy = null; };
+cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
+function getPad() { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.connected) return p; return null; }
+function readMove() {
+  let x = 0, y = 0;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) x--; if (keys.has('KeyD') || keys.has('ArrowRight')) x++;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) y--; if (keys.has('KeyS') || keys.has('ArrowDown')) y++;
+  const p = getPad();
+  if (p) {
+    const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
+    if (Math.hypot(ax, ay) > 0.2) { x += ax; y += ay; }
+    const b = i => p.buttons[i] && p.buttons[i].pressed;
+    if (b(14)) x--; if (b(15)) x++; if (b(12)) y--; if (b(13)) y++;
+  }
+  if (joy) { const s = 40 * (window.devicePixelRatio || 1); x += (joy.x - joy.ox) / s; y += (joy.y - joy.oy) / s; }
+  return [x, y];
+}
+function pollPad(dt) {
+  const p = getPad(); if (!p) return;
+  const down = i => !!(p.buttons[i] && p.buttons[i].pressed);
+  const edge = i => down(i) && !pad.prev[i];
+  if (labOpen) { if (edge(1)) closeLab(); }
+  else if (menuOpen()) {
+    pad.navT -= dt;
+    const ay = (p.axes[1] || 0) + (p.axes[0] || 0) * 0.0, ax = p.axes[0] || 0;
+    let nav = 0;
+    if (edge(12) || edge(14)) nav = -1; else if (edge(13) || edge(15)) nav = 1;
+    else if (pad.navT <= 0 && (Math.abs(ay) > 0.6 || Math.abs(ax) > 0.6)) { nav = (Math.abs(ay) > Math.abs(ax) ? ay : ax) > 0 ? 1 : -1; pad.navT = 0.22; }
+    if (Math.abs(ay) < 0.3 && Math.abs(ax) < 0.3) pad.navT = 0;
+    if (nav) moveSel(nav);
+    if (edge(0)) clickSel();
+    if (edge(1) || edge(9)) { const back = overlay.querySelector('[data-back]'); if (back) back.click(); }
+  } else if (G && G.state === 'play') { if (edge(9) || edge(8)) pauseRun(); else if (edge(3)) cycleSpeed(); }
+  pad.prev = p.buttons.map(b => b.pressed);
+}
+
+/* ---------- menus ---------- */
+let sel = 0;
+const menuOpen = () => overlay.style.display === 'flex';
+function showMenu(html) {
+  overlay.className = ''; overlay.innerHTML = `<div class="panel">${html}</div>`; overlay.style.display = 'flex'; sel = 0; titleArt(false);
+  if (!G && A.menuBg) { overlay.classList.add('parch'); overlay.style.backgroundImage = `url(${A.menuBg})`; if (!overlay.querySelector('.cards')) overlay.classList.add('bare'); }
+  wcify(overlay); fitPanel(); highlight();
+}
+// Shrink a menu slightly when it would otherwise need scrolling (down to 75%; smaller screens scroll).
+function fitPanel() {
+  const p = overlay.querySelector('.panel'); if (!p) return;
+  p.style.zoom = '';
+  let z = 1;
+  for (let k = 0; k < 8 && overlay.scrollHeight > overlay.clientHeight + 1 && z > 0.75; k++) {
+    z = Math.max(0.75, z * Math.min(0.99, overlay.clientHeight / overlay.scrollHeight)); p.style.zoom = z;
+  }
+}
+addEventListener('resize', () => { if (menuOpen()) fitPanel(); });
+function titleArt(on) {
+  overlay.classList.toggle('titled', !!(on && A.titleUrl));
+  overlay.style.backgroundImage = on && A.titleUrl ? `linear-gradient(rgba(0,0,0,.05),rgba(0,0,0,.55)), url(${A.titleUrl})` : '';
+}
+function hideMenu() { overlay.style.display = 'none'; overlay.innerHTML = ''; overlay.className = ''; }
+const opts = () => [...overlay.querySelectorAll('button.opt')];
+function highlight() { opts().forEach((b, i) => b.classList.toggle('sel', i === sel)); const b = opts()[sel]; if (b) b.scrollIntoView?.({ block: 'nearest' }); }
+function moveSel(d) { const n = opts().length; if (!n) return; sel = (sel + d + n) % n; highlight(); }
+function clickSel() { const b = opts()[sel]; if (b) b.click(); }
+function menuKey(code) {
+  if (['ArrowUp', 'ArrowLeft', 'KeyW', 'KeyA'].includes(code)) moveSel(-1);
+  else if (['ArrowDown', 'ArrowRight', 'KeyS', 'KeyD'].includes(code)) moveSel(1);
+  else if (code === 'Enter' || code === 'Space') clickSel();
+  else if (/^Digit[1-9]$/.test(code)) { const b = opts()[+code.slice(5) - 1]; if (b) b.click(); }
+  else if (code === 'Escape') { const back = overlay.querySelector('[data-back]'); if (back) back.click(); }
+}
+overlay.addEventListener('pointermove', e => { const b = e.target.closest('button.opt'); if (b) { const i = opts().indexOf(b); if (i >= 0 && i !== sel) { sel = i; highlight(); } } });
+overlay.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act;
+  ensureAudio();
+  if (b.disabled) return;
+  if (act === 'title') showTitle();
+  else if (act === 'choose') showChoose();
+  else if (act === 'hero') { heroVoice('yes', 1, b.dataset.id); showLevels(b.dataset.id); }
+  else if (act === 'start') newRun(b.dataset.id, b.dataset.level);
+  else if (act === 'quick') { const l = meta.last; newRun(l.hero, l.level); }
+  else if (act === 'retry') newRun(G.heroId, G.LV.id);
+  else if (act === 'lab') openLab();
+  else if (act === 'settings') showSettings(b.dataset.from);
+  else if (act === 'opt') { changeOpt(b.dataset.k); showSettings(b.dataset.from, b.dataset.k); }
+  else if (act === 'shop') showShop();
+  else if (act === 'buy') { buyUp(b.dataset.id); showShop(b.dataset.id); }
+  else if (act === 'refund') { meta.gold += meta.spent; meta.spent = 0; meta.ups = {}; saveMeta(); showShop(); }
+  else if (act === 'resume') { hideMenu(); G.state = 'play'; showHudBtns(true); musicDuck(false); }
+  else if (act === 'pause') pauseRun(true);
+  else if (act === 'pick') pickCard(b.dataset.kind, b.dataset.id);
+  else if (act === 'reroll') { if (G.rerolls > 0) { G.rerolls--; openLevelUp(true); } }
+  else if (act === 'skip') { G.hero.hp = Math.min(G.hero.maxHp, G.hero.hp + G.hero.maxHp * 0.1); resumeOrNext(); }
+  else if (act === 'chestok') { const l = $('#loot'); if (l && !l.classList.contains('fast') && performance.now() - G.chestAt < 450 * l.children.length) { l.classList.add('fast'); return; } resumeOrNext(); }
+  else if (act === 'quit') { if (G && G.state !== 'over') bankRun(); G = null; showHudBtns(false); showTitle(); }
+});
+pauseBtn.addEventListener('click', () => pauseRun());
+speedBtn.addEventListener('click', () => cycleSpeed());
+
+function showTitle() {
+  showHudBtns(false); playMusic('menu');
+  const l = meta.last, lv = l && LEVELS.find(x => x.id === l.level);
+  if (A.menuBg && A.btn) {
+    const quick = l && HEROES[l.hero] && lv ? `<button class="opt" data-act="quick">Quick Start: ${HEROES[l.hero].name.split(' ')[0]}</button>` : '';
+    overlay.innerHTML = `<div class="wcstage"><img class="bg" src="${A.menuBg}" alt="">
+      <div class="wcbtns"><button class="opt" data-act="choose">Start a Run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
+      <button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="lab">Asset Lab</button></div>
+      ${mu.names.size ? '' : '<div class="note">Re-import your game folder in the Asset Lab to add the music and hero voices.</div>'}
+      <div class="ver" data-wcsmall="TIDES OF SURVIVAL"></div></div>`;
+    overlay.className = 'wcmenu'; overlay.style.display = 'flex'; overlay.style.backgroundImage = '';
+    sel = 0; wcify(overlay);
+    const v = overlay.querySelector('.ver'), vi = fontImage('TIDES OF SURVIVAL  ' + (best.time ? 'BEST ' + fmtTime(best.time) : ''), 'small', 'white', 1); if (vi) v.appendChild(vi);
+    fitStage(); highlight(); return;
+  }
+  const b = best.time ? `<p class="help">Best: survived ${fmtTime(best.time)} as ${best.hero || 'a hero'}, ${best.kills} kills, level ${best.level}.</p>` : '';
+  const quick = l && HEROES[l.hero] && lv ? `<button class="opt" data-act="quick">Quick start: ${HEROES[l.hero].name.split(' ')[0]}, ${lv.name}</button>` : '';
+  showMenu(`<h1>Tides of Survival</h1><p class="sub">A Warcraft II survivors-like fan game</p>
+    <div class="status">${assetSummary()}</div>
+    <div class="opts"><button class="opt" data-act="choose">Start a run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
+      <button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="lab">Asset Lab</button></div>
+    <p class="help long">Move with WASD, arrow keys, a gamepad stick, or by dragging on the screen. Your weapons attack by themselves. F, Tab or the Y button changes game speed.</p>${b}
+    <p class="fine">Unofficial fan project, not affiliated with or endorsed by Blizzard Entertainment. Graphics, music and sounds are read from your own copy of Warcraft II and never leave your device. Nothing from the game is included in this page.</p>`);
+  titleArt(true);
+}
+function showLevels(heroId) {
+  const cards = LEVELS.map((L, i) => {
+    const open = i <= meta.unlocked;
+    return `<button class="opt card" data-act="start" data-id="${heroId}" data-level="${L.id}" ${open ? '' : 'disabled'}>
+      <span class="nm">${L.name}</span><span class="lv">${open ? (i ? 'Difficulty ' + '★'.repeat(i + 1) : 'Difficulty ★') : 'Locked'}</span>
+      <span class="ds">${open ? L.blurb : `Survive ${UNLOCK_T / 60} minutes in ${LEVELS[i - 1].name} to unlock.`}</span></button>`;
+  }).join('');
+  showMenu(`<h2>Choose a battlefield</h2><p class="sub">Playing as ${HEROES[heroId].name}</p><div class="cards">${cards}</div>
+    <div class="opts" style="margin-top:14px"><button class="opt" data-act="choose" data-back>Back</button></div>`);
+  sel = Math.min(meta.unlocked, LEVELS.length - 1); highlight();
+}
+const OPT_DEFS = {
+  speed: { label: 'Game speed', vals: SPEEDS, fmt: v => v + 'x' },
+  music: { label: 'Music volume', vals: [0, 0.2, 0.4, 0.6, 0.8, 1], fmt: v => Math.round(v * 100) + '%' },
+  sfx: { label: 'Sound volume', vals: [0, 0.2, 0.4, 0.6, 0.8, 1], fmt: v => Math.round(v * 100) + '%' },
+  nums: { label: 'Damage numbers', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
+  quickChest: { label: 'Chest animation', vals: [false, true], fmt: v => v ? 'Quick' : 'Full' },
+};
+function changeOpt(k) {
+  const d = OPT_DEFS[k], i = d.vals.indexOf(cfg.opts[k]);
+  cfg.opts[k] = d.vals[(i + 1) % d.vals.length]; saveCfg();
+  if (k === 'music') musicVolume(); if (k === 'sfx') sfx('s_hit', 0);
+}
+function showSettings(from, focus) {
+  const keys = Object.keys(OPT_DEFS);
+  const rows = keys.map(k => `<button class="opt" data-act="opt" data-k="${k}" data-from="${from}">${OPT_DEFS[k].label}: ${OPT_DEFS[k].fmt(cfg.opts[k])}</button>`).join('');
+  showMenu(`<h2>Settings</h2><div class="opts">${rows}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
+  if (focus) { sel = keys.indexOf(focus); highlight(); }
+}
+function buyUp(id) {
+  const c = upCost(id);
+  if (up(id) >= UPGRADES[id].max || meta.gold < c) return;
+  meta.gold -= c; meta.spent += c; meta.ups[id] = up(id) + 1; saveMeta(); sfx('s_level', 0);
+}
+function showShop(focus) {
+  const ids = Object.keys(UPGRADES);
+  const rows = ids.map(id => {
+    const U = UPGRADES[id], r = up(id), maxed = r >= U.max, c = upCost(id);
+    return `<button class="opt card" data-act="buy" data-id="${id}" ${maxed || meta.gold < c ? 'disabled' : ''}>
+      <span class="nm">${U.name}</span><span class="lv">Rank ${r} of ${U.max}</span><span class="ds">${U.desc}${U.max > 1 ? ' per rank' : ''}.</span>
+      <span class="ds chestgold">${maxed ? 'Fully upgraded' : c + ' gold'}</span></button>`;
+  }).join('');
+  showMenu(`<h2>Armoury</h2><p class="sub">Spend the gold you bring back from battle on permanent upgrades. You have <b class="chestgold">${meta.gold} gold</b>.</p>
+    <div class="cards shop">${rows}</div>
+    <div class="opts" style="margin-top:10px"><button class="opt" data-act="refund" ${meta.spent ? '' : 'disabled'}>Refund all (${meta.spent} gold)</button><button class="opt" data-act="title" data-back>Back</button></div>`);
+  if (focus) { sel = ids.indexOf(focus); highlight(); }
+}
+function heroCard(id) {
+  const H_ = HEROES[id], spd = H_.speed >= 82 ? 'fast' : H_.speed >= 72 ? 'average speed' : 'slow';
+  return `<button class="opt card hero" data-act="hero" data-id="${id}">
+    <span class="hrow"><canvas class="hpic" width="48" height="48" data-hero="${id}"></canvas>
+    <span><span class="nm">${H_.name}</span><span class="lv ${H_.side === 'Horde' ? 'horde' : 'ally'}">${H_.unit}</span></span></span>
+    <span class="ds">Starts with <b>${WEAPONS[H_.start].name}</b>. ${H_.hp} health, ${spd}.</span>
+    <span class="ds sig"><b>${H_.sig}:</b> ${H_.sigDesc}</span></button>`;
+}
+function drawHeroPics() {
+  overlay.querySelectorAll('canvas.hpic').forEach(c => {
+    const id = c.dataset.hero, ic = A.icons && A.icons[id];
+    if (ic) { c.width = ic.width; c.height = ic.height; c.style.width = '58px'; c.style.height = '48px'; c.getContext('2d').drawImage(ic, 0, 0); return; }
+    const x = c.getContext('2d'), s = A.sprites['hero_' + id] || A.sprites.hero;
+    x.imageSmoothingEnabled = false; x.clearRect(0, 0, 48, 48);
+    if (s) {
+      const { fi } = spriteFrame(s, 4, 0), big = Math.max(s.fw, s.fh), sc = big > 48 ? 48 / big : big <= 24 ? 2 : 1;
+      x.drawImage(s.canvas, (fi % s.cols) * s.fw, Math.floor(fi / s.cols) * s.fh, s.fw, s.fh, 24 - s.fw * sc / 2, 24 - s.fh * sc / 2, s.fw * sc, s.fh * sc);
+    } else {
+      x.fillStyle = HEROES[id].col; x.beginPath(); x.arc(24, 24, 14, 0, Math.PI * 2); x.fill();
+      x.lineWidth = 2; x.strokeStyle = HEROES[id].side === 'Horde' ? '#8a1c12' : '#d9b25a'; x.stroke();
+      x.fillStyle = '#000'; x.font = 'bold 16px Cinzel,serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(HEROES[id].name[0], 24, 25);
+    }
+  });
+}
+function showChoose() {
+  const ids = Object.keys(HEROES), ally = ids.filter(i => HEROES[i].side === 'Alliance'), horde = ids.filter(i => HEROES[i].side === 'Horde');
+  showMenu(`<h2>Choose your hero</h2>
+    <h3 class="side ally">The Alliance</h3><div class="cards">${ally.map(heroCard).join('')}</div>
+    <h3 class="side horde">The Horde</h3><div class="cards">${horde.map(heroCard).join('')}</div>
+    <div class="opts" style="margin-top:14px"><button class="opt" data-act="title" data-back>Back</button></div>`);
+  const i = [...ally, ...horde].indexOf(store.get('tos_hero', 'lothar'));
+  if (i >= 0) { sel = i; highlight(); }
+  drawHeroPics();
+}
+function pauseRun(again) {
+  if (!G || (G.state !== 'play' && !again)) return;
+  G.state = 'paused'; showHudBtns(false); joy = null; musicDuck(true);
+  showMenu(`<h2>Paused</h2><div class="stats"><b>Battlefield</b><span>${G.LV.name}</span><b>Time</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>${G.gold}</span></div>
+    <div class="opts"><button class="opt" data-act="resume" data-back>Resume</button><button class="opt" data-act="retry">Restart</button>
+    <button class="opt" data-act="settings" data-from="pause">Settings</button><button class="opt" data-act="quit">Quit to title (keep gold)</button></div>`);
+}
+function choices() {
+  const o = [], wc = Object.keys(G.weapons).length, pc = Object.keys(G.passives).length;
+  for (const id in WEAPONS) { const c = G.weapons[id]; if (c) { if (c.lvl < MAX_LVL) o.push({ kind: 'w', id, lvl: c.lvl + 1, wgt: 1.2 }); } else if (wc < MAX_SLOTS) o.push({ kind: 'w', id, lvl: 1, wgt: 0.8 }); }
+  for (const id in PASSIVES) { const c = G.passives[id] || 0; if (c) { if (c < MAX_LVL) o.push({ kind: 'p', id, lvl: c + 1, wgt: 1 }); } else if (pc < MAX_SLOTS) o.push({ kind: 'p', id, lvl: 1, wgt: 0.7 }); }
+  const out = [];
+  while (out.length < 3 && o.length) {
+    let s = o.reduce((a, b) => a + b.wgt, 0), r = Math.random() * s, i = 0;
+    for (; i < o.length; i++) { r -= o[i].wgt; if (r <= 0) break; }
+    out.push(o.splice(Math.min(i, o.length - 1), 1)[0]);
+  }
+  if (!out.length) out.push({ kind: 'gold', id: 'gold', lvl: 0 });
+  return out;
+}
+function itemInfo(c) {
+  if (c.kind === 'w') { const W_ = WEAPONS[c.id]; return { nm: W_.name, ds: c.lvl === 1 ? W_.desc : W_.up[c.lvl - 2], lv: c.lvl === 1 ? '<span class="lv new">New weapon</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
+  if (c.kind === 'p') { const P = PASSIVES[c.id]; return { nm: P.name, ds: P.desc, lv: c.lvl === 1 ? '<span class="lv new">New</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
+  return { nm: 'Gold', ds: 'Restore 40 health and gain 25 gold.', lv: '<span class="lv">Everything is maxed</span>' };
+}
+function openLevelUp(reroll) {
+  G.state = 'levelup'; if (!reroll) G.pending--; joy = null; showHudBtns(false);
+  if (!reroll) { sfx('s_level', 0); heroVoice('yes', 0.35); }
+  const cards = choices().map((c, i) => {
+    const { nm, ds, lv } = itemInfo(c);
+    return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="nm">${i + 1}. ${nm}</span>${lv}<span class="ds">${ds}</span></button>`;
+  }).join('');
+  showMenu(`<h2>Level ${G.hero.level}</h2><div class="cards">${cards}</div>
+    <div class="lvlrow"><button class="opt" data-act="reroll" ${G.rerolls > 0 ? '' : 'disabled'}>Reroll (${G.rerolls})</button><button class="opt" data-act="skip">Skip (+10% health)</button></div>`);
+}
+function resumeOrNext() {
+  if (G.chestQueue.length) openChest(G.chestQueue.shift());
+  else if (G.pending > 0) openLevelUp();
+  else { hideMenu(); G.state = 'play'; showHudBtns(true); }
+}
+function pickCard(kind, id) {
+  addItem(kind, id); if (kind === 'gold') addGold(25);
+  resumeOrNext();
+}
+// Treasure chests: boss chests give 1, 3 or 5 upgrades; camp chests give gold and sometimes an upgrade.
+function openChest(kind) {
+  G.state = 'chest'; joy = null; showHudBtns(false); sfx('s_level', 0);
+  const r = Math.random(), n = kind === 'boss' ? (r < 0.15 ? 5 : r < 0.5 ? 3 : 1) : (r < 0.35 ? 1 : 0);
+  const got = [];
+  for (let i = 0; i < n; i++) { const c = choices()[0]; if (!c) break; addItem(c.kind, c.id); got.push(itemInfo(c)); }
+  const gold = Math.round((kind === 'boss' ? 60 + rnd(0, 40) : 15 + rnd(0, 20)) * goldMul());
+  addGold(gold);
+  const step = cfg.opts.quickChest ? 0 : 0.45;
+  const items = got.map((g, i) => `<li style="animation-delay:${(i * step).toFixed(2)}s"><b>${g.nm}</b> ${g.lv}<br><span class="ds">${g.ds}</span></li>`).join('')
+    + `<li style="animation-delay:${(got.length * step).toFixed(2)}s" class="chestgold">+${gold} gold</li>`;
+  G.chestAt = performance.now();
+  showMenu(`<h2>${kind === 'boss' ? 'Treasure!' : 'Supply cache'}</h2><ul class="loot${step ? '' : ' fast'}" id="loot">${items}</ul>
+    <div class="opts"><button class="opt" data-act="chestok" data-back>Continue</button></div>`);
+}
+function endRun(won) {
+  G.state = 'over'; G.won = won; showHudBtns(false); joy = null;
+  if (G.t > best.time || (won && G.kills > best.kills)) { best = { time: Math.floor(G.t), kills: G.kills, level: G.hero.level, hero: G.HD.name }; store.set('tos_best', best); }
+  const unlocked = bankRun();
+  playMusic(won ? 'victory' : 'defeat');
+  showMenu(`<h2>${won ? 'Victory!' : 'You have fallen'}</h2><p class="sub">${won ? 'You held the line for fifteen minutes.' : 'The horde was too much this time.'}</p>
+    <div class="stats"><b>Hero</b><span>${G.HD.name}</span><b>Battlefield</b><span>${G.LV.name}</span><b>Survived</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>+${G.gold}</span></div>
+    ${unlocked ? `<p class="sub chestgold">New battlefield unlocked: ${unlocked}!</p>` : ''}
+    <div class="opts"><button class="opt" data-act="retry">Retry</button><button class="opt" data-act="choose">Change hero</button><button class="opt" data-act="quit" data-back>Title screen</button></div>`);
+}
+// Bank the run's gold and unlock the next level. Returns the name of a newly unlocked level, if any.
+function bankRun() {
+  if (G.banked) return null;
+  G.banked = true; meta.gold += G.gold;
+  const i = LEVELS.indexOf(G.LV); let unlocked = null;
+  if (G.t >= UNLOCK_T && i === meta.unlocked && i + 1 < LEVELS.length) { meta.unlocked = i + 1; unlocked = LEVELS[i + 1].name; }
+  saveMeta(); return unlocked;
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseRun(); });
+
+/* ---------- Asset Lab ---------- */
+let labOpen = false, labSel = null, labTimer = null, labObs = null;
+const labGrid = $('#labGrid'), labSide = $('#labSide'), labFile = $('#labFile'), labFilter = $('#labFilter');
+function openLab() {
+  hideMenu(); labOpen = true; $('#lab').style.display = 'flex'; labRefresh();
+  savedFolderName().then(n => { const b = $('#labReimport'); b.hidden = !(n && canRemember); if (n) b.textContent = `Re-import from ${n}`; });
+}
+function closeLab() { labOpen = false; clearInterval(labTimer); $('#lab').style.display = 'none'; rebuildSprites(); showTitle(); }
+$('#labClose').onclick = closeLab;
+$('#labAuto').onclick = () => { const n = autoAssign(true); rebuildSprites(); labRefresh(); labSide.insertAdjacentHTML('afterbegin', `<div class="hint">${n ? `Assigned ${n} sprites and sounds from the standard Warcraft II layout.` : 'Load <code>TOME.1</code> (or <code>MAINDAT.WAR</code>) first.'}</div>`); };
+$('#labForget').onclick = async () => { await DB.clear(); A.wars = {}; stopMusic(); mu.names.clear(); mu.cache.clear(); rebuildSprites(); labSel = null; labRefresh(); };
+// Known locations of the data inside a Warcraft II install (Battle.net Edition first, then DOS).
+const KNOWN_PATHS = [/(^|\/)support\/tomes\/tome\.1$/i, /(^|\/)support\/tomes\/tome\.2$/i, /(^|\/)war2dat\.mpq$/i, /(^|\/)maindat\.war$/i, /(^|\/)snddat\.war$/i, /(^|\/)install\.mpq$/i];
+$('#labDir').onchange = async e => { const all = [...e.target.files]; e.target.value = ''; await importFolderFiles(all); };
+// Chrome, Edge and other Chromium browsers can remember the chosen folder, so later imports are one click.
+const canRemember = typeof window.showDirectoryPicker === 'function';
+$('#labPick').onclick = async () => {
+  if (!canRemember) return $('#labDir').click();
+  let dir; try { dir = await showDirectoryPicker({ id: 'wc2', mode: 'read' }); } catch (e) { if (e && e.name === 'AbortError') return; return $('#labDir').click(); }
+  await DB.req('readwrite', s => s.put({ name: 'wc2dir', handle: dir }), 'handles');
+  await importFromHandle(dir);
+};
+$('#labReimport').onclick = async () => {
+  const rec = await DB.req('readonly', s => s.get('wc2dir'), 'handles'), dir = rec && rec.handle; if (!dir) return;
+  try { if ((await dir.queryPermission({ mode: 'read' })) !== 'granted' && (await dir.requestPermission({ mode: 'read' })) !== 'granted') return; } catch (e) { return; }
+  await importFromHandle(dir);
+};
+async function savedFolderName() { if (!canRemember) return null; try { const rec = await DB.req('readonly', s => s.get('wc2dir'), 'handles'); return rec && rec.handle ? rec.handle.name : null; } catch (e) { return null; } }
+// If the chosen folder isn't the install itself, look inside it for one, only following folders with
+// likely names (the approach D2 Survivors' desktop app uses), so picking ~/Games or your home folder works.
+const LOOK_INTO = /^(games|gog|gog games|gog galaxy|heroic|lutris|drive_c|pfx|program files( \(x86\))?|steamapps|common|steam|\.wine|\.local|share|bottles|blizzard( entertainment)?|.*warcraft.*|.*war2.*|.*tides.*)$/i;
+async function holdsInstall(d) {
+  try { for await (const [n, h] of d.entries()) { const l = n.toLowerCase(); if ((l === 'war2dat.mpq' || l === 'maindat.war') && h.kind === 'file') return true; if (l === 'support' && h.kind === 'directory') for await (const [m] of h.entries()) if (m.toLowerCase() === 'tomes') return true; } } catch (e) {}
+  return false;
+}
+async function findInstall(d, depth = 6) {
+  if (await holdsInstall(d)) return d;
+  if (depth <= 0) return null;
+  const subs = []; try { for await (const [n, h] of d.entries()) if (h.kind === 'directory' && (LOOK_INTO.test(n) || /drive_c/i.test(n))) subs.push(h); } catch (e) { return null; }
+  // Folders under ~/Games are often Wine prefixes named after the game: look into all of those too.
+  if (/^games$/i.test(d.name)) try { for await (const [, h] of d.entries()) if (h.kind === 'directory' && !subs.includes(h)) subs.push(h); } catch (e) {}
+  for (const h of subs.sort((a, b) => a.name.localeCompare(b.name))) { labSide.innerHTML = `<div class="hint">Searching ${h.name}…</div>`; const f = await findInstall(h, depth - 1); if (f) return f; }
+  return null;
+}
+// Collect just the files the game uses from a folder handle, without walking the whole install.
+async function importFromHandle(dir) {
+  labSide.innerHTML = `<div class="hint">Looking in ${dir.name}…</div>`;
+  const found = await findInstall(dir);
+  if (!found) { labSide.innerHTML = `<div class="hint">I couldn't find Warcraft II in <code>${dir.name}</code>. Pick the folder that contains <code>War2Dat.mpq</code>, or a folder above it such as your Games folder.<br><br>${installPathsHtml()}</div>` + labRoles(); return; }
+  if (found !== dir) await DB.req('readwrite', s => s.put({ name: 'wc2dir', handle: found }), 'handles');
+  dir = found;
+  const out = [], kids = async d => { const m = new Map(); for await (const [n, h] of d.entries()) m.set(n.toLowerCase(), h); return m; };
+  const add = async (h, path) => { const f = await h.getFile(); Object.defineProperty(f, 'webkitRelativePath', { value: path }); out.push(f); };
+  try {
+    const top = await kids(dir);
+    for (const n of ['war2dat.mpq', 'install.mpq', 'maindat.war', 'snddat.war']) { const h = top.get(n); if (h && h.kind === 'file') await add(h, dir.name + '/' + h.name); }
+    const sup = top.get('support'); if (sup && sup.kind === 'directory') { const tomes = (await kids(sup)).get('tomes'); if (tomes && tomes.kind === 'directory') for (const [n, h] of await kids(tomes)) if (/^tome\.[12]$/.test(n) && h.kind === 'file') await add(h, `${dir.name}/Support/TOMES/${h.name}`); }
+    const sfx = top.get('gamesfx');
+    if (sfx && sfx.kind === 'directory') for (const [n, h] of await kids(sfx)) {
+      if (h.kind !== 'directory' || !Object.values(VOICE_DIRS).some(v => v.toLowerCase() === n)) continue;
+      for (const [, w] of await kids(h)) if (w.kind === 'file' && /\.wav$/i.test(w.name)) await add(w, `${dir.name}/GameSFX/${h.name}/${w.name}`);
+    }
+  } catch (e) { console.warn('folder import', e); }
+  await importFolderFiles(out);
+}
+async function importFolderFiles(all) {
+  const picked = [];
+  for (const re of KNOWN_PATHS) { const f = all.find(x => re.test(x.webkitRelativePath || x.name)); if (f) picked.push(f); }
+  const voices = all.filter(x => /(^|\/)gamesfx\/[^/]+\/[^/]+\.wav$/i.test(x.webkitRelativePath || ''));
+  if (voices.length) picked.push(...voices);
+  if (!picked.length) {
+    labSide.innerHTML = `<div class="hint">I couldn't find the game data in that folder (looked at ${all.length} files). Pick the folder that contains <code>War2Dat.mpq</code> and the <code>Support</code> folder, usually <code>Warcraft II BNE</code>.</div>` + labRoles();
+    return;
+  }
+  await loadFiles(picked);
+};
+$('#labInput').onchange = async e => { const fs = [...e.target.files]; e.target.value = ''; await loadFiles(fs); };
+async function loadFiles(list) {
+  const errs = [], notes = [];
+  const wavs = list.filter(f => /\.wav$/i.test(f.name)); list = list.filter(f => !/\.wav$/i.test(f.name));
+  if (wavs.length) {
+    const items = [];
+    for (const [hero, dir] of Object.entries(VOICE_DIRS)) for (const f of wavs) {
+      const path = (f.webkitRelativePath || f.name).replace(/\\/g, '/'), parts = path.split('/');
+      if (parts.length < 2 || parts[parts.length - 2].toLowerCase() !== dir.toLowerCase()) continue;
+      const kind = VOICE_KIND.find(([, re]) => re.test(f.name)); if (!kind) continue;
+      items.push({ role: hero + ':' + kind[0], data: new Uint8Array(await f.arrayBuffer()) });
+    }
+    if (items.length) {
+      const nm = 'GAMESFX/VOICES.WAR', b = packWar(items);
+      addWar(nm, b); A.wars[nm].names = items.map(x => x.role); await DB.put(nm, b); store.set('tos_sndnames_' + nm, A.wars[nm].names);
+      notes.push(`GameSFX: found ${items.length} hero voice lines.`);
+    }
+  }
+  for (const f of list) {
+    const name = f.name.toUpperCase();
+    labSide.innerHTML = `<div class="hint">Reading ${f.name}…</div>`;
+    await new Promise(r => setTimeout(r, 30));
+    try {
+      if (name === 'INSTALL.MPQ') {
+        const n = await mpqFileMusic(f, k => { labSide.innerHTML = `<div class="hint">Reading music from Install.mpq… ${k} tracks</div>`; });
+        notes.push(n ? `Install.mpq: found ${n} music tracks.` : 'Install.mpq: no music found inside.');
+        continue;
+      }
+      const buf = await f.arrayBuffer(), d = new Uint8Array(buf, 0, Math.min(16, buf.byteLength));
+      const isWar = d.length >= 4 && Core.u32(d, 0) >= 0x18 && Core.u32(d, 0) <= 0x1F;
+      if (isWar) {
+        const nm = name === 'TOME.1' ? 'MAINDAT.WAR' : name === 'TOME.2' ? 'REZDAT.WAR' : name;
+        addWar(nm, buf); await DB.put(nm, buf); notes.push(`${f.name}: loaded as ${nm}.`); continue;
+      }
+      const base = name.replace(/\.MPQ$/, ''), inner = Core.mpqExtractWars(buf), found = [];
+      for (const w of inner) {
+        const nm = `${base}/${w.name}`, b = w.data.buffer.slice(w.data.byteOffset, w.data.byteOffset + w.data.byteLength);
+        addWar(nm, b); await DB.put(nm, b); found.push(w.name);
+      }
+      const m = Core.parseMpq(buf), wavs = []; let failed = 0, missing = 0;
+      for (const [role, path] of MPQ_SOUNDS) {
+        const bi = Core.mpqFind(m, path); if (bi < 0) { missing++; continue; }
+        try { const d = Core.mpqRead(m, bi, path); if (d && d[0] === 0x52) wavs.push({ role, data: d }); else failed++; } catch (e) { failed++; }
+      }
+      if (wavs.length) {
+        const nm = `${base}/SOUNDS.WAR`, b = packWar(wavs);
+        addWar(nm, b); A.wars[nm].names = wavs.map(w => w.role); await DB.put(nm, b);
+        store.set('tos_sndnames_' + nm, wavs.map(w => w.role));
+        found.push(`${wavs.length} sounds`);
+      }
+      notes.push(found.length ? `${f.name}: found ${found.join(', ')}.${failed ? ` ${failed} sound${failed > 1 ? 's use' : ' uses'} a compression the game can't read yet.` : ''}`
+        : `${f.name}: nothing the game can use inside.${failed ? ' Its sounds use a compression I can\'t read yet.' : ''}`);
+    } catch (err) { errs.push(`${f.name}: ${err.message}`); }
+  }
+  const auto = autoAssign(false);
+  if (auto) notes.push(`Assigned ${auto} sprites and sounds automatically.`);
+  else if (!findMain()) notes.push('For the unit sprites, also load <code>Support/TOMES/TOME.1</code> from the game folder.');
+  rebuildSprites(); labRefresh();
+  if (notes.length) labSide.insertAdjacentHTML('afterbegin', `<div class="hint">${notes.join('<br>')}</div>`);
+  if (errs.length) labSide.insertAdjacentHTML('afterbegin', `<div class="hint">Couldn't read: ${errs.join('<br>')}</div>`);
+};
+labFile.onchange = () => { labSel = null; labRenderGrid(); labRenderSide(); };
+labFilter.onchange = () => labRenderGrid();
+function labRefresh() {
+  const names = warNames(), cur = labFile.value;
+  labFile.innerHTML = names.map(n => `<option>${n}</option>`).join('') || '<option value="">(no files)</option>';
+  if (names.includes(cur)) labFile.value = cur;
+  labRenderGrid(); labRenderSide();
+}
+function labPalText() {
+  const p = A.palSrc; $('#labPalInfo').textContent = p ? `Palette: ${p.file} #${p.entry}${p.auto ? ' (auto)' : ''}` : 'Palette: none found, using greyscale';
+}
+function thumb(canvas, war, i, kind) {
+  const d = Core.safeEntry(war, i); const x = canvas.getContext('2d'); x.imageSmoothingEnabled = false;
+  x.clearRect(0, 0, 56, 56);
+  try {
+    if (kind === 'pal') { const p = Core.toPalette(d); for (let k = 0; k < 256; k++) { x.fillStyle = `rgb(${p[k * 3]},${p[k * 3 + 1]},${p[k * 3 + 2]})`; x.fillRect((k % 16) * 3.5, Math.floor(k / 16) * 3.5, 3.5, 3.5); } return; }
+    let g, fi = 0;
+    if (kind === 'gfx') { const n = Core.u16(d, 0), w = Core.u16(d, 2), h = Core.u16(d, 4); fi = n >= 5 ? 4 : 0; g = { w, h, px: Core.decodeGfuFrame(d, fi, w, h) }; }
+    else if (kind === 'img') { const im = Core.decodeImg(d); g = { w: im.w, h: im.h, px: im.frames[0] }; }
+    else return;
+    const t = document.createElement('canvas'); t.width = g.w; t.height = g.h; t.getContext('2d').putImageData(frameImage(g.px, g.w, g.h, A.pal), 0, 0);
+    const s = Math.min(56 / g.w, 56 / g.h), sc = s >= 1 ? Math.floor(s) : s;
+    x.drawImage(t, (56 - g.w * sc) / 2, (56 - g.h * sc) / 2, g.w * sc, g.h * sc);
+  } catch (e) {}
+}
+function labRenderGrid() {
+  labPalText();
+  labObs?.disconnect(); labGrid.innerHTML = '';
+  const war = A.wars[labFile.value];
+  if (!war) {
+    labGrid.innerHTML = `<div class="hint" style="grid-column:1/-1">
+      <b>Load your Warcraft II data.</b> Click <i>Import game folder</i> and choose your Warcraft II install folder${typeof window.showDirectoryPicker === 'function' ? ', or any folder above it, such as your Games or home folder: the game searches inside it and remembers where it found Warcraft II' : ''}. The game finds what it needs inside:
+      <br>• <code>Support/TOMES/TOME.1</code>: all the unit sprites
+      <br>• <code>War2Dat.mpq</code>: sound effects
+      <br><br>${installPathsHtml()}
+      <br>Heroes, enemies, missiles and sounds are then assigned automatically. Files stay in this browser only, so you do this once per device and nothing is uploaded. Old DOS installs work too: load <code>MAINDAT.WAR</code> and <code>SNDDAT.WAR</code>.</div>`;
+    return;
+  }
+  const filter = labFilter.value, frag = document.createDocumentFragment();
+  labObs = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { const c = en.target; labObs.unobserve(c); thumb(c, war, +c.dataset.i, c.dataset.k); } }), { root: labGrid }) : null;
+  let shown = 0;
+  for (let i = 0; i < war.count; i++) {
+    if (!war.entries[i]) continue;
+    const k = Core.kindOf(war, i);
+    if (filter !== 'all' && k !== filter) continue;
+    shown++;
+    const tile = document.createElement('div'); tile.className = 'tile' + (labSel && labSel.i === i && labSel.file === war.name ? ' sel' : '');
+    const d = Core.safeEntry(war, i);
+    let info = k;
+    if (k === 'gfx') info = `${Core.u16(d, 0)} fr ${Core.u16(d, 2)}×${Core.u16(d, 4)}`;
+    else if (k === 'img') info = `${Core.u16(d, 0)}×${Core.u16(d, 2)}`;
+    else if (k !== 'pal') info = `${k} ${(d ? d.length / 1024 : 0).toFixed(1)}k`;
+    if (k === 'gfx' || k === 'img' || k === 'pal') {
+      const c = document.createElement('canvas'); c.width = c.height = 56; c.dataset.i = i; c.dataset.k = k; tile.appendChild(c);
+      labObs ? labObs.observe(c) : thumb(c, war, i, k);
+    } else { const ic = document.createElement('div'); ic.className = 'ico'; ic.textContent = k === 'wav' ? '♪' : '?'; tile.appendChild(ic); }
+    tile.insertAdjacentHTML('beforeend', `<div>#${i}</div><div class="muted">${info}</div>`);
+    tile.onclick = () => { labSel = { file: war.name, i }; labGrid.querySelectorAll('.tile.sel').forEach(t => t.classList.remove('sel')); tile.classList.add('sel'); labRenderSide(); };
+    frag.appendChild(tile);
+  }
+  labGrid.appendChild(frag);
+  if (!shown) labGrid.innerHTML = '<div class="hint" style="grid-column:1/-1">Nothing of this kind in this file. Try another file or the <i>Everything</i> filter.</div>';
+}
+// Likely install folders, most likely first for this system. Paste one into the folder window (Ctrl+L, or the address bar on Windows).
+function installPaths() {
+  const ua = navigator.userAgent, win = /Windows/.test(ua), mac = /Mac OS X/.test(ua) && !/Mobile/.test(ua);
+  const linux = [['GOG installer or Lutris', '~/Games/gog/warcraft-ii-tides-of-darkness/drive_c/GOG Games/Warcraft II BNE'], ['Heroic (also the Steam Deck)', '~/Games/Heroic/Warcraft II BNE']];
+  const windows = [['GOG Galaxy', 'C:\\Program Files (x86)\\GOG Galaxy\\Games\\Warcraft II BNE'], ['GOG installer', 'C:\\GOG Games\\Warcraft II BNE']];
+  return win ? [...windows, ...linux] : mac ? [['GOG (Mac)', '/Applications/Warcraft II BNE'], ...linux] : [...linux, ...windows];
+}
+function installPathsHtml() {
+  const rows = installPaths().map(([who, path]) => `<div class="pathrow"><span class="muted">${who}</span><code>${path}</code><button class="lbtn" data-copy="${path.replace(/"/g, '&quot;')}">Copy</button></div>`).join('');
+  return `<b>Where's my game folder?</b> It's usually one of these. Click <i>Copy</i>, then in the folder window press <b>Ctrl+L</b> (on Windows, click the address bar), paste and press Enter.${rows}`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  const t = b.dataset.copy, done = () => { b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy'; }, 1500); };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(t).then(done, () => {}); else { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (err) {} ta.remove(); }
+});
+function roleOptions(list, cur) { return list.map(([k, n]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${n}</option>`).join(''); }
+function labRoles() {
+  const rows = ROLES.map(([k, n]) => { const r = cfg.roles[k]; return `<span>${n}</span><span class="muted">${r ? `${r.file} #${r.entry} (${r.mode === 'cycle' ? 'frames' : 'rows'} ${r.r0}-${r.r1})` : 'placeholder'}</span>${r ? `<button class="lbtn" data-clr="${k}">Clear</button>` : '<span></span>'}`; }).join('')
+    + SOUND_ROLES.map(([k, n]) => { const r = cfg.sounds[k]; return `<span>♪ ${n}</span><span class="muted">${r ? `${r.file} #${r.entry}` : 'silent'}</span>${r ? `<button class="lbtn" data-clrs="${k}">Clear</button>` : '<span></span>'}`; }).join('');
+  return `<h3>Assignments</h3><div class="roleList">${rows}</div>`;
+}
+function labRenderSide() {
+  clearInterval(labTimer);
+  let html = '';
+  const war = labSel && A.wars[labSel.file];
+  if (!war) {
+    html = `<div class="hint">Pick an entry on the left to preview it. Then assign sprites to roles (hero, enemies, missiles) and sounds to events.
+      <br><br><b>Tips</b><br>• Unit sprites have frames in 5 directions per row (north, NE, east, SE, south); the game mirrors them for the west side. Use <i>Directional</i> mode with the walking rows.<br>
+      • Each hero has their own slot (Lothar a knight, Uther a paladin, Zul'jin a troll axethrower and so on). Any hero without one uses the default Hero sprite.<br>
+      • If colours look wrong, open <i>Palettes</i> and try others until units look right.<br>
+      • Missiles and explosions often work better in <i>Frame cycle</i> mode.</div>`;
+  } else {
+    const i = labSel.i, d = Core.safeEntry(war, i), k = Core.kindOf(war, i);
+    html = `<h3>${war.name} #${i}</h3>`;
+    if (k === 'gfx' || k === 'img' || k === 'data') {
+      let g = null; try { g = k === 'img' ? Core.decodeImg(d) : (k === 'gfx' || labSel.force) ? Core.decodeGfu(d) : null; } catch (e) {}
+      if (!g) {
+        html += `<p class="muted">Unrecognised data (${d ? d.length : 0} bytes).</p><div class="row"><button class="lbtn" id="labForce">Try decoding as a sprite</button></div>`;
+      } else {
+        const cur = Object.entries(cfg.roles).find(([, r]) => r.file === war.name && r.entry === i);
+        const r = cur ? cur[1] : { mode: g.count >= 10 && g.count % 5 === 0 ? 'dir5' : 'cycle', r0: 0, r1: g.count >= 10 && g.count % 5 === 0 ? Math.min(4, g.count / 5 - 1) : g.count - 1 };
+        html += `<p class="muted">${g.count} frame${g.count > 1 ? 's' : ''}, ${g.w}×${g.h} each.</p>
+          <div class="row"><canvas id="labPrev" width="${g.w}" height="${g.h}" style="width:${g.w * 2}px;height:${g.h * 2}px"></canvas><span class="muted" id="labPrevInfo"></span></div>
+          <div class="row">Mode <select id="labMode"><option value="dir5">Directional (5 per row)</option><option value="cycle">Frame cycle</option></select></div>
+          <div class="row"><span id="labRangeLbl">Rows</span> from <input type="number" id="labR0" min="0" value="${r.r0}"> to <input type="number" id="labR1" min="0" value="${r.r1}"></div>
+          <div class="row">Use as <select id="labRole">${roleOptions(ROLES, cur ? cur[0] : 'hero')}</select><button class="lbtn primary" id="labAssign">Assign</button></div>
+          <p class="muted" style="margin-top:10px">All frames (numbered):</p><canvas id="labAtlas"></canvas>`;
+        setTimeout(() => labSprite(g, r), 0);
+      }
+    } else if (k === 'pal') {
+      html += `<canvas id="labPalC" width="256" height="256" style="width:256px"></canvas><div class="row"><button class="lbtn primary" id="labUsePal">Use this palette</button></div>`;
+      setTimeout(() => { const x = $('#labPalC').getContext('2d'), p = Core.toPalette(d); for (let c = 0; c < 256; c++) { x.fillStyle = `rgb(${p[c * 3]},${p[c * 3 + 1]},${p[c * 3 + 2]})`; x.fillRect((c % 16) * 16, Math.floor(c / 16) * 16, 16, 16); } $('#labUsePal').onclick = () => { cfg.palette = { file: war.name, entry: i }; saveCfg(); rebuildSprites(); labRenderGrid(); labRenderSide(); }; }, 0);
+    } else if (k === 'wav') {
+      const cur = Object.entries(cfg.sounds).find(([, r]) => r.file === war.name && r.entry === i);
+      html += `<p class="muted">Sound, ${(d.length / 1024).toFixed(1)} KB.</p><div class="row"><button class="lbtn" id="labPlay">▶ Play</button></div>
+        <div class="row">Use for <select id="labSRole">${roleOptions(SOUND_ROLES, cur ? cur[0] : 's_hit')}</select><button class="lbtn primary" id="labSAssign">Assign</button></div>`;
+      setTimeout(() => {
+        $('#labPlay').onclick = () => { ensureAudio(); A.actx?.decodeAudioData(d.slice().buffer).then(b => playBuffer(b, 0.6)).catch(() => { $('#labPlay').textContent = 'Could not decode'; }); };
+        $('#labSAssign').onclick = () => { cfg.sounds[$('#labSRole').value] = { file: war.name, entry: i }; saveCfg(); A.sbuf = {}; labRenderSide(); };
+      }, 0);
+    }
+  }
+  html += labRoles();
+  labSide.innerHTML = html;
+  labSide.querySelectorAll('[data-clr]').forEach(b => b.onclick = () => { delete cfg.roles[b.dataset.clr]; saveCfg(); rebuildSprites(); labRenderSide(); });
+  labSide.querySelectorAll('[data-clrs]').forEach(b => b.onclick = () => { delete cfg.sounds[b.dataset.clrs]; saveCfg(); A.sbuf = {}; labRenderSide(); });
+  const f = $('#labForce'); if (f) f.onclick = () => { labSel.force = true; labRenderSide(); };
+}
+function labSprite(g, r) {
+  const mode = $('#labMode'), r0 = $('#labR0'), r1 = $('#labR1');
+  mode.value = r.mode || 'dir5';
+  const atlasCols = () => mode.value === 'dir5' ? 5 : Math.min(10, g.count);
+  const drawAtlas = () => {
+    const at = buildAtlas(g, A.pal, atlasCols()), c = $('#labAtlas'), S = 2;
+    c.width = at.canvas.width * S; c.height = at.canvas.height * S; c.style.width = Math.min(c.width, labSide.clientWidth - 30) + 'px';
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(at.canvas, 0, 0, c.width, c.height);
+    x.font = 'bold 11px system-ui'; x.textBaseline = 'top';
+    for (let i = 0; i < g.count; i++) { const px = (i % at.cols) * g.w * S + 2, py = Math.floor(i / at.cols) * g.h * S + 2; x.fillStyle = '#000'; x.fillText(i, px + 1, py + 1); x.fillStyle = '#ffd27a'; x.fillText(i, px, py); }
+    if (mode.value === 'dir5') { x.fillStyle = '#8fe08a'; for (let row = 0; row * 5 < g.count; row++) x.fillText('row ' + row, at.canvas.width * S - 40, row * g.h * S + 2); }
+    $('#labRangeLbl').textContent = mode.value === 'dir5' ? 'Walk rows' : 'Frames';
+    return at;
+  };
+  let at = drawAtlas();
+  mode.onchange = () => { at = drawAtlas(); if (mode.value === 'cycle') { r0.value = 0; r1.value = g.count - 1; } else { r0.value = 0; r1.value = Math.max(0, Math.min(4, Math.ceil(g.count / 5) - 1)); } };
+  const prev = $('#labPrev').getContext('2d'); let t = 0;
+  labTimer = setInterval(() => {
+    t += 0.05;
+    const s = { ...at, mode: mode.value, r0: +r0.value || 0, r1: +r1.value || 0 };
+    const dir = Math.floor(t / 1.2) % 8, { fi, flip } = spriteFrame(s, dir, t);
+    prev.clearRect(0, 0, g.w, g.h); prev.save();
+    if (flip) { prev.translate(g.w, 0); prev.scale(-1, 1); }
+    prev.drawImage(at.canvas, (fi % at.cols) * g.w, Math.floor(fi / at.cols) * g.h, g.w, g.h, 0, 0, g.w, g.h); prev.restore();
+    const pi = $('#labPrevInfo'); if (pi) pi.textContent = mode.value === 'dir5' ? `Facing ${['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][dir]}, frame ${fi}` : `Frame ${fi}`;
+  }, 50);
+  $('#labAssign').onclick = () => {
+    const role = $('#labRole').value;
+    cfg.roles[role] = { file: labSel.file, entry: labSel.i, mode: mode.value, r0: +r0.value || 0, r1: +r1.value || 0, force: !!labSel.force };
+    saveCfg(); rebuildSprites(); labRenderSide();
+  };
+}
+
+/* ---------- main loop ---------- */
+function resize() {
+  const dpr = window.devicePixelRatio || 1, pw = Math.floor(innerWidth * dpr), ph = Math.floor(innerHeight * dpr);
+  cv.width = pw; cv.height = ph; cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+  SCALE = Math.max(1, Math.round(Math.min(pw, ph) / (Object.keys(A.sprites).length ? 420 : 250))); W = pw / SCALE; H = ph / SCALE;
+}
+addEventListener('resize', resize);
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  attract += dt;
+  try {
+    pollPad(dt);
+    if (G && G.state === 'play') { let rem = dt * cfg.opts.speed; while (rem > 1e-4 && G && G.state === 'play') { const st = Math.min(rem, 0.034); update(st); rem -= st; } }
+    else if (G && G.state === 'dying') { G.dieT += dt; for (const c of G.corpses) c.t += dt; for (const f of G.fx) f.t += dt; if (G.dieT > 1.8) endRun(false); }
+    render();
+  }
+  catch (e) { console.error(e); }
+  requestAnimationFrame(frame);
+}
+async function boot() {
+  resize();
+  await DB.open();
+  const files = (await DB.all()) || [];
+  for (const f of files) { if (!f.buf) continue; try { const w = addWar(f.name, f.buf); const nm = store.get('tos_sndnames_' + f.name, null); if (nm) w.names = nm; } catch (e) {} }
+  try { for (const k of (await DB.musicNames()) || []) mu.names.add(k); } catch (e) {}
+  autoAssign(false);
+  rebuildSprites();
+  showTitle();
+  const wake = () => ensureAudio();
+  addEventListener('pointerdown', wake); addEventListener('keydown', wake);
+  if (navigator.userActivation?.hasBeenActive || /kiosk/i.test(location.search)) ensureAudio();
+  else { try { const probe = new (window.AudioContext || window.webkitAudioContext)(); if (probe.state === 'running') { probe.close(); ensureAudio(); } else probe.close(); } catch (e) {} }
+  requestAnimationFrame(frame);
+}
+// Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
+if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths };
+boot();
+})();
+</script>
+</body>
+</html>
