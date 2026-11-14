@@ -2698,7 +2698,9 @@ $('#labForget').onclick = async () => { await DB.clear(); A.wars = {}; stopMusic
 const KNOWN_PATHS = [/(^|\/)support\/tomes\/tome\.1$/i, /(^|\/)support\/tomes\/tome\.2$/i, /(^|\/)war2dat\.mpq$/i, /(^|\/)maindat\.war$/i, /(^|\/)snddat\.war$/i, /(^|\/)install\.mpq$/i];
 $('#labDir').onchange = async e => { const all = [...e.target.files]; e.target.value = ''; await importFolderFiles(all); };
 // Chrome, Edge and other Chromium browsers can remember the chosen folder, so later imports are one click.
-const canRemember = typeof window.showDirectoryPicker === 'function';
+// Not inside another site's frame (itch.io shows games in one), where the browser blocks this picker.
+const inFrame = (() => { try { return window.top !== window.self; } catch (e) { return true; } })();
+const canRemember = typeof window.showDirectoryPicker === 'function' && !inFrame;
 $('#labPick').onclick = async () => {
   if (!canRemember) return $('#labDir').click();
   let dir; try { dir = await showDirectoryPicker({ id: 'wc2', mode: 'read' }); } catch (e) { if (e && e.name === 'AbortError') return; return $('#labDir').click(); }

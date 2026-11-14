@@ -1,0 +1,34 @@
+# Uploads the game to itch.io whenever a new version is published here.
+#
+# One-time setup (repository Settings on GitHub):
+#   Secrets and variables → Actions → Secrets:   BUTLER_API_KEY = an itch.io API key (itch.io → Settings → API keys)
+#   Secrets and variables → Actions → Variables: ITCH_GAME      = your-itch-username/your-game-slug
+# Without both, this workflow does nothing.
+name: Upload to itch.io
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  itch:
+    runs-on: ubuntu-latest
+    env:
+      BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+      ITCH_GAME: ${{ vars.ITCH_GAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check setup
+        id: setup
+        run: |
+          if [ -z "$BUTLER_API_KEY" ] || [ -z "$ITCH_GAME" ]; then echo "itch.io upload not set up yet: add the BUTLER_API_KEY secret and ITCH_GAME variable."; echo "ready=no" >> "$GITHUB_OUTPUT"; else echo "ready=yes" >> "$GITHUB_OUTPUT"; fi
+      - name: Build the upload
+        if: steps.setup.outputs.ready == 'yes'
+        run: mkdir build && cp index.html build/
+      - name: Install butler
+        if: steps.setup.outputs.ready == 'yes'
+        run: |
+          curl -sSL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d butler && chmod +x butler/butler && ./butler/butler -V
+      - name: Push to itch.io
+        if: steps.setup.outputs.ready == 'yes'
+        run: ./butler/butler push build "$ITCH_GAME:html" --userversion "$(git rev-parse --short HEAD)"
