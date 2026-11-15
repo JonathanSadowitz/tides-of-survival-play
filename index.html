@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
 <title>Tides of Survival</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
@@ -14,7 +16,8 @@
   html,body{margin:0;height:100%;background:#000;overflow:hidden;color:var(--ink);
     font:15px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none;
     -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
-  canvas#c{position:fixed;inset:0;display:block;image-rendering:pixelated}
+  canvas#c{position:fixed;inset:0;display:block;image-rendering:pixelated;-webkit-touch-callout:none}
+  @media (pointer:coarse) and (max-height:599px),(pointer:coarse) and (max-width:599px){ button.opt:not(.wcstage *){min-height:44px} #pauseBtn,#speedBtn{width:46px;height:46px} }
   #pauseBtn{position:fixed;top:calc(env(safe-area-inset-top) + 34px);right:calc(env(safe-area-inset-right) + 8px);
     width:40px;height:40px;border-radius:8px;border:2px solid var(--gold2);background:rgba(20,14,8,.7);color:var(--gold);
     font-weight:900;font-size:16px;display:none;z-index:5}
@@ -36,6 +39,7 @@
   .wcstage button.opt.sel,.wcstage button.opt:hover{box-shadow:none;outline:1px solid #e8c84a;outline-offset:0}
   .wcstage button.opt:active{background-image:var(--btnp)}
   .wcstage .ver{position:absolute;left:56px;top:452px}
+  .wcstage.tall{background:#1a120a}
   .wcstage .note{position:absolute;left:180px;top:428px;width:270px;text-align:center;font:10px Georgia,serif;color:#3b2a14}
   body.wcbtn .panel button.opt:not(.card){border:5px solid transparent;border-image:var(--btnb) 5 fill stretch;background:none;border-radius:0;box-shadow:none}
   body.wcbtn .panel button.opt:not(.card).sel,body.wcbtn .panel button.opt:not(.card):hover{outline:1px solid #e8c84a}
@@ -197,6 +201,7 @@
   .hint{background:#241b12;border-left:3px solid var(--gold2);padding:8px 10px;margin:8px 0;line-height:1.45}
   code{background:#0d0a06;padding:1px 4px;border-radius:3px;font-size:12px}
   @media (max-width:760px){#labMain{flex-direction:column}#labSide{width:auto;border-left:0;border-top:2px solid var(--gold2);max-height:52vh}}
+  @media (max-height:520px){ .panel.scrolls .sheet{overflow:auto;overscroll-behavior:contain} .panel.scrolls .sheet .items{max-height:none;overflow:visible} }   /* phones on their side: the whole sheet scrolls */
   @media (max-width:600px){   /* narrow (phone upright): one column */
     .sheet{grid-template-columns:1fr} .sheet .items{grid-column:1;grid-row:auto;max-height:none}
     .panel.tight .opts.set{grid-template-columns:1fr}
@@ -1454,7 +1459,28 @@ function retitleLogo(c) {
     fontDraw(g, f, word, Math.round(245 - tw / 2), Math.round(117 - f.mh / 2), 'ink'); break;
   }
 }
-function fitStage() { const st = overlay.querySelector('.wcstage'); if (st) st.style.zoom = Math.min(innerWidth / 640, innerHeight / 480); }
+// The title screen is the original 640x480 menu, zoomed to fit. On a phone the buttons are scaled up so they're
+// easy to tap (40 screen pixels tall where there's room); held upright, the art sits at the top and the buttons below it.
+function fitStage() {
+  const st = overlay.querySelector('.wcstage'); if (!st) return;
+  const tall = innerHeight > innerWidth * 1.15, z = tall ? innerWidth / 640 : Math.min(innerWidth / 640, innerHeight / 480);
+  st.style.zoom = z; st.classList.toggle('tall', tall); st.style.height = tall ? innerHeight / z + 'px' : '';
+  const btns = st.querySelector('.wcbtns'), note = st.querySelector('.note'), ver = st.querySelector('.ver'); if (!btns) return;
+  const n = btns.children.length, bh = n * 28 + (n - 1) * 7;
+  let k = Math.min(2.4, Math.max(1, 41 / (28 * z))), top;
+  if (tall) {   // the art, then the buttons under it
+    const sh = innerHeight / z, nh = note ? 80 : 0, room = sh - 490 - 60 - nh; k = Math.max(1, Math.min(k, room / bh));
+    const off = Math.max(0, Math.round((sh - (480 + 30 + bh * k + nh)) / 2));   // art and buttons together, centred
+    top = off + 510; st.querySelector('img.bg').style.top = off + 'px';
+  } else {
+    st.querySelector('img.bg').style.top = ''; k = Math.max(1, Math.min(k, 255 / bh)); top = k > 1 ? Math.max(185, 440 - bh * k) : 236; }
+  Object.assign(btns.style, { transform: k > 1 ? `scale(${k})` : '', transformOrigin: 'top left', left: Math.round(315 - 112 * k) + 'px', top: top + 'px' });
+  const end = top + bh * k;
+  if (note) Object.assign(note.style, tall ? { top: end + 24 + 'px', left: '60px', width: '520px', fontSize: '22px', color: '#e8d9b0' }
+    : z < 1.3 ? { top: Math.min(446, end + 6) + 'px', left: '140px', width: '420px', fontSize: Math.ceil(13 / z) + 'px', color: '' }   // readable on a small screen
+    : { top: '', left: '', width: '', fontSize: '', color: '' });
+  if (ver) Object.assign(ver.style, tall ? { top: innerHeight / z - 40 + 'px', left: '24px' } : { top: '', left: '' });
+}
 addEventListener('resize', fitStage);
 
 /* ---------- audio ---------- */
@@ -1874,6 +1900,7 @@ function newRun(heroId, levelId, seed) {
   if (typeof startLevel === 'function') startLevel();
   ensureAudio(); sfx('s_start'); playMusic('battle'); heroVoice('ready', 1);
   hideMenu(); showHudBtns(true);
+  if (coarse() && (meta.touchHints = (meta.touchHints || 0) + 1) <= 3) { G.banner = { text: 'Touch and drag anywhere to move', t: 4 }; saveMeta(); }   // the first few runs on a touch screen
 }
 function addItem(kind, id) {
   if (kind === 'w') { const w = G.weapons[id] || (G.weapons[id] = { lvl: 0, cd: 0.3, tick: 0 }); w.lvl++; if (w.lvl >= MAX_LVL && !meta.maxed.includes(id)) { meta.maxed.push(id); saveMeta(); } }
@@ -2800,6 +2827,18 @@ function drawHud() {
     ctx.fillStyle = '#000'; ctx.fillRect(mx - 4, my - 1, 9, 3); ctx.fillRect(mx - 1, my - 4, 3, 9);
     ctx.fillStyle = '#5ce65c'; ctx.fillRect(mx - 3, my, 7, 1); ctx.fillRect(mx, my - 3, 1, 7);
   }
+}
+// The HUD drawn inside the safe area, with the strip under a phone's status bar blacked out.
+function drawHudSafe() {
+  const { t, r, b, l } = SAFE;
+  if (t || r || b || l) {
+    const W0 = W, H0 = H; if (t) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W0, t); }
+    W = W0 - l - r; H = H0 - t - b; ctx.translate(l, t);
+    try { drawHud(); } finally { W = W0; H = H0; ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0); }
+  } else drawHud();
+  drawJoy();
+}
+function drawJoy() {   // the touch stick, where your thumb went down
   if (joy) {
     const ox = joy.ox / SCALE, oy = joy.oy / SCALE;
     circle(ox, oy, 26, 'rgba(255,255,255,.08)', 'rgba(217,178,90,.5)');
@@ -2853,7 +2892,7 @@ function render() {
   for (const s of G.shots) if (s.k !== 'rune') drawShot(s);
   for (const s of G.eshots) { if (!drawSprite(s.role && A.sprites[s.role] ? s.role : foeRole('eshot'), s.x, s.y, s.dir, attract, false)) circle(s.x - camX, s.y - camY, s.homing ? 4 : 2.5, s.homing ? '#c060ff' : '#9be04a', '#203a08'); }
   for (const f of G.fx) drawFx(f);
-  drawHud();
+  drawHudSafe();
 }
 
 /* ---------- input ---------- */
@@ -2881,6 +2920,11 @@ cv.addEventListener('pointerdown', e => {
   cv.setPointerCapture?.(e.pointerId);
 });
 cv.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') { ms.sx = e.clientX; ms.sy = e.clientY; if (ms.held && G) G.moveTo = screenToWorld(e.clientX, e.clientY); return; } if (joy && e.pointerId === joy.id) { const dpr = window.devicePixelRatio || 1; joy.x = e.clientX * dpr; joy.y = e.clientY * dpr; } });
+// Phones: no pinch-zoom, long-press menus or double-tap zoom while playing.
+for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+cv.addEventListener('contextmenu', e => e.preventDefault());
+const coarse = () => matchMedia('(pointer: coarse)').matches;
+function isPhone() { return coarse() && Math.min(innerWidth, innerHeight) < 600; }   // a touch screen this small (not the Steam Deck)
 const endJoy = e => { if (e.pointerType === 'mouse') { ms.held = false; return; } if (joy && e.pointerId === joy.id) joy = null; };
 cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
 function getPad() { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.connected) return p; return null; }
@@ -2948,6 +2992,7 @@ function fitPanel() {
   // Shrinking with zoom makes the pixel font uneven, so first try a tighter layout at full size.
   if (overlay.scrollHeight > overlay.clientHeight + 1) p.classList.add('tight');
   if (overlay.scrollHeight <= overlay.clientHeight + 1) return;
+  if (isPhone()) return;   // phones scroll the menu instead of shrinking it, so buttons stay thumb-sized
   let small = 99; for (const el of p.querySelectorAll('.ds,.lv,.help,.sub,.nm,b,span,p,div')) { if (el.childNodes.length && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) small = Math.min(small, parseFloat(getComputedStyle(el).fontSize) || 99); }
   const floor = Math.max(0.75, Math.min(1, MIN_TEXT / small));
   let z = 1;
@@ -3749,10 +3794,18 @@ function labSprite(g, r) {
 }
 
 /* ---------- main loop ---------- */
+// The phone's notch, rounded corners and home bar (CSS safe areas), in game pixels. The map fills the whole screen;
+// the HUD keeps clear of them.
+let SAFE = { t: 0, r: 0, b: 0, l: 0 }, safeOverride = null;
+const safeProbe = document.createElement('div');
+safeProbe.style.cssText = 'position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+document.body.appendChild(safeProbe);
 function resize() {
   const dpr = window.devicePixelRatio || 1, pw = Math.floor(innerWidth * dpr), ph = Math.floor(innerHeight * dpr);
   cv.width = pw; cv.height = ph; cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
   SCALE = Math.max(1, Math.round(Math.min(pw, ph) / (Object.keys(A.sprites).length ? 420 : 250))); W = pw / SCALE; H = ph / SCALE;
+  const cs = getComputedStyle(safeProbe), k = dpr / SCALE, px = v => Math.ceil((parseFloat(v) || 0) * k);
+  SAFE = safeOverride ? { ...safeOverride } : { t: px(cs.paddingTop), r: px(cs.paddingRight), b: px(cs.paddingBottom), l: px(cs.paddingLeft) };
 }
 addEventListener('resize', resize);
 let last = performance.now();
@@ -3792,7 +3845,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, LATE, FINAL, BOSS_HIT, BOSSES, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, fitStage, LATE, FINAL, BOSS_HIT, BOSSES, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
