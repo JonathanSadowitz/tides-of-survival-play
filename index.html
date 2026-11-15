@@ -1690,7 +1690,7 @@ const EVOS = {
 };
 const wName = id => G && G.weapons[id] && G.weapons[id].evo ? EVOS[id].name : WEAPONS[id].name;
 const evolvable = () => Object.keys(G.weapons).filter(id => { const w = G.weapons[id]; return !w.evo && w.lvl >= MAX_LVL && EVOS[id] && G.passives[EVOS[id].p]; });
-function evolve(id) { if (!meta.evos.includes(id)) { meta.evos.push(id); saveMeta(); } G.weapons[id].evo = true; G.weapons[id].cd = 0.3; G.weapons[id].tick = 0; }
+function evolve(id) { logEvent('evolved ' + id); if (!meta.evos.includes(id)) { meta.evos.push(id); saveMeta(); } G.weapons[id].evo = true; G.weapons[id].cd = 0.3; G.weapons[id].tick = 0; }
 function evoStats(id) {
   switch (id) {
     case 'sword': return '80 damage, reach about 75, front and back, heavy knockback.';
@@ -1798,8 +1798,9 @@ const upCost = id => { const n = up(id); return Math.round(UPGRADES[id].cost * (
 const goldMul = () => 1 + 0.15 * up('greed');
 // All gold collected in a run is scaled by GOLD_RATE (tuned from real runs: the Armoury should take
 // roughly 15 to 20 runs to fill). Fractions carry over so small coins still count.
-const GOLD_RATE = 0.5;
-function addGold(v) { if (!G) return; G.goldFrac = (G.goldFrac || 0) + v * GOLD_RATE; const n = Math.floor(G.goldFrac); G.gold += n; G.goldFrac -= n; }
+// 16 November 2026: 0.5 -> 0.3 after Jon's first run on a fresh save earned 611 gold (the bot was earning about 100).
+const ECON = { gold: 0.3, minute: 4 };   // gold rate, and the bonus per minute survived
+function addGold(v) { if (!G) return; G.goldFrac = (G.goldFrac || 0) + v * ECON.gold; const n = Math.floor(G.goldFrac); G.gold += n; G.goldFrac -= n; }
 
 /* ---------- power-ups: rare drops with a spell icon from the game ---------- */
 const POWERUPS = {
@@ -1852,8 +1853,8 @@ const FOES = {
   tank: { Horde: 'Ogre', Alliance: 'Knight', desc: 'Slow, heavy and hard-hitting. From 4:00.' },
   ranged: { Horde: 'Troll Axethrower', Alliance: 'Elven Archer', desc: 'Keeps its distance and throws. From 3:30.' },
   scout: { Horde: 'Goblin Zeppelin', Alliance: 'Gnomish Flying Machine', desc: 'Fast, frail scouts that fly over trees and water. From 2:00.' },
-  flyer: { Horde: 'Dragon', Alliance: 'Gryphon Rider', desc: 'Tough fliers that cross trees and water to reach you. From 5:30.' },
-  siege: { Horde: 'Catapult', Alliance: 'Ballista', desc: 'Stops at range and marks a circle where its shot will land. Step out of it. From 4:30.' },
+  flyer: { Horde: 'Dragon', Alliance: 'Gryphon Rider', desc: 'Tough fliers that cross trees and water to reach you. From 4:30.' },
+  siege: { Horde: 'Catapult', Alliance: 'Ballista', desc: 'Stops at range and marks a circle where its shot will land. Step out of it. From 3:30.' },
   elite1: { Horde: 'Ogre-Mage', Alliance: 'Paladin', elite: true, move: { Horde: 'Bloodlust', Alliance: 'Holy Light' }, desc: 'Every few seconds it heals the troops around it and spurs them on to move faster.' },
   elite2: { Horde: 'Troll Berserker', Alliance: 'Ranger', elite: true, move: { Horde: 'Volley', Alliance: 'Volley' }, desc: 'Throws three at once in a spread.' },
   elite3: { Horde: 'Death Knight', Alliance: 'Mage', elite: true, move: { Horde: 'Death Coil', Alliance: 'Fireball' }, desc: 'Casts a slow missile that follows you. Outrun it until it fades.' },
@@ -1892,7 +1893,7 @@ function continueRun() {
   G.weapons = {}; for (const [k, l] of Object.entries(s.w || {})) if (WEAPONS[k]) G.weapons[k] = { lvl: l, cd: 0.3, tick: 0, evo: (s.e || []).includes(k) && !!EVOS[k] };
   G.passives = Object.fromEntries(Object.entries(s.p || {}).filter(([k]) => PASSIVES[k]));   // drops retired passives
   // Saves from before the named bosses counted bosses due every 4 minutes from 5:00; they map onto the new 5, 10, 15.
-  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(240, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives, rerolls: s.rerolls, pending: s.pending || 0, chestQueue: s.chests || [] });
+  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(PACE.elite, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives, rerolls: s.rerolls, pending: s.pending || 0, chestQueue: s.chests || [] });
   Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next }); G.labour = s.lab || 0;
   recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
   if (s.bs && BOSSES[s.bs.n - 1]) spawnBoss(s.bs.n, s.bs.f);   // the boss you were fighting comes back, wounded as he was
@@ -1915,11 +1916,11 @@ function newRun(heroId, levelId, seed) {
   store.set('tos_hero', heroId); meta.last = { hero: heroId, level: LV.id }; saveMeta();
   applyCursor(HD.side === 'Horde' ? 'orc' : 'human');
   G = { heroId, HD, LV, seed,
-    t: 0, kills: 0, spawnAcc: 0, bossN: 0, eliteNext: 240, eliteN: 0, final: false, swarmNext: 95, pending: 0, state: 'play', banner: null,
+    t: 0, kills: 0, spawnAcc: 0, bossN: 0, eliteNext: PACE.elite, eliteN: 0, final: false, swarmNext: 95, pending: 0, state: 'play', banner: null,
     hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
     weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], marks: [], hv: [0, 0], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: [], buffs: {}, stats: { dmg: 0, hp: 0, next: 60, mins: [], lastHit: null }
   };
-  addItem('w', HD.start); recalc(); G.hero.hp = G.hero.maxHp;
+  addItem('w', HD.start); recalc(); G.hero.hp = G.hero.maxHp; logStart();
   G.revives = up('revival'); G.rerolls = 1 + up('reroll');
   if (typeof startLevel === 'function') startLevel();
   ensureAudio(); sfx('s_start'); playMusic('battle'); heroVoice('ready', 1);
@@ -2076,6 +2077,12 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 // The late game: from 8:00 enemies grow tougher faster, and in the last 3:00 they come thicker and hit harder.
 // Tuned with scripts/balance.js so a full Armoury can win, but has to work for it (docs/TESTING.md).
 const LATE = { from: 480, hp: 2.6, push: 720, spawn: 1.4, dmg: 0.55 };
+// The middle of a run: from 3:00 the army grows tougher and thicker, reaching full strength at 7:00 (tuned to a
+// player who has finished Vampire Survivors; the first three minutes stay gentle for newcomers).
+const MID = { from: 180, to: 420, hp: 0.8, spawn: 0.6 };
+const midK = t => Math.max(0, Math.min(1, (t - MID.from) / (MID.to - MID.from)));
+// When each kind of enemy first appears, in seconds.
+const PACE = { scout: 120, siege: 210, elite: 180, flyer: 270 };
 const FINAL = { spawn: 0.25, dmg: 0.6, hp: 1 };   // hp: the final boss's toughness
 const BOSS_HIT = { mark: 0.45, final: 0.5, spd: 0.8 };   // spd: the final boss flies over trees and water, so he's a little slower   // a barrage circle hurts less than a bite; the final boss bites a little softer than his size suggests   // when the final boss comes the army falls back, then trickles in again more thinly
 const lateHp = t => t > LATE.from ? 1 + LATE.hp * ((t - LATE.from) / (RUN_LEN - LATE.from)) ** 1.4 : 1;
@@ -2092,7 +2099,7 @@ function spawnEnemy(type, x, y, boss) {
   } else if (!free && footBlocked(x, y, 4)) return;
   // Each boss is tougher than the last: the first is a fair fight, the second close to full strength, the last a real test.
   const bossK = boss ? [0.45, 0.85, FINAL.hp][boss.n - 1] : 1;
-  const hpMul = (1 + t / 240 + (t / 360) ** 2) * G.LV.hp * (0.6 + 0.4 * EASE(t)) * bossK * lateHp(t); G.stats.hp += T.hp * hpMul;
+  const hpMul = (1 + t / 240 + (t / 360) ** 2) * G.LV.hp * (0.6 + 0.4 * EASE(t)) * bossK * lateHp(t) * (1 + MID.hp * midK(t)); G.stats.hp += T.hp * hpMul;
   const e = { type, role: boss ? 'boss' + boss.n : type, x, y, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (1 + Math.min(0.3, t / 3000)) * rnd(0.92, 1.08),
     dmg: T.dmg * (1 + t / 600) * (0.6 + 0.4 * EASE(t)) * (bossK < 1 ? 0.7 : 1) * (boss && boss.final ? BOSS_HIT.final : G.final ? FINAL.dmg : 1) * (1 + LATE.dmg * pushK(t)), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0,
     shootT: rnd(1, 3), sigT: 3, dir: 4, t: rnd(0, 5), fly: !!(T.fly || (boss && boss.fly && hasFoe('boss' + boss.n))), free, elite: !!T.elite };
@@ -2105,7 +2112,7 @@ function seeFoe(k) { if (!meta.seen.includes(k)) { meta.seen.push(k); saveMeta()
 function spawnBoss(n, frac) {
   const B = BOSSES[n - 1], e = spawnEnemy('boss', undefined, undefined, { ...B, n });
   if (frac) e.hp = e.maxHp * frac;
-  if (!frac) banner(B.final ? `${e.name} has come! Slay him to win.` : `${e.name} approaches!`);
+  if (!frac) banner(B.final ? `${e.name} has come! Slay him to win.` : `${e.name} approaches!`); logEvent('boss ' + n);
   if (B.final && !frac) {   // the army falls back as he arrives, so the last fight is with him
     for (const o of G.enemies) if (!o.static && !o.boss) o.dead = true;
     G.enemies = G.enemies.filter(o => !o.dead); G.eshots.length = 0; G.marks.length = 0;
@@ -2116,7 +2123,7 @@ function spawnBoss(n, frac) {
 }
 function pickType(t) {
   const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 210 ? 0.25 : 0, tank: t > 240 ? Math.min(0.4, 0.05 + t / 1500) : 0,
-    scout: t > 120 ? 0.1 : 0, flyer: t > 330 ? Math.min(0.14, 0.04 + (t - 330) / 4000) : 0, siege: t > 270 ? 0.05 : 0 };
+    scout: t > PACE.scout ? 0.1 : 0, flyer: t > PACE.flyer ? Math.min(0.14, 0.04 + (t - PACE.flyer) / 4000) : 0, siege: t > PACE.siege ? 0.05 : 0 };
   for (const k in w) w[k] *= G.LV.mix[k] || 1;
   for (const k of ['scout', 'flyer', 'siege']) if (w[k] && !hasFoe(k)) w[k] = 0;   // only units with their own pictures
   let s = 0; for (const k in w) s += w[k];
@@ -2125,10 +2132,10 @@ function pickType(t) {
 }
 function spawn(dt) {
   const t = Math.min(G.t, RUN_LEN);
-  G.spawnAcc += (0.7 + t / 50) * EASE(t) * (1 + LATE.spawn * pushK(t)) * (G.final ? FINAL.spawn : 1) * dt;
+  G.spawnAcc += (0.7 + t / 50) * EASE(t) * (1 + LATE.spawn * pushK(t)) * (1 + MID.spawn * midK(t)) * (G.final ? FINAL.spawn : 1) * dt;
   while (G.spawnAcc >= 1) { G.spawnAcc--; if (G.enemies.length < 330) spawnEnemy(pickType(t)); }
   if (G.bossN < BOSSES.length && G.t >= BOSSES[G.bossN].at) spawnBoss(++G.bossN);
-  // An elite every 50 seconds from 4:00 (every 35 from 10:00), taking turns.
+  // An elite every 50 seconds from 3:00 (every 35 from 10:00), taking turns.
   if (G.t >= G.eliteNext && !G.final) { G.eliteNext += G.t >= 600 ? 35 : 50; spawnEnemy('elite' + (G.eliteN++ % 3 + 1)); }
   if (t >= G.swarmNext && !G.final) {
     G.swarmNext += 100; const h = G.hero, d = Math.hypot(W, H) / 2 + 10;
@@ -2143,7 +2150,7 @@ function hitEnemy(e, dmg, kx = 0, ky = 0) {
   if (e.dead) return;
   const h = G.hero;
   const dealt = dmg * h.might * (G.HD.fury && h.hp < h.maxHp / 2 ? 1.3 : 1);
-  G.stats.dmg += Math.min(dealt, e.hp);
+  G.stats.dmg += Math.min(dealt, e.hp); if (G.lg) G.lg.dmg += Math.min(dealt, e.hp);
   e.hp -= dealt; e.flash = 0.1;
   if (cfg.opts.nums && dealt < 9000 && G.numCount < 70) { G.numCount++; G.fx.push({ k: 'num', x: e.x + rnd(-4, 4), y: e.y - e.r - 4, v: Math.max(1, Math.round(dealt)), t: 0, life: 0.6 }); }
   if (e.type !== 'boss' && !e.static) { e.kx += kx; e.ky += ky; }
@@ -2167,6 +2174,7 @@ function drawCorpse(c) {
   ctx.globalAlpha = 1;
 }
 function drop(e) {
+  if (e.boss) logEvent('boss ' + e.boss + ' slain');
   if (e.final) { G.finalDead = true; return; }
   if (e.type === 'boss') { G.gems.push({ x: e.x, y: e.y, chest: 'boss' }); banner(`${e.name || 'The boss'} dropped a treasure chest!`); return; }
   if (e.elite) {   // elites always leave a purse, and often a power-up
@@ -2182,6 +2190,7 @@ function drop(e) {
 function hurtHero(d, src) {
   const h = G.hero; G.stats.lastHit = src || null; let dm = Math.max(1, d - h.armour);
   if (h.shield > 0) { const a = Math.min(h.shield, dm); h.shield -= a; dm -= a; if (dm <= 0) return; }
+  if (G.lg) { const k = src || '?'; G.lg.hurt[k] = (G.lg.hurt[k] || 0) + Math.min(dm, Math.max(0, h.hp)); G.lg.hits++; }
   h.hp -= dm; h.hurtT = 0.15; sfx('s_hurt', 0.25);
 }
 function explode(s) {
@@ -2531,6 +2540,7 @@ function update(dt) {
   if (stuck || !footBlocked(hnx, h.y, 5)) h.x = hnx; if (stuck || !footBlocked(h.x, hny, 5)) h.y = hny;
   if (ml > 0.15) { h.face = Math.atan2(my, mx); h.dir = dirOf(mx, my); h.moveT += dt; }
   G.hv = [mx * hs, my * hs];
+  logTick(dt, ml > 0.15);
   h.hp = Math.min(h.maxHp, h.hp + h.regen * dt); h.hurtT -= dt; h.atkT -= dt;
   h.coilBank = Math.min(COIL_HEAL_PER_S, (h.coilBank || 0) + COIL_HEAL_PER_S * dt);
   spawn(dt); updateCamps(dt); buildGrid(); updateEnemies(dt); updateWeapons(dt); updateShots(dt); updateGems(dt);
@@ -2538,12 +2548,57 @@ function update(dt) {
   for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
   if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
   if (h.hp <= 0) {
-    if (G.revives > 0) { G.revives--; h.hp = h.maxHp * 0.5; banner('Revived!'); sfx('s_level', 0); for (const e of G.enemies) if (!e.static && !e.boss && Math.hypot(e.x - h.x, e.y - h.y) < 120) hitEnemy(e, 9999); }
+    if (G.revives > 0) { G.revives--; h.hp = h.maxHp * 0.5; banner('Revived!'); logEvent('revived'); sfx('s_level', 0); for (const e of G.enemies) if (!e.static && !e.boss && Math.hypot(e.x - h.x, e.y - h.y) < 120) hitEnemy(e, 9999); }
     else { G.state = 'dying'; G.dieT = 0; showHudBtns(false); joy = null; sfx('s_hurt', 0); return; }
   }
   if (G.finalDead) return endRun(true);   // the clock ran out and the final boss has fallen
   if (G.chestQueue.length) openChest(G.chestQueue.shift());
   else if (G.pending > 0) openLevelUp();
+}
+
+/* ---------- the run log ----------
+   Every five seconds: health, level, kills, enemies on the field, damage dealt and taken (by what), how close the
+   nearest enemy came and how much of the time you were moving; plus every level-up choice and the big moments.
+   Copied from the end-of-run screen or Run history as a code, so real runs can be used to tune the game. */
+const LOG_EVERY = 5, LOGS_KEPT = 8;
+function logStart() {
+  G.log = { v: 1, hero: G.heroId, level: G.LV.id, ups: { ...meta.ups }, ver: document.title, s: [], picks: [], ev: [] };
+  G.lg = { t: 0, dmg: 0, hurt: {}, hits: 0, move: 0, near: 0, nearN: 0, nearMin: 1e9, scan: 0 };
+}
+function logEvent(text) { if (G && G.log) G.log.ev.push([Math.round(G.t), text]); }
+function logTick(dt, moving) {
+  const L = G.lg; if (!L) return; const h = G.hero;
+  L.t += dt; if (moving) L.move += dt;
+  if ((L.scan -= dt) <= 0) {   // the nearest enemy, four times a second
+    L.scan = 0.25; let best = 1e9; for (const e of G.enemies) if (!e.static) { const d = Math.hypot(e.x - h.x, e.y - h.y) - e.r; if (d < best) best = d; }
+    if (best < 1e9) { L.near += best; L.nearN++; L.nearMin = Math.min(L.nearMin, best); }
+  }
+  if (L.t < LOG_EVERY) return;
+  const r = v => Math.round(v), hurt = {}; for (const k in L.hurt) hurt[k] = r(L.hurt[k]);
+  G.log.s.push([r(G.t), +(h.hp / h.maxHp).toFixed(2), h.level, G.kills, G.enemies.length, r(L.dmg / L.t), hurt, L.hits, +(L.move / L.t).toFixed(2), L.nearN ? r(L.near / L.nearN) : -1, L.nearMin < 1e9 ? r(L.nearMin) : -1, G.gold]);
+  Object.assign(L, { t: 0, dmg: 0, hurt: {}, hits: 0, move: 0, near: 0, nearN: 0, nearMin: 1e9 });
+}
+function logEnd(won) {
+  if (!G.log || G.log.done) return;
+  const L = G.log; L.done = true; L.won = !!won; L.t = Math.floor(G.t); L.by = won ? null : G.stats.lastHit; L.kills = G.kills; L.lvl = G.hero.level; L.gold = G.gold;
+  L.w = Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl + (v.evo ? 'e' : '')])); L.p = { ...G.passives };
+  L.at = Date.now(); const all = store.get('tos_logs', []); all.push(L); store.set('tos_logs', all.slice(-LOGS_KEPT));
+}
+async function runLogCode(L) {
+  const bytes = new TextEncoder().encode(JSON.stringify(L));
+  let out = bytes;
+  try { out = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer()); } catch (e) {}
+  let bin = ''; for (const b of out) bin += String.fromCharCode(b);
+  return `TOSLOG${out === bytes ? 'J' : 'Z'}-${btoa(bin)}`;
+}
+async function showRunLog(at) {
+  const L = store.get('tos_logs', []).find(x => x.at === at) || store.get('tos_logs', []).slice(-1)[0]; if (!L) return;
+  const code = await runLogCode(L), from = G && G.state === 'over' ? 'over' : 'history';
+  showMenu(`<h2>Run log</h2><p class="sub">Copy this and paste it to whoever is tuning the game. It holds what happened every five seconds of the run (health, damage, what hit you, how close enemies got) and every upgrade choice. Nothing about you or your device.</p>
+    <textarea id="saveCode" class="savecode" readonly>${code}</textarea>
+    <div class="opts"><button class="opt" id="copyCode">Copy to clipboard</button><button class="opt" data-act="${from === 'over' ? 'endscreen' : 'history'}" data-back>Back</button></div>`);
+  const ta = $('#saveCode'); ta.focus(); ta.select();
+  $('#copyCode').onclick = async () => { ta.select(); let ok = false; try { await navigator.clipboard.writeText(code); ok = true; } catch (e) { try { ok = document.execCommand('copy'); } catch (e2) {} } $('#copyCode').textContent = ok ? 'Copied!' : 'Select the code and copy it'; };
 }
 
 /* ---------- drawing ---------- */
@@ -3082,6 +3137,8 @@ overlay.addEventListener('click', e => {
   else if (act === 'quick') { const l = meta.last; if (heroOpen(l.hero) && levelOpen(LEVELS.findIndex(L => L.id === l.level))) newRun(l.hero, l.level); }
   else if (act === 'continue') continueRun();
   else if (act === 'history') showHistory();
+  else if (act === 'runlog') showRunLog(b.dataset.at ? +b.dataset.at : null);
+  else if (act === 'endscreen') { if (G && G.endHtml) showMenu(G.endHtml); else showTitle(); }
   else if (act === 'exportsave') showSaveCode('export');
   else if (act === 'importsave') showSaveCode('import');
   else if (act === 'loadcode') loadSaveCode();
@@ -3106,7 +3163,7 @@ overlay.addEventListener('click', e => {
   else if (act === 'pause') pauseRun(true);
   else if (act === 'pick') pickCard(b.dataset.kind, b.dataset.id);
   else if (act === 'reroll') { if (G.rerolls > 0) { G.rerolls--; openLevelUp(true); } }
-  else if (act === 'skip') { G.hero.hp = Math.min(G.hero.maxHp, G.hero.hp + G.hero.maxHp * 0.1); resumeOrNext(); }
+  else if (act === 'skip') { if (G.log) G.log.picks.push([Math.round(G.t), G.hero.level, (G.offer || []).join(','), 'skip']); G.hero.hp = Math.min(G.hero.maxHp, G.hero.hp + G.hero.maxHp * 0.1); resumeOrNext(); }
   else if (act === 'chestok') { const l = $('#loot'); if (l && !l.classList.contains('fast') && performance.now() - G.chestAt < 450 * l.children.length) { l.classList.add('fast'); return; } resumeOrNext(); }
   else if (act === 'quit') { if (G && G.state !== 'over') bankRun(); G = null; showHudBtns(false); showTitle(); }
 });
@@ -3173,7 +3230,7 @@ function foesBook(card) {
   const both = o => o.Horde === o.Alliance ? o.Horde : `${o.Horde} / ${o.Alliance}`;
   const troops = ['basic', 'fast', 'tank', 'ranged', 'scout', 'flyer', 'siege'].map(k => card(pics(k), both(FOES[k]), '', [FOES[k].desc])).join('');
   const elites = ['elite1', 'elite2', 'elite3'].map(k => meta.seen.includes(k) ? card(pics(k), both(FOES[k]), `Elite. ${both(FOES[k].move)}`, [FOES[k].desc])
-    : card(pics(k, true), '???', 'Elite', ['Not met yet. Elites join the fight from 4:00, marked with a crown.'])).join('');
+    : card(pics(k, true), '???', 'Elite', ['Not met yet. Elites join the fight from 3:00, marked with a crown.'])).join('');
   const bosses = BOSSES.map((B, i) => { const k = 'boss' + (i + 1);
     return meta.seen.includes(k) ? card(pics(k), both(B), `Boss at ${fmtTime(B.at)}. ${both(B.move)}`, [B.desc]) : card(pics(k, true), '???', `Boss at ${fmtTime(B.at)}`, ['Not met yet.']); }).join('');
   return `<h3 class="bookhead">Troops</h3>${troops}<h3 class="bookhead">Elites</h3>${elites}<h3 class="bookhead">Bosses</h3>${bosses}`;
@@ -3280,10 +3337,13 @@ function showHistory() {
   const rows = Object.values(by).sort((a, b) => b.n - a.n).slice(0, 10).map(o => `<b>${hn(o.hero)}, ${lv(o.level)}</b><span>${o.n} run${o.n > 1 ? 's' : ''}, ${o.wins} won, average ${fmtTime(o.sum / o.n)}, best ${fmtTime(o.best)}</span>`).join('');
   const deaths = {}; for (const r of runs) if (!r.won) { const k = KILLER[r.by] || 'Unknown'; deaths[k] = (deaths[k] || 0) + 1; }
   const dl = Object.entries(deaths).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(', ');
+  const logs = store.get('tos_logs', []), logAt = r => (logs.find(L => L.hero === r.hero && Math.abs(L.at - r.at) < 5000) || {}).at;
   const last = runs.slice(-6).reverse().map(r => `<b>${hn(r.hero)}, ${lv(r.level)}</b><span>${r.won ? 'Won' : 'Fell at ' + fmtTime(r.t)}, level ${r.lvl}, ${r.kills} kills${r.won ? '' : ', to ' + (KILLER[r.by] || 'unknown').toLowerCase()}</span>`).join('');
+  const logBtns = runs.slice(-LOGS_KEPT).reverse().filter(logAt).map(r => `<button class="opt" data-act="runlog" data-at="${logAt(r)}">Log: ${hn(r.hero)}, ${r.won ? 'won' : fmtTime(r.t)}</button>`).join('');
   const wins = runs.filter(r => r.won).length;
   showMenu(`<h2>Run history</h2><p class="sub">${runs.length} runs, ${wins} won (${Math.round(wins / runs.length * 100)}%).${dl ? ' Deaths: ' + dl + '.' : ''}</p>
     <div class="stats hist">${rows}</div><h3 class="side">Latest runs</h3><div class="stats hist">${last}</div>
+    ${logBtns ? `<h3 class="side">Run logs</h3><p class="help">Copy a run's log to send it for tuning.</p><div class="opts buyrow">${logBtns}</div>` : ''}
     <div class="opts" style="margin-top:12px"><button class="opt" data-act="settings" data-from="title" data-back>Back</button></div>`);
 }
 function buyUp(id) {
@@ -3432,7 +3492,8 @@ function openLevelUp(reroll) {
   G.state = 'levelup'; if (!reroll) G.pending--; joy = null; showHudBtns(false);
   if (!reroll) guardMenu(350);
   if (!reroll && !heroVoice('any')) sfx(levelSnd(), 0);   // a random line from the hero, or the jingle if no voices were imported
-  const cards = choices().map((c, i) => {
+  const offer = choices(); G.offer = offer.map(c => c.id);
+  const cards = offer.map((c, i) => {
     const { nm, ds, lv, hint } = itemInfo(c);
     return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="chead">${itemIcon(c.kind, c.id)}<span class="ctitle"><span class="nm">${i + 1}. ${nm}</span>${lv}</span></span><span class="ds">${ds}</span>${hint ? `<span class="ds evohint">${hint}</span>` : ''}</button>`;
   }).join('');
@@ -3445,6 +3506,7 @@ function resumeOrNext() {
   else { hideMenu(); G.state = 'play'; showHudBtns(true); }
 }
 function pickCard(kind, id) {
+  if (G.log) G.log.picks.push([Math.round(G.t), G.hero.level, (G.offer || []).join(','), id]);
   addItem(kind, id); if (kind === 'gold') G.gold += 50;   // the full 50, not scaled by GOLD_RATE
   resumeOrNext();
 }
@@ -3472,22 +3534,22 @@ function runRecord(won) {
 }
 let runs = store.get('tos_runs', []); if (!Array.isArray(runs)) runs = [];
 function endRun(won) {
-  G.state = 'over'; G.won = won; showHudBtns(false); joy = null;
+  G.state = 'over'; G.won = won; showHudBtns(false); joy = null; logEnd(won);
   runs.push(runRecord(won)); if (runs.length > 200) runs = runs.slice(-200); store.set('tos_runs', runs);
   if (G.t > best.time || (won && G.kills > best.kills)) { best = { time: Math.floor(G.t), kills: G.kills, level: G.hero.level, hero: G.HD.name }; store.set('tos_best', best); }
   const unlocked = bankRun();
   playMusic(won ? 'victory' : 'defeat');
-  showMenu(`<h2>${won ? 'Victory!' : 'You have fallen'}</h2><p class="sub">${won ? `You held the line for fifteen minutes and slew ${G.finalName || BOSSES[2][foeSide()]}.` : G.final ? `${G.finalName || BOSSES[2][foeSide()]} was too much this time.` : 'The horde was too much this time.'}</p>
+  showMenu(G.endHtml = `<h2>${won ? 'Victory!' : 'You have fallen'}</h2><p class="sub">${won ? `You held the line for fifteen minutes and slew ${G.finalName || BOSSES[2][foeSide()]}.` : G.final ? `${G.finalName || BOSSES[2][foeSide()]} was too much this time.` : 'The horde was too much this time.'}</p>
     <div class="stats"><b>Hero</b><span>${G.HD.name}</span><b>Battlefield</b><span>${G.LV.name}</span><b>Survived</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>+${G.gold}${G.bonus ? ` (+${G.bonus} for surviving)` : ''}</span></div>
     ${unlocked || G.newHeroes.length ? `<h3 class="chestgold">Unlocked</h3>${[unlocked && `New battlefield: ${unlocked}`, ...G.newHeroes.filter(id => !HEROES[id].secret).map(id => `New hero: ${HEROES[id].name}`),
       G.newHeroes.includes('peasant') && 'Someone has been watching from the woodpile. Secret heroes: the Peasant and the Peon!'].filter(Boolean).map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}` : ''}
     ${nextUp().map(t => `<p class="help nextup">${t}</p>`).join('')}
-    <div class="opts"><button class="opt" data-act="retry">Retry</button><button class="opt" data-act="choose">Change hero</button><button class="opt" data-act="quit" data-back>Title screen</button></div>`);
+    <div class="opts"><button class="opt" data-act="retry">Retry</button><button class="opt" data-act="choose">Change hero</button><button class="opt" data-act="runlog">Run log</button><button class="opt" data-act="quit" data-back>Title screen</button></div>`);
 }
 // Bank the run's gold and unlock the next level. Returns the name of a newly unlocked level, if any.
 function bankRun() {
   if (G.banked) return null;
-  G.banked = true; G.bonus = Math.floor(G.t / 60) * 6; meta.gold += G.gold + G.bonus; store.del(RUN_KEY);   // a little extra for every minute survived
+  G.banked = true; G.bonus = Math.floor(Math.min(G.t, RUN_LEN) / 60) * ECON.minute; meta.gold += G.gold + G.bonus; store.del(RUN_KEY);   // a little extra for every minute survived
   const i = LEVELS.indexOf(G.LV); let unlocked = null;
   if (G.t >= UNLOCK_T && i === meta.unlocked && i + 1 < LEVELS.length) { meta.unlocked = i + 1; unlocked = LEVELS[i + 1].name; }
   G.newHeroes = recordProgress();
@@ -3906,7 +3968,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, fitStage, LATE, FINAL, BOSS_HIT, BOSSES, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, fitStage, LATE, FINAL, BOSS_HIT, BOSSES, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
