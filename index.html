@@ -43,6 +43,8 @@
   body.wcbtn .panel button.opt:not(.card):disabled{border-image:var(--btnbg) 5 fill stretch}
   #overlay.parch{background-color:#000;background-size:contain;background-repeat:no-repeat;background-position:center;image-rendering:pixelated}
   #overlay.parch.bare{align-items:flex-start;padding-top:max(12px,calc(50vh - min(37.5vw,50vh) * 0.42))}
+  #overlay>*{margin:auto}
+  #overlay.parch.bare>.panel{margin:0 auto}
   #overlay.parch.bare .panel{background:none;border:0;outline:0;box-shadow:none;max-width:420px}
   #overlay.parch.bare .panel .sub{color:#3b2a14}
   #overlay.parch .panel{background:linear-gradient(#2e241a,#1d160f)}
@@ -60,9 +62,13 @@
   #overlay a{color:#e7c04a}
   p.unl{margin:2px 0}
   .bookgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;text-align:left;margin-top:8px}
+  .opts.row{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:8px}
+  .opts.row .opt{width:auto!important;min-width:150px;padding-left:14px;padding-right:14px}
+  .panel.scrolls{display:flex;flex-direction:column;max-height:calc(100dvh - 24px)}
+  .panel.scrolls .scrollbox{overflow:auto;min-height:0;flex:1 1 auto;overscroll-behavior:contain;padding-right:4px}
   .bookgrid .booknote{grid-column:1/-1;text-align:center;margin:0}
   .bookcard{background:rgba(0,0,0,.25);border:1px solid #6b5228;padding:7px 9px}
-  .bookcard .nm{color:var(--gold)} .bookcard .ds{font-size:.85em;margin-top:3px} .bookcard .lv{font-size:.8em;opacity:.85}
+  .bookcard .nm{color:var(--gold);font-size:17px} .bookcard .ds{font-size:15px;line-height:1.3;margin-top:4px} .bookcard .lv{font-size:14px;opacity:.9}
   .cicon.dim,.hpic.dim{filter:grayscale(1) brightness(.55)} span.cicon.blank{display:inline-block;width:46px;height:38px;background:#000}
   .booktabs .opt.cur{outline:2px solid #e8c84a}
   img.cicon.evo{box-shadow:0 0 0 2px #ffd24a,0 0 6px 2px rgba(255,210,74,.7)}
@@ -81,7 +87,7 @@
     h3.side{margin:6px 0 5px}
     .cards{gap:8px}
     button.card{padding:7px 11px;gap:2px}
-    .card .ds{font-size:13px;line-height:1.25}
+    .card .ds{font-size:14px;line-height:1.25}
     .wclines{gap:1px}
     .card .sig{margin-top:0}
     .opts{gap:7px}
@@ -101,7 +107,7 @@
   .panel.tight .opts.set{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
   .panel.tight .opts.set [data-back]{grid-column:1 / -1;justify-self:center}
   .pathrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
-  .pathrow code{flex:1;min-width:0;word-break:break-all;user-select:all;-webkit-user-select:all}
+  .pathrow code{font-size:14px;flex:1;min-width:0;word-break:break-all;user-select:all;-webkit-user-select:all}
   .pathrow .muted{flex-basis:100%}
   .lvlrow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
   .lvlrow button.opt{min-width:150px}
@@ -110,7 +116,8 @@
   .loot.fast li{animation-duration:.01s;animation-delay:0s!important}
   @keyframes lootIn{to{opacity:1;transform:none}}
   .chestgold{color:#ffd24a;font-weight:700}
-  #overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;
+  /* Centre the menu when it fits; when it's taller than the window it starts at the top and scrolls (never cut off). */
+  #overlay{position:fixed;inset:0;display:none;align-items:flex-start;justify-content:flex-start;z-index:10;
     padding:calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 12px);
     background:radial-gradient(ellipse at center,rgba(0,0,0,.45),rgba(0,0,0,.8));overflow:auto}
   .panel{background:linear-gradient(#3b2f22,#241b12);border:3px solid var(--gold2);outline:2px solid #000;
@@ -128,12 +135,12 @@
   button.card{min-width:0;width:200px;text-align:left;font-family:inherit;font-weight:400;padding:12px 14px;display:flex;flex-direction:column;gap:4px;background:#17110b;text-shadow:0 1px 0 #000}
   button.card.sel,button.card:hover{background:#2a1f13}
   .card .nm{font-family:Cinzel,Georgia,serif;font-size:17px;color:var(--gold)}
-  .card .lv{font-size:12px;color:#c8b58c;text-transform:uppercase;letter-spacing:.06em}
+  .card .lv{font-size:13px;color:#c8b58c;text-transform:uppercase;letter-spacing:.06em}
   .card .lv.new{color:#8fe08a;opacity:1}
   .card .ds{font-size:15px;line-height:1.35;color:#f6edd8}
   .card .ds.chestgold{color:#f0c850}
-  .help{font-size:13px;opacity:.8;margin-top:14px}
-  .fine{font-size:11px;opacity:.55;margin-top:10px}
+  .help{font-size:14px;opacity:.88;margin-top:14px}
+  .fine{font-size:13px;opacity:.65;margin-top:10px}
   .stats{display:grid;grid-template-columns:auto auto;gap:4px 16px;justify-content:center;margin:8px 0 16px;font-size:15px}
   .stats b{color:var(--gold);text-align:right}
   .panel.wide{max-width:860px;width:min(860px,94vw)}
@@ -141,13 +148,14 @@
   .sheet .who{display:flex;gap:10px;align-items:center;grid-column:1}
   .sheet .who .nm{color:var(--gold);font-size:1.15em}
   .sheet .stats{grid-column:1;margin:4px 0}
-  .sheet .items{grid-column:2;grid-row:1 / span 3}
+  .sheet .items{grid-column:2;grid-row:1 / span 3;max-height:calc(100dvh - 190px)}
+  .panel.scrolls .sheet{min-height:0}
   .sheet .items h3{margin:2px 0 4px}
-  .sheet .sigline{font-size:.85em;opacity:.9;margin-top:2px}
+  .sheet .sigline{font-size:14px;opacity:.9;margin-top:2px}
   .sheet .sigline b{color:var(--gold)}
   .pitem{display:flex;gap:8px;align-items:center;margin:0 0 5px}
-  .pitem .ds{font-size:.85em;opacity:.85}
-  .pitem .lv{color:var(--gold);font-size:.85em}
+  .pitem .ds{font-size:14px;opacity:.9}
+  .pitem .lv{color:var(--gold);font-size:14px}
   button.card.hero{width:330px}
   .hrow{display:flex;gap:10px;align-items:center}
   .hrow>span{display:flex;flex-direction:column}
@@ -188,6 +196,11 @@
   .hint{background:#241b12;border-left:3px solid var(--gold2);padding:8px 10px;margin:8px 0;line-height:1.45}
   code{background:#0d0a06;padding:1px 4px;border-radius:3px;font-size:12px}
   @media (max-width:760px){#labMain{flex-direction:column}#labSide{width:auto;border-left:0;border-top:2px solid var(--gold2);max-height:52vh}}
+  @media (max-width:600px){   /* narrow (phone upright): one column */
+    .sheet{grid-template-columns:1fr} .sheet .items{grid-column:1;grid-row:auto;max-height:none}
+    .panel.tight .opts.set{grid-template-columns:1fr}
+    .panel.scrolls{max-height:none} .panel.scrolls .scrollbox{overflow:visible}
+  }
 </style>
 </head>
 <body>
@@ -2749,15 +2762,21 @@ function showMenu(html) {
   if (!G && A.menuBg) { overlay.classList.add('parch'); overlay.style.backgroundImage = `url(${A.menuBg})`; if (!overlay.querySelector('.cards')) overlay.classList.add('bare'); }
   wcify(overlay); fitPanel(); highlight();
 }
-// Shrink a menu slightly when it would otherwise need scrolling (down to 75%; smaller screens scroll).
+// Shrink a menu slightly when it would otherwise need scrolling, but never so far that text drops below
+// 13 px (MIN_TEXT): past that the menu scrolls instead. Long menus (.scrolls) scroll inside their panel.
+const MIN_TEXT = 13;
 function fitPanel() {
   const p = overlay.querySelector('.panel'); if (!p) return;
   p.style.zoom = ''; p.classList.remove('tight');
+  if (p.classList.contains('scrolls')) return;
   // Shrinking with zoom makes the pixel font uneven, so first try a tighter layout at full size.
   if (overlay.scrollHeight > overlay.clientHeight + 1) p.classList.add('tight');
+  if (overlay.scrollHeight <= overlay.clientHeight + 1) return;
+  let small = 99; for (const el of p.querySelectorAll('.ds,.lv,.help,.sub,.nm,b,span,p,div')) { if (el.childNodes.length && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) small = Math.min(small, parseFloat(getComputedStyle(el).fontSize) || 99); }
+  const floor = Math.max(0.75, Math.min(1, MIN_TEXT / small));
   let z = 1;
-  for (let k = 0; k < 8 && overlay.scrollHeight > overlay.clientHeight + 1 && z > 0.75; k++) {
-    z = Math.max(0.75, z * Math.min(0.99, overlay.clientHeight / overlay.scrollHeight)); p.style.zoom = z;
+  for (let k = 0; k < 8 && overlay.scrollHeight > overlay.clientHeight + 1 && z > floor; k++) {
+    z = Math.max(floor, z * Math.min(0.99, overlay.clientHeight / overlay.scrollHeight)); p.style.zoom = z;
   }
 }
 addEventListener('resize', () => { if (menuOpen()) fitPanel(); });
@@ -2894,8 +2913,8 @@ function showBook(tab = 'weapons') {
       const status = heroOpen(id) ? 'Unlocked' : demoLocked(id) ? 'Requires the full game' : `Locked. ${U.goal} (${U.best()}), or buy for ${U.cost} gold.`;
       return card(`<canvas class="hpic${heroOpen(id) ? '' : ' dim'}" width="48" height="48" data-hero="${id}"></canvas>`, H_.name, `${H_.unit}, ${H_.side}`, [`Starts with <b>${WEAPONS[H_.start].name}</b>. ${H_.hp} health.`, `<b>${H_.sig}:</b> ${H_.sigDesc}`, status]); }).join('');
   showMenu(`<h2>Book of War</h2><div class="opts buyrow booktabs">${BOOK_TABS.map(([k, l]) => `<button class="opt${k === tab ? ' cur' : ''}" data-act="book" data-tab="${k}">${l}</button>`).join('')}</div>
-    <div class="bookgrid">${body}</div><div class="opts" style="margin-top:12px"><button class="opt" data-act="title" data-back>Back</button></div>`);
-  overlay.classList.remove('bare'); overlay.querySelector('.panel').classList.add('wide');
+    <div class="bookgrid scrollbox">${body}</div><div class="opts" style="margin-top:12px"><button class="opt" data-act="title" data-back>Back</button></div>`);
+  overlay.classList.remove('bare'); overlay.querySelector('.panel').classList.add('wide', 'scrolls');
   sel = BOOK_TABS.findIndex(([k]) => k === tab); highlight(); drawHeroPics(); fitPanel();
 }
 let resetArmed = false;
@@ -3037,9 +3056,9 @@ function pauseRun(again) {
   if (!G || (G.state !== 'play' && !again)) return;
   G.state = 'paused'; showHudBtns(false); joy = null; musicDuck(true); if (!again) guardMenu();
   showMenu(`<h2>Paused</h2>${pauseSheet()}
-    <div class="opts"><button class="opt" data-act="resume" data-back>Resume</button><button class="opt" data-act="retry">Restart</button>
+    <div class="opts row"><button class="opt" data-act="resume" data-back>Resume</button><button class="opt" data-act="retry">Restart</button>
     <button class="opt" data-act="settings" data-from="pause">Settings</button><button class="opt" data-act="quit">Quit to title (keep gold)</button></div>`);
-  overlay.querySelector('.panel').classList.add('wide'); drawHeroPics(); fitPanel();
+  overlay.querySelector('.panel').classList.add('wide', 'scrolls'); drawHeroPics(); fitPanel();
 }
 // The character sheet on the pause screen: who you are, your numbers, and everything you're carrying.
 function pauseSheet() {
@@ -3056,7 +3075,7 @@ function pauseSheet() {
       <div><div class="nm">${HD.name}</div><div class="sub">${HD.unit}, level ${h.level}</div>${HD.sig ? `<div class="sigline"><b>${HD.sig}:</b> ${HD.sigDesc}</div>` : ''}</div></div>
     <div class="stats">${stats}</div>
     <div class="stats run">${stat('Battlefield', G.LV.name)}${stat('Time', fmtTime(G.t))}${stat('Kills', G.kills)}${stat('Gold', G.gold)}</div>
-    <div class="items"><h3>Weapons</h3>${ws}<h3>Passives</h3>${ps}</div></div>`;
+    <div class="items scrollbox"><h3>Weapons</h3>${ws}<h3>Passives</h3>${ps}</div></div>`;
 }
 function choices() {
   const o = [], wc = Object.keys(G.weapons).length, pc = Object.keys(G.passives).length;
