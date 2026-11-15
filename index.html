@@ -2833,7 +2833,7 @@ function showTitle() {
     overlay.innerHTML = `<div class="wcstage"><img class="bg" src="${A.menuBg}" alt="">
       <div class="wcbtns"><button class="opt" data-act="choose">Start a Run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
       <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="import">Game files</button></div>
-      ${A.demo ? `<div class="note">Demo version: Alterac Mountains and six heroes. Get ${fullGameLink()} and import it under Game files to unlock everything.</div>` : mu.names.size ? '' : '<div class="note">Re-import your game folder in the Asset Lab to add the music and hero voices.</div>'}
+      ${A.demo ? `<div class="note">Demo version: Alterac Mountains and six heroes. Get ${fullGameLink()} and import it under Game files to unlock everything.</div>` : mu.names.size ? '' : '<div class="note">Import your game folder again under Game files to add the music and hero voices.</div>'}
       <div class="ver" data-wcsmall="TIDES OF SURVIVAL"></div></div>`;
     overlay.className = 'wcmenu'; overlay.style.display = 'flex'; overlay.style.backgroundImage = '';
     sel = 0; wcify(overlay);
