@@ -49,6 +49,8 @@
   .cards.shop button.card{width:170px}
   .chead{display:flex;gap:8px;align-items:center}
   .ctitle{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+  .evohint{color:#ffd24a;margin-top:3px}
+  img.cicon.evo{box-shadow:0 0 0 2px #ffd24a,0 0 6px 2px rgba(255,210,74,.7)}
   img.cicon{width:46px;height:38px;image-rendering:pixelated;flex:none;border:1px solid #000;box-shadow:0 0 0 1px #8c6a2c}
   .loot img.cicon{float:left;margin:0 8px 0 0;width:34px;height:28px}
   .stats.hist{grid-template-columns:auto auto;text-align:left;max-width:640px}
@@ -1446,6 +1448,34 @@ const WEAPONS = {
   runes:   { name: 'Runes', desc: 'Lays explosive runes on the ground around you.', up: ['one more rune', 'more damage', 'one more rune', 'more damage, one more rune'] },
   coil:    { name: 'Death Coil', desc: 'A seeking bolt of shadow that heals you when it hits.', up: ['more damage', 'one more coil', 'more damage and healing', 'one more coil'] },
 };
+// Evolutions: a maxed weapon plus its partner passive (any level) turns into a stronger weapon
+// the next time you open a boss's treasure chest. The evolved weapon replaces the original.
+const EVOS = {
+  sword:    { p: 'might',    name: 'Doomhammer',          desc: 'A crushing sweep in front and behind that hurls enemies back.' },
+  arrows:   { p: 'boots',    name: "Ranger's Volley",     desc: 'A fan of seven piercing arrows.' },
+  axes:     { p: 'heal',     name: "Berserker's Fury",    desc: 'Five axes whirl out in every direction; each kill heals you.' },
+  aura:     { p: 'armour',   name: 'Exorcism',            desc: 'A stronger holy aura that bursts outward every few seconds.' },
+  fireball: { p: 'area',     name: 'Blizzard',            desc: 'Ice storms crash down on enemies all around you.' },
+  ballista: { p: 'haste',    name: 'Juggernaught Bolts',  desc: 'Rapid heavy bolts, front and back, piercing everything.' },
+  runes:    { p: 'magnet',   name: 'Death and Decay',     desc: 'A field of rot follows you, wearing down everything inside it.' },
+  coil:     { p: 'vitality', name: 'Unholy Armour',       desc: 'More coils; each hit also builds a shield that soaks up damage.' },
+};
+const wName = id => G && G.weapons[id] && G.weapons[id].evo ? EVOS[id].name : WEAPONS[id].name;
+const evolvable = () => Object.keys(G.weapons).filter(id => { const w = G.weapons[id]; return !w.evo && w.lvl >= MAX_LVL && EVOS[id] && G.passives[EVOS[id].p]; });
+function evolve(id) { G.weapons[id].evo = true; G.weapons[id].cd = 0.3; G.weapons[id].tick = 0; }
+function evoStats(id) {
+  switch (id) {
+    case 'sword': return '80 damage, reach about 75, front and back, heavy knockback.';
+    case 'arrows': return '7 arrows, 28 damage, each pierces 6.';
+    case 'axes': return '5 axes, 44 damage each, heal 1 per kill.';
+    case 'aura': return '21 damage every 0.4 s, wider, and a 60-damage burst every 2.5 s.';
+    case 'fireball': return '6 ice storms, 55 damage each, every 2 s.';
+    case 'ballista': return '85 damage per bolt, front and back, every 1.1 s.';
+    case 'runes': return '22 damage every 0.5 s to everything within 80.';
+    case 'coil': return '5 coils, 40 damage, heals 2, each hit adds 4 shield (up to 40).';
+  }
+  return '';
+}
 const HEROES = {
   lothar:  { name: 'Anduin Lothar', side: 'Alliance', unit: 'Knight', col: '#3f6fd1', start: 'sword', hp: 140, speed: 78, armour: 1,
              sig: 'Lion of Azeroth', sigDesc: '+15% damage and 1 armour.', might: 1.15 },
@@ -1480,7 +1510,8 @@ let meta = store.get('tos_meta', null) || { gold: 0, spent: 0, ups: {}, unlocked
 meta.ups ||= {};
 const saveMeta = () => store.set('tos_meta', meta);
 const up = id => meta.ups[id] || 0;
-const upCost = id => UPGRADES[id].cost * (up(id) + 1);
+// Each level costs more than the last: base x 1, 2.5, 4.5, 7, 10 (rather than 1, 2, 3, 4, 5), so a full Armoury takes many runs.
+const upCost = id => { const n = up(id); return Math.round(UPGRADES[id].cost * (n + 1) * (1 + 0.25 * n) / 5) * 5; };
 const goldMul = () => 1 + 0.15 * up('greed');
 // All gold collected in a run is scaled by GOLD_RATE (tuned from real runs: the Armoury should take
 // roughly 15 to 20 runs to fill). Fractions carry over so small coins still count.
@@ -1537,7 +1568,7 @@ function snapRun() {
     bossNext: G.bossNext, bossN: G.bossN || 0, swarmNext: G.swarmNext, revives: G.revives, rerolls: G.rerolls,
     pending: G.pending + (G.state === 'levelup' ? 1 : 0), chests: G.chestQueue,
     h: { x: h.x, y: h.y, hp: h.hp, xp: h.xp, level: h.level, next: h.next },
-    w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), p: G.passives,
+    w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), e: Object.keys(G.weapons).filter(k => G.weapons[k].evo), p: G.passives, sh: G.hero.shield || 0,
     camps: [...G.camps.values()].filter(c => c.dead.size || c.chest).map(c => ({ key: c.key, ox: c.ox, oy: c.oy, dead: [...c.dead], chest: c.chest })) };
 }
 function saveRun() { const s = snapRun(); if (s) store.set(RUN_KEY, s); }
@@ -1546,7 +1577,7 @@ function continueRun() {
   const s = savedRun(); if (!s) return showTitle();
   newRun(s.hero, s.level, s.seed);
   if (!G || !G.terrain) return;
-  G.weapons = {}; for (const [k, l] of Object.entries(s.w || {})) if (WEAPONS[k]) G.weapons[k] = { lvl: l, cd: 0.3, tick: 0 };
+  G.weapons = {}; for (const [k, l] of Object.entries(s.w || {})) if (WEAPONS[k]) G.weapons[k] = { lvl: l, cd: 0.3, tick: 0, evo: (s.e || []).includes(k) && !!EVOS[k] };
   G.passives = Object.fromEntries(Object.entries(s.p || {}).filter(([k]) => PASSIVES[k]));   // drops retired passives
   Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossNext: s.bossNext, bossN: s.bossN || 0, swarmNext: s.swarmNext, revives: s.revives, rerolls: s.rerolls, pending: s.pending || 0, chestQueue: s.chests || [] });
   Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next });
@@ -1726,6 +1757,11 @@ const dirOf = (x, y) => (Math.round(Math.atan2(x, -y) / (Math.PI / 4)) + 8) % 8;
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 /* ---------- spawning ---------- */
+// The late game: from 8:00 enemies grow tougher faster, and in the last 3:00 they come thicker and hit harder.
+// Tuned with scripts/balance.js so a full Armoury can win, but has to work for it (docs/TESTING.md).
+const LATE = { from: 480, hp: 2.6, push: 720, spawn: 1.4, dmg: 0.55 };
+const lateHp = t => t > LATE.from ? 1 + LATE.hp * ((t - LATE.from) / (RUN_LEN - LATE.from)) ** 1.4 : 1;
+const pushK = t => t > LATE.push ? (t - LATE.push) / (RUN_LEN - LATE.push) : 0;
 function spawnEnemy(type, x, y) {
   const t = G.t, T = ET[type], h = G.hero;
   if (x === undefined) {
@@ -1734,9 +1770,9 @@ function spawnEnemy(type, x, y) {
   } else if (type !== 'boss' && footBlocked(x, y, 4)) return;
   // Each boss is tougher than the last: the first is a fair fight, from the third on they're at full strength.
   const bossK = type === 'boss' ? [0.45, 0.75][(G.bossN = (G.bossN || 0) + 1) - 1] ?? 1 : 1;
-  const hpMul = (1 + t / 240 + (t / 360) ** 2) * G.LV.hp * (0.6 + 0.4 * EASE(t)) * bossK; G.stats.hp += T.hp * hpMul;
+  const hpMul = (1 + t / 240 + (t / 360) ** 2) * G.LV.hp * (0.6 + 0.4 * EASE(t)) * bossK * lateHp(t); G.stats.hp += T.hp * hpMul;
   G.enemies.push({ type, x, y, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (1 + Math.min(0.3, t / 3000)) * rnd(0.92, 1.08),
-    dmg: T.dmg * (1 + t / 600) * (0.6 + 0.4 * EASE(t)) * (bossK < 1 ? 0.7 : 1), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0, shootT: rnd(1, 3), dir: 4, t: rnd(0, 5) });
+    dmg: T.dmg * (1 + t / 600) * (0.6 + 0.4 * EASE(t)) * (bossK < 1 ? 0.7 : 1) * (1 + LATE.dmg * pushK(t)), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0, shootT: rnd(1, 3), dir: 4, t: rnd(0, 5) });
 }
 function pickType(t) {
   const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 210 ? 0.25 : 0, tank: t > 240 ? Math.min(0.4, 0.05 + t / 1500) : 0 };
@@ -1747,7 +1783,7 @@ function pickType(t) {
 }
 function spawn(dt) {
   const t = G.t;
-  G.spawnAcc += (0.7 + t / 50) * EASE(t) * dt;
+  G.spawnAcc += (0.7 + t / 50) * EASE(t) * (1 + LATE.spawn * pushK(t)) * dt;
   while (G.spawnAcc >= 1) { G.spawnAcc--; if (G.enemies.length < 330) spawnEnemy(pickType(t)); }
   if (t >= G.bossNext) { G.bossNext += 240; spawnEnemy('boss'); }
   if (t >= G.swarmNext) {
@@ -1793,7 +1829,9 @@ function drop(e) {
   if (G.gems.length > 420) { const i = G.gems.findIndex(g => g.v); if (i >= 0) gainXp(G.gems.splice(i, 1)[0].v); }
 }
 function hurtHero(d, src) {
-  const h = G.hero; G.stats.lastHit = src || null; h.hp -= Math.max(1, d - h.armour); h.hurtT = 0.15; sfx('s_hurt', 0.25);
+  const h = G.hero; G.stats.lastHit = src || null; let dm = Math.max(1, d - h.armour);
+  if (h.shield > 0) { const a = Math.min(h.shield, dm); h.shield -= a; dm -= a; if (dm <= 0) return; }
+  h.hp -= dm; h.hurtT = 0.15; sfx('s_hurt', 0.25);
 }
 function explode(s) {
   G.fx.push({ k: 'boom', x: s.x, y: s.y, r: s.er, t: 0, life: 0.4 }); sfx(s.k === 'fire' && A.sbuf.s_fire ? 's_fire' : 's_boom', 0.08);
@@ -1806,8 +1844,12 @@ function nearest(n, maxD) {
   return arr.slice(0, n).map(a => a[1]);
 }
 const CD = { coil: 1.2, sword: 1.0, arrows: 0.75, axes: 1.8, fireball: 2.4, ballista: 2.8, runes: 3.2 };
+// Death Coil healing is capped per second, so piling on coils can't make you unkillable.
+const COIL_HEAL_PER_S = 3;
+const CD_EVO = { arrows: 0.65, fireball: 2.0, ballista: 1.1 };
 function fire(id, l) {
   const h = G.hero, ar = h.area;
+  if (G.weapons[id] && G.weapons[id].evo && fireEvo(id)) return;
   if (id === 'sword') {
     const range = (30 + 4 * l + (l >= 5 ? 6 : 0)) * ar, dmg = 14 + 6 * (l - 1), arc = 2.2;
     const dirs = [h.face]; if (l >= 4) dirs.push(h.face + Math.PI);
@@ -1869,21 +1911,70 @@ function fire(id, l) {
     }
   }
 }
+// The evolved weapons. Returns true when it handled the attack.
+function fireEvo(id) {
+  const h = G.hero, ar = h.area;
+  if (id === 'sword') {
+    const range = 75 * ar, dmg = 80, arc = 3.2;
+    for (const a of [h.face, h.face + Math.PI]) {
+      G.fx.push({ k: 'arc', a, r: range, arc, t: 0, life: 0.22 });
+      query(h.x, h.y, range + 12, e => {
+        const dx = e.x - h.x, dy = e.y - h.y, d = Math.hypot(dx, dy) || 1; if (d > range + e.r) return;
+        let da = Math.atan2(dy, dx) - a; da = Math.atan2(Math.sin(da), Math.cos(da));
+        if (Math.abs(da) <= arc / 2 || d < e.r + 6) hitEnemy(e, dmg, dx / d * 320, dy / d * 320);
+      });
+    }
+  } else if (id === 'arrows') {
+    const t = nearest(1, 280)[0], a0 = t ? Math.atan2(t.y - h.y, t.x - h.x) : h.face;
+    for (let i = 0; i < 7; i++) { const a = a0 + (i - 3) * 0.16; G.shots.push({ k: 'arrow', role: 'proj', x: h.x, y: h.y, vx: Math.cos(a) * 260, vy: Math.sin(a) * 260, dmg: 28, pierce: 6, life: 1.4, r: 3 }); }
+  } else if (id === 'axes') {
+    for (let i = 0; i < 5; i++) { const a = h.face + i * TAU / 5; G.shots.push({ k: 'axe', role: 'axe', x: h.x, y: h.y, vx: Math.cos(a) * 210, vy: Math.sin(a) * 210, dmg: 44, pierce: Infinity, life: 2.4, r: 7 * ar, hitCd: new Map(), killHeal: 1 }); }
+  } else if (id === 'fireball') {
+    const pool = G.enemies.filter(e => !e.static && Math.abs(e.x - h.x) < W / 2 && Math.abs(e.y - h.y) < H / 2), er = 34 * ar;
+    for (let i = 0; i < 6; i++) {
+      const t = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null; if (!t && i) break;
+      const x = t ? t.x : h.x + Math.cos(h.face) * 80, y = t ? t.y : h.y + Math.sin(h.face) * 80;
+      G.fx.push({ k: 'ice', x, y, r: er, t: 0, life: 0.5 });
+      query(x, y, er + 16, e => { const dx = e.x - x, dy = e.y - y, d = Math.hypot(dx, dy) || 1; if (d < er + e.r) hitEnemy(e, 55, dx / d * 60, dy / d * 60); });
+    }
+    sfx(A.sbuf.s_fire ? 's_fire' : 's_boom', 0.1);
+  } else if (id === 'ballista') {
+    const t = nearest(1, 330)[0], a = t ? Math.atan2(t.y - h.y, t.x - h.x) : h.face;
+    for (const d of [a, a + Math.PI]) G.shots.push({ k: 'bolt', role: 'bolt', x: h.x, y: h.y, vx: Math.cos(d) * 300, vy: Math.sin(d) * 300, dmg: 85, pierce: Infinity, life: 1.5, r: 6 });
+  } else if (id === 'coil') {
+    const ts = nearest(5, 320);
+    for (let i = 0; i < 5; i++) { const a = h.face + (i - 2) * 0.8; G.shots.push({ k: 'coil', role: 'coil', x: h.x, y: h.y, vx: Math.cos(a) * 130, vy: Math.sin(a) * 130, dmg: 40, heal: 2, shield: 4, pierce: 1, life: 3, r: 5, target: ts[i % Math.max(1, ts.length)] || null }); }
+  } else return false;
+  return true;
+}
 function updateWeapons(dt) {
   const h = G.hero;
   for (const id in G.weapons) {
     const w = G.weapons[id];
     if (id === 'aura') {
       w.tick -= dt;
+      const r = (26 + 5 * w.lvl + (w.lvl >= 5 ? 5 : 0)) * h.area * (w.evo ? 1.25 : 1);
       if (w.tick <= 0) {
-        w.tick = 0.4; const r = (26 + 5 * w.lvl + (w.lvl >= 5 ? 5 : 0)) * h.area, dmg = 3 + 2 * w.lvl;
+        w.tick = 0.4; const dmg = (3 + 2 * w.lvl) * (w.evo ? 1.6 : 1);
         query(h.x, h.y, r + 12, e => { if (Math.hypot(e.x - h.x, e.y - h.y) < r + e.r) hitEnemy(e, dmg); });
+      }
+      if (w.evo && (w.pulse = (w.pulse ?? 2.5) - dt) <= 0) {   // Exorcism: a burst of holy fire
+        w.pulse = 2.5; const R = r * 1.9; G.fx.push({ k: 'ring', x: h.x, y: h.y, r: R, t: 0, life: 0.45, col: '255,236,150' });
+        query(h.x, h.y, R + 12, e => { const dx = e.x - h.x, dy = e.y - h.y, d = Math.hypot(dx, dy) || 1; if (d < R + e.r) hitEnemy(e, 60, dx / d * 120, dy / d * 120); });
+      }
+      continue;
+    }
+    if (id === 'runes' && w.evo) {   // Death and Decay: a field of rot that follows you
+      w.tick -= dt;
+      if (w.tick <= 0) {
+        w.tick = 0.5; const r = 80 * h.area; G.fx.push({ k: 'rot', x: h.x, y: h.y, r, t: 0, life: 0.55 });
+        query(h.x, h.y, r + 12, e => { if (Math.hypot(e.x - h.x, e.y - h.y) < r + e.r) hitEnemy(e, 22); });
       }
       continue;
     }
     w.cd -= dt;
     if (w.cd <= 0) {
-      fire(id, w.lvl); w.cd = CD[id] * h.haste;
+      fire(id, w.lvl); w.cd = (w.evo && CD_EVO[id] || CD[id]) * h.haste;
       const tg = ['sword', 'axes'].includes(id) ? null : nearest(1, 300)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
       h.atkT = HSWING; h.atkDir = dirOf(Math.cos(a), Math.sin(a)); const snd = { sword: 's_sword', arrows: 's_bow', axes: 's_axe', coil: 's_coil', ballista: 's_bow' }[id]; if (snd) sfx(snd, 0.1); }
   }
@@ -1923,7 +2014,9 @@ function updateShots(dt) {
       else { s.hitSet ||= new Set(); if (s.hitSet.has(e)) return; s.hitSet.add(e); }
       const sp = Math.hypot(s.vx, s.vy) || 1;
       hitEnemy(e, s.dmg, s.vx / sp * 70, s.vy / sp * 70);
-      if (s.heal) h.hp = Math.min(h.maxHp, h.hp + s.heal);
+      if (s.heal) { const amt = Math.min(s.heal, h.coilBank || 0); h.coilBank -= amt; h.hp = Math.min(h.maxHp, h.hp + amt); }   // capped per second
+      if (s.shield) h.shield = Math.min(40, (h.shield || 0) + s.shield);
+      if (s.killHeal && e.dead) h.hp = Math.min(h.maxHp, h.hp + s.killHeal);
       if (--s.pierce <= 0) s.dead = true;
     });
   }
@@ -2005,6 +2098,7 @@ function update(dt) {
   if (stuck || !footBlocked(hnx, h.y, 5)) h.x = hnx; if (stuck || !footBlocked(h.x, hny, 5)) h.y = hny;
   if (ml > 0.15) { h.face = Math.atan2(my, mx); h.dir = dirOf(mx, my); h.moveT += dt; }
   h.hp = Math.min(h.maxHp, h.hp + h.regen * dt); h.hurtT -= dt; h.atkT -= dt;
+  h.coilBank = Math.min(COIL_HEAL_PER_S, (h.coilBank || 0) + COIL_HEAL_PER_S * dt);
   spawn(dt); updateCamps(dt); buildGrid(); updateEnemies(dt); updateWeapons(dt); updateShots(dt); updateGems(dt);
   for (const f of G.fx) f.t += dt; G.fx = G.fx.filter(f => f.t < f.life); G.numCount = 0; for (const f of G.fx) if (f.k === 'num') G.numCount++;
   for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
@@ -2095,6 +2189,7 @@ function drawEnemy(e) {
 }
 function drawHero() {
   const h = G.hero, x = h.x - camX, y = h.y - camY;
+  if (h.shield > 0) { ctx.strokeStyle = `rgba(150,255,120,${0.25 + 0.5 * h.shield / 40})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y - 2, 13, 0, TAU); ctx.stroke(); }
   ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(x, y + 7, 8, 3, 0, 0, TAU); ctx.fill();
   const swing = h.atkT > 0 ? 1 - h.atkT / HSWING : null, dying = G.state === 'dying' || (G.state === 'over' && !G.won);
   if (!drawSprite(A.sprites['hero_' + G.heroId] ? 'hero_' + G.heroId : 'hero', h.x, h.y, swing != null ? h.atkDir : h.dir, h.moveT, h.hurtT > 0 && !dying, dying ? null : swing, dying ? G.dieT : null)) {
@@ -2140,6 +2235,16 @@ function drawFx(f) {
     ctx.globalAlpha = Math.min(1, 2.2 * (1 - p));
     txt(String(f.v), Math.round(f.x - camX), Math.round(f.y - camY - 10 * p), 7, f.v >= 40 ? '#ffd24a' : '#fff', 'center');
     ctx.globalAlpha = 1;
+  } else if (f.k === 'ring') {
+    ctx.strokeStyle = `rgba(${f.col},${0.9 * (1 - p)})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(f.x - camX, f.y - camY, f.r * (0.3 + 0.7 * p), 0, TAU); ctx.stroke();
+  } else if (f.k === 'ice') {
+    const x = f.x - camX, y = f.y - camY;
+    circle(x, y, f.r * (0.5 + 0.5 * p), `rgba(170,215,255,${0.45 * (1 - p)})`);
+    ctx.strokeStyle = `rgba(235,248,255,${1 - p})`; ctx.lineWidth = 1;
+    for (let i = 0; i < 6; i++) { const a = i * 1.05 + f.x, rr = f.r * 0.8; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * rr * p - 3, y - 18 * (1 - p) + Math.sin(a) * rr * p); ctx.lineTo(x + Math.cos(a) * rr * p, y + Math.sin(a) * rr * p); ctx.stroke(); }
+  } else if (f.k === 'rot') {
+    circle(f.x - camX, f.y - camY, f.r, `rgba(60,90,30,${0.2 * (1 - p)})`, `rgba(120,170,60,${0.5 * (1 - p)})`);
   } else if (f.k === 'boom') {
     const s = A.sprites.boom;
     if (s) { const fi = Math.min(s.count - 1, Math.floor(p * s.count)); ctx.drawImage(s.canvas, (fi % s.cols) * s.fw, Math.floor(fi / s.cols) * s.fh, s.fw, s.fh, Math.round(f.x - camX - s.fw / 2), Math.round(f.y - camY - s.fh / 2), s.fw, s.fh); return; }
@@ -2269,7 +2374,7 @@ function drawFrame(ui) {
   const icons = (list, kind, lvl, y) => list.forEach((id, i) => {
     const key = iconKey(kind, id), ic = A.icons && A.icons[key], x = px + 6 + i * 25;
     if (x + 23 > px + pw) return;
-    ctx.fillStyle = '#000'; ctx.fillRect(x - 1, y - 1, 25, 21);
+    ctx.fillStyle = key.startsWith('e:') ? '#ffd24a' : '#000'; ctx.fillRect(x - 1, y - 1, 25, 21);
     if (ic) ctx.drawImage(ic, x, y, 23, 19); else { ctx.fillStyle = dark; ctx.fillRect(x, y, 23, 19); }
     txt(String(lvl(id)), x + 22, y + 12, 7, '#ffffff', 'right');
   });
@@ -2286,7 +2391,7 @@ function drawHud() {
     if (W < 320) txt(`${G.kills} kills  ${G.gold} gold`, W / 2, boss ? 46 : 30, 8, '#f1e6c8', 'center');
     else { txt(`${G.kills} kills`, W - 60, 16, 9, '#f1e6c8', 'right'); txt(`${G.gold} gold`, W - 60, 27, 8, '#ffd24a', 'right'); }
     let y = 18;
-    for (const id in G.weapons) { txt(`${WEAPONS[id].name} ${G.weapons[id].lvl}`, 6, y, 7, '#e8d9b0'); y += 9; }
+    for (const id in G.weapons) { txt(`${wName(id)} ${G.weapons[id].lvl}`, 6, y, 7, '#e8d9b0'); y += 9; }
     for (const id in G.passives) { txt(`${PASSIVES[id].name} ${G.passives[id]}`, 6, y, 7, '#a8c4e0'); y += 9; }
   }
   let bx = W / 2 - Object.keys(G.buffs).length * 15, by = boss ? 46 : 31;   // with the frame, the clock sits in the top bar   // active power-ups, under the clock (and boss bar)
@@ -2688,7 +2793,8 @@ function pauseSheet() {
     stat('Attack speed', pct(1 / h.haste - 1)), stat('Area', pct(h.area - 1)), stat('Pickup range', pct(h.magnet - 1)), stat('Regeneration', `${h.regen.toFixed(1)} per second`),
     stat('Revives', G.revives), stat('Rerolls', G.rerolls)].join('');
   const row = (kind, id, nm, lvl, ds) => `<div class="pitem">${itemIcon(kind, id)}<div><div class="nm">${nm} <span class="lv">Level ${lvl}${lvl >= MAX_LVL ? ' (max)' : ''}</span></div>${ds ? `<div class="ds">${ds}</div>` : ''}</div></div>`;
-  const ws = Object.entries(G.weapons).map(([id, w]) => row('w', id, WEAPONS[id].name, w.lvl, weaponStats(id, w.lvl))).join('');
+  const ws = Object.entries(G.weapons).map(([id, w]) => w.evo ? row('w', id, EVOS[id].name, w.lvl, evoStats(id)).replace(/Level \d+ \(max\)/, 'Evolved')
+    : row('w', id, WEAPONS[id].name, w.lvl, weaponStats(id, w.lvl) + (w.lvl >= MAX_LVL && EVOS[id] ? ` Evolves into ${EVOS[id].name} with ${PASSIVES[EVOS[id].p].name} and a boss chest.` : ''))).join('');
   const ps = Object.entries(G.passives).map(([id, l]) => row('p', id, PASSIVES[id].name, l, PASSIVES[id].desc)).join('') || '<p class="sub">None yet.</p>';
   return `<div class="sheet"><div class="who"><canvas class="hpic" data-hero="${G.heroId}" width="48" height="48"></canvas>
       <div><div class="nm">${HD.name}</div><div class="sub">${HD.unit}, level ${h.level}</div>${HD.sig ? `<div class="sigline"><b>${HD.sig}:</b> ${HD.sigDesc}</div>` : ''}</div></div>
@@ -2731,16 +2837,17 @@ function weaponStats(id, l) {
 const ITEM_ICONS = {
   'w:sword': 117, 'w:arrows': 125, 'w:axes': 129, 'w:aura': 110, 'w:fireball': 101, 'w:ballista': 140, 'w:runes': 97, 'w:coil': 108,
   'p:armour': 165, 'p:armour.orc': 168, 'p:boots': 130, 'p:heal': 107, 'p:magnet': 133, 'p:might': 118, 'p:might.orc': 120, 'p:haste': 96, 'p:area': 104, 'p:vitality': 9, 'food:food': 134,
+  'e:sword': 119, 'e:arrows': 132, 'e:axes': 137, 'e:aura': 110, 'e:fireball': 105, 'e:ballista': 141, 'e:runes': 103, 'e:coil': 98,   // evolved weapons
 };
-const iconKey = (kind, id) => { const k = kind + ':' + id; return G && G.HD.side === 'Horde' && ITEM_ICONS[k + '.orc'] != null ? k + '.orc' : k; };
+const iconKey = (kind, id) => { if (kind === 'w' && G && G.weapons[id] && G.weapons[id].evo) return 'e:' + id; const k = kind + ':' + id; return G && G.HD.side === 'Horde' && ITEM_ICONS[k + '.orc'] != null ? k + '.orc' : k; };
 const iconUrls = {};
 function itemIcon(kind, id) {
   const key = iconKey(kind, id), c = A.icons && A.icons[key]; if (!c) return '';
   if (!iconUrls[key]) iconUrls[key] = c.toDataURL();
-  return `<img class="cicon" src="${iconUrls[key]}" alt="">`;
+  return `<img class="cicon${key.startsWith('e:') ? ' evo' : ''}" src="${iconUrls[key]}" alt="">`;
 }
 function itemInfo(c) {
-  if (c.kind === 'w') { const W_ = WEAPONS[c.id]; return { nm: W_.name, ds: c.lvl === 1 ? `${W_.desc} ${weaponStats(c.id, 1)}` : `${W_.up[c.lvl - 2].replace(/^./, m => m.toUpperCase())}. Now ${weaponStats(c.id, c.lvl).replace(/^./, m => m.toLowerCase())}`, lv: c.lvl === 1 ? '<span class="lv new">New weapon</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
+  if (c.kind === 'w') { const W_ = WEAPONS[c.id]; return { nm: W_.name, ds: c.lvl === 1 ? `${W_.desc} ${weaponStats(c.id, 1)}` : `${W_.up[c.lvl - 2].replace(/^./, m => m.toUpperCase())}. Now ${weaponStats(c.id, c.lvl).replace(/^./, m => m.toLowerCase())}`, lv: c.lvl === 1 ? '<span class="lv new">New weapon</span>' : `<span class="lv">Level ${c.lvl}</span>`, hint: c.lvl >= MAX_LVL && EVOS[c.id] ? `Max level. With ${PASSIVES[EVOS[c.id].p].name}, a boss chest evolves it into ${EVOS[c.id].name}.` : '' }; }
   if (c.kind === 'p') { const P = PASSIVES[c.id]; return { nm: P.name, ds: P.desc, lv: c.lvl === 1 ? '<span class="lv new">New</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
   if (c.kind === 'food') return { nm: 'Field rations', ds: 'Restore 40% of your health.', lv: '<span class="lv">Everything is maxed</span>' };
   return { nm: 'Sack of gold', ds: 'Gain 50 gold.', lv: '<span class="lv">Everything is maxed</span>' };
@@ -2751,8 +2858,8 @@ function openLevelUp(reroll) {
   if (!reroll) guardMenu(350);
   if (!reroll && !heroVoice('any')) sfx(levelSnd(), 0);   // a random line from the hero, or the jingle if no voices were imported
   const cards = choices().map((c, i) => {
-    const { nm, ds, lv } = itemInfo(c);
-    return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="chead">${itemIcon(c.kind, c.id)}<span class="ctitle"><span class="nm">${i + 1}. ${nm}</span>${lv}</span></span><span class="ds">${ds}</span></button>`;
+    const { nm, ds, lv, hint } = itemInfo(c);
+    return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="chead">${itemIcon(c.kind, c.id)}<span class="ctitle"><span class="nm">${i + 1}. ${nm}</span>${lv}</span></span><span class="ds">${ds}</span>${hint ? `<span class="ds evohint">${hint}</span>` : ''}</button>`;
   }).join('');
   showMenu(`<h2>Level ${G.hero.level}</h2><div class="cards">${cards}</div>
     <div class="lvlrow"><button class="opt" data-act="reroll" ${G.rerolls > 0 ? '' : 'disabled'}>Reroll (${G.rerolls})</button><button class="opt" data-act="skip">Skip (+10% health)</button></div>`);
@@ -2770,8 +2877,9 @@ function pickCard(kind, id) {
 function openChest(kind) {
   G.state = 'chest'; joy = null; showHudBtns(false); sfx(levelSnd(), 0); guardMenu(350);
   const r = Math.random(), n = kind === 'boss' ? (r < 0.15 ? 5 : r < 0.5 ? 3 : 1) : (r < 0.35 ? 1 : 0);
-  const got = [];
-  for (let i = 0; i < n; i++) { const c = choices()[0]; if (!c) break; addItem(c.kind, c.id); got.push({ ...itemInfo(c), ic: itemIcon(c.kind, c.id) }); }
+  const got = [], evo = kind === 'boss' ? evolvable()[0] : null;
+  if (evo) { evolve(evo); got.push({ nm: EVOS[evo].name, lv: '<span class="lv new">Evolved!</span>', ds: `${WEAPONS[evo].name} has evolved. ${EVOS[evo].desc}`, ic: itemIcon('w', evo) }); }
+  for (let i = evo ? 1 : 0; i < n; i++) { const c = choices()[0]; if (!c) break; addItem(c.kind, c.id); got.push({ ...itemInfo(c), ic: itemIcon(c.kind, c.id) }); }
   const gold = Math.round((kind === 'boss' ? 60 + rnd(0, 40) : 15 + rnd(0, 20)) * goldMul());
   addGold(gold);
   const step = cfg.opts.quickChest ? 0 : 0.45;
@@ -2784,7 +2892,7 @@ function openChest(kind) {
 const KILLER = { basic: 'Infantry', fast: 'Sappers', tank: 'Heavy units', ranged: 'Ranged units', boss: 'The boss', shot: 'Missiles', bld: 'A tower' };
 function runRecord(won) {
   return { at: Date.now(), hero: G.heroId, level: G.LV.id, t: Math.floor(G.t), won: !!won, kills: G.kills, gold: G.gold, lvl: G.hero.level,
-    by: won ? null : G.stats.lastHit, w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), p: { ...G.passives }, ups: Object.values(meta.ups).reduce((a, b) => a + b, 0) };
+    by: won ? null : G.stats.lastHit, w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), e: Object.keys(G.weapons).filter(k => G.weapons[k].evo), p: { ...G.passives }, ups: Object.values(meta.ups).reduce((a, b) => a + b, 0) };
 }
 let runs = store.get('tos_runs', []); if (!Array.isArray(runs)) runs = [];
 function endRun(won) {
@@ -3156,7 +3264,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, LATE, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
