@@ -55,6 +55,7 @@
   .opts.buyrow{flex-direction:row;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0 2px}
   .opts.buyrow .opt{width:auto!important;min-width:0;padding:3px 10px;font-size:.9em}
   .nextup{opacity:.9}
+  #overlay a{color:#e7c04a}
   p.unl{margin:2px 0}box-shadow:0 0 0 2px #ffd24a,0 0 6px 2px rgba(255,210,74,.7)}
   img.cicon{width:46px;height:38px;image-rendering:pixelated;flex:none;border:1px solid #000;box-shadow:0 0 0 1px #8c6a2c}
   .loot img.cicon{float:left;margin:0 8px 0 0;width:34px;height:28px}
@@ -641,7 +642,27 @@ const Core = (() => {
     return out;
   }
 
-  return { u16, u32, parseWar, lzDecode, getEntry, safeEntry, isGfu, decodeGfu, decodeGfuFrame, isImg, decodeImg, classify, kindOf, toPalette, greyPalette,
+  // Read a .zip (stored or deflated entries). Returns [{ name, data }]. Used for the shareware demo's DOSBOX_WAR2.ZIP.
+  async function unzip(buf, want = () => true) {
+    const d = new Uint8Array(buf); let e = -1;
+    for (let i = d.length - 22; i >= Math.max(0, d.length - 66000); i--) if (u32(d, i) === 0x06054b50) { e = i; break; }
+    if (e < 0) throw new Error('Not a zip file');
+    const n = u16(d, e + 10); let p = u32(d, e + 16); const out = [];
+    for (let k = 0; k < n; k++) {
+      if (u32(d, p) !== 0x02014b50) throw new Error('Damaged zip file');
+      const method = u16(d, p + 10), csize = u32(d, p + 20), nlen = u16(d, p + 28), xlen = u16(d, p + 30), clen = u16(d, p + 32), lho = u32(d, p + 42);
+      const name = new TextDecoder('latin1').decode(d.subarray(p + 46, p + 46 + nlen)); p += 46 + nlen + xlen + clen;
+      if (name.endsWith('/') || !want(name)) continue;
+      const start = lho + 30 + u16(d, lho + 26) + u16(d, lho + 28), raw = d.subarray(start, start + csize);
+      let data;
+      if (method === 0) data = raw.slice();
+      else if (method === 8) data = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+      else continue;
+      out.push({ name, data });
+    }
+    return out;
+  }
+  return { u16, u32, parseWar, lzDecode, getEntry, safeEntry, unzip, isGfu, decodeGfu, decodeGfuFrame, isImg, decodeImg, classify, kindOf, toPalette, greyPalette, isGfu, decodeGfu, decodeGfuFrame, isImg, decodeImg, classify, kindOf, toPalette, greyPalette,
     explode: Blast.explode, huffDecompress, adpcmDecompress, hashStr, decrypt, parseMpq, mpqFind, mpqRead, mpqDetectKey, mpqExtractWars };
 })();
 if (typeof module !== 'undefined') module.exports = Core;
@@ -942,6 +963,7 @@ const DB = {
     });
   },
   put(name, buf) { return this.req('readwrite', s => s.put({ name, buf })); },
+  del(name) { return this.req('readwrite', s => s.delete(name)); },
   all() { return this.req('readonly', s => s.getAll()); },
   clear() { return Promise.all([this.req('readwrite', s => s.clear()), this.req('readwrite', s => s.clear(), 'music')]); }, // keeps the remembered folder
   putMusic(rec) { return this.req('readwrite', s => s.put(rec), 'music'); },
@@ -988,8 +1010,9 @@ function autoAssign(force) {
   if (main) {
     const war = A.wars[main];
     if ((force || !cfg.palette || !A.wars[cfg.palette.file]) && Core.kindOf(war, AUTO_PALETTE) === 'pal') cfg.palette = { file: main, entry: AUTO_PALETTE };
-    for (const [role, r] of Object.entries(AUTO_ROLES)) {
-      const cur = cfg.roles[role];
+    const demo = isDemoMain(war);
+    for (const [role, r0] of Object.entries(AUTO_ROLES)) {
+      const r = demo && DEMO.roles[role] ? unitR(DEMO.roles[role]) : r0, cur = cfg.roles[role];
       if (!force && cur && A.wars[cur.file]) continue;
       if (Core.kindOf(war, r.e) !== 'gfx') continue;
       cfg.roles[role] = { file: main, entry: r.e, mode: r.mode, r0: r.r0, r1: r.r1, auto: true }; n++;
@@ -1016,6 +1039,63 @@ function packWar(items) {
   let p = head;
   items.forEach((it, i) => { dv.setUint32(8 + i * 4, p, true); dv.setUint32(p, it.data.length, true); out.set(it.data, p + 4); p += 4 + it.data.length; });
   return out.buffer;
+}
+/* ---------- the shareware demo ----------
+   The free 1996 Warcraft II demo (DOSBOX_WAR2.ZIP from dosgames.com) holds an earlier, smaller MAINDAT.WAR.
+   When it's imported, its pictures are copied into a MAINDAT.WAR laid out like the full game's, so everything
+   else works unchanged. This table holds only entry numbers (full game -> demo), no game data.
+   Each run is [first full entry, first demo entry, count]; found by matching the two archives entry by entry. */
+const DEMO = {
+  marker: 'TOS-DEMO', count: 528, level: 'winter', heroes: ['lothar', 'uther', 'alleria', 'grom', 'zuljin', 'chogall'],
+  runs: [[1,1,1],[18,18,7],[26,26,3],[29,28,1],[38,38,2],[41,41,2],[45,45,4],[51,51,4],[61,61,3],[66,66,1],[118,118,1],[120,120,1],[122,122,4],[128,128,2],
+    [134,134,4],[142,142,4],[150,150,8],[162,162,5],[187,187,1],[189,189,1],[248,199,2],[259,220,2],[262,213,9],[273,224,1],[275,226,2],[279,230,3],[283,234,2],
+    [287,238,12],[301,252,26],[327,277,1],[328,279,14],[342,292,1],[344,295,12],[359,310,12],[379,322,2],[383,326,2],[387,330,4],[393,336,5],[400,343,2],
+    [404,347,4],[410,353,5],[417,360,2],[421,364,4],[427,370,4],[432,375,1],[435,378,2]],
+  // Stand-ins: the winter palette for the forest one, the game font and icon sheet (one slot earlier in the demo),
+  // same-sized winter buildings for the ones the demo lacks, and the circle of power for the runestone.
+  extra: { 2: 18, 282: 233, 356: 308, 146: 144, 138: 150, 169: 134, 147: 145, 139: 151, 170: 135, 181: 166 },
+  heroIcons: { grom: 3, alleria: 4 },   // the grunt and elven archer portraits; the hero portraits came with the expansion
+  // The demo has no dwarves, sappers, gryphon riders or dragons: footmen and axe throwers rush in, and an
+  // oversized champion knight or ogre chieftain leads the attack.
+  roles: { fast: 54, ally_fast: 45, boss: 52, ally_boss: 51 }, bossScale: 1.6, bossNames: { Horde: 'Champion Knight', Alliance: 'Ogre Chieftain' },
+  // The demo names its spell and capture sounds but leaves their data out, so the nearest sounds it does have stand in.
+  sounds: { s_hit: 'Bow Hit', s_hurt: 'Punch', s_die: 'O:Basic Orc Voices/Death', s_die_ally: 'H:Basic Human Voices/Death', s_level: 'H:Basic Human Voices/Ready', s_boom: 'Explosion',
+    s_sword: 'Sword Attack 1', s_bow: 'Bow Fire', s_axe: 'Axe Throw', s_fire: 'Fireball Hit', s_coil: 'Fireball', s_start: 'Placement Success', s_level_orc: 'O:Basic Orc Voices/Ready',
+    s_power: 'Fist', s_buy: 'Placement Success' },
+  // Only the footman, grunt, elven archer and troll voices have data in the demo.
+  voices: { lothar: 'H:Basic Human Voices', uther: 'H:Basic Human Voices', alleria: 'H:Elven Archer/Ranger', grom: 'O:Basic Orc Voices', zuljin: 'O:Troll Axethrower/Berserker', chogall: 'O:Basic Orc Voices' },
+  shop: 'https://shop.battle.net/product/warcraft-2-battle-net-edition', download: 'https://www.dosgames.com/game/warcraft-2-tides-of-darkness',
+};
+function demoIndex(i) {
+  if (DEMO.extra[i] !== undefined) return DEMO.extra[i];
+  for (const [a, b, n] of DEMO.runs) if (i >= a && i < a + n) return b + i - a;
+  return -1;
+}
+const isDemoMain = w => !!w && w.count === DEMO.count + 1 && (() => { const d = Core.safeEntry(w, DEMO.count); return !!d && new TextDecoder().decode(d) === DEMO.marker; })();
+// Build the game's archives from the demo's files: { 'MAINDAT.WAR', 'REZDAT.WAR', 'SFXDAT.SUD', ... } -> [{ name, buf, names }]
+function buildDemoWars(files) {
+  const out = [], D = Core.parseWar(files['MAINDAT.WAR'].buffer.slice(0));
+  const items = [];
+  for (let i = 0; i < DEMO.count; i++) { const j = demoIndex(i); let data = new Uint8Array(0); if (j >= 0) { const e = Core.safeEntry(D, j); if (e) data = e; } items.push({ data }); }
+  items.push({ data: new TextEncoder().encode(DEMO.marker) });
+  out.push({ name: 'MAINDAT.WAR', buf: packWar(items) });
+  if (files['REZDAT.WAR']) out.push({ name: 'REZDAT.WAR', buf: files['REZDAT.WAR'].buffer.slice(0) });
+  if (files['SFXDAT.SUD']) {
+    const S = Core.parseWar(files['SFXDAT.SUD'].buffer.slice(0)), list = Core.safeEntry(S, 1);
+    // Entry 1 names every sound: pairs of strings (group, sound), one pair per entry from 2 on.
+    const str = new TextDecoder('latin1').decode(list.subarray(4)).split('\0').filter(Boolean), rec = [];
+    for (let k = 0; k + 1 < str.length; k += 2) rec.push({ g: str[k].split('|').pop(), n: str[k + 1].split('|').pop() });
+    const find = q => { const [g, n] = q.includes('/') && /^[HO]:/.test(q) ? q.split('/') : [null, q]; const k = rec.findIndex(r => (g ? r.g === g && r.n === n : r.n === n)); return k < 0 ? null : Core.safeEntry(S, k + 2); };
+    const snd = MPQ_SOUNDS.map(([role]) => ({ role, data: find(DEMO.sounds[role]) })).filter(x => x.data && x.data[0] === 0x52);
+    if (snd.length === MPQ_SOUNDS.length) out.push({ name: 'DEMODATA/SOUNDS.WAR', buf: packWar(snd), names: snd.map(x => x.role) });
+    const vo = [];
+    for (const [hero, grp] of Object.entries(DEMO.voices)) rec.forEach((r, k) => {
+      if (r.g !== grp) return; const kind = /^Ready/.test(r.n) ? 'ready' : /^Selected/.test(r.n) ? 'what' : /^Acknowledgement/.test(r.n) ? 'yes' : /^Annoyed/.test(r.n) ? 'pissed' : null;
+      const d = kind && Core.safeEntry(S, k + 2); if (d && d[0] === 0x52) vo.push({ role: hero + ':' + kind, data: d });
+    });
+    if (vo.length) out.push({ name: 'GAMESFX/VOICES.WAR', buf: packWar(vo), names: vo.map(x => x.role) });
+  }
+  return out;
 }
 const A = { wars: {}, sprites: {}, pal: Core.greyPalette(), palSrc: null, actx: null, sbuf: {}, lastPlay: {}, active: 0 };
 
@@ -1068,6 +1148,7 @@ function buildAtlas(g, pal, cols) {
 }
 function decodeAny(d) { if (Core.isGfu(d)) return Core.decodeGfu(d); if (Core.isImg(d)) return Core.decodeImg(d); return null; }
 function rebuildSprites() {
+  A.demo = isDemoMain(A.wars['MAINDAT.WAR']);
   A.pal = resolvePalette(); A.sprites = {}; A.tilesets = {}; A.bldSpr = {};
   for (const [role, r] of Object.entries(cfg.roles)) {
     const war = A.wars[r.file]; if (!war) continue;
@@ -1077,6 +1158,7 @@ function rebuildSprites() {
     const at = buildAtlas(g, teamPalette(A.pal, HUMAN_ROLE.test(role)), r.mode === 'dir5' ? 5 : 10);
     const an = (r.mode || 'dir5') === 'dir5' && /(^|\/)MAINDAT\.WAR$/.test(r.file) ? ANIM[r.entry] : null;
     A.sprites[role] = { ...at, mode: r.mode || 'dir5', r0: r.r0 ?? 0, r1: r.r1 ?? 4, walk: an && an.walk, atk: an && an.atk, die: an && an.die };
+    if (A.demo && /^(ally_)?boss$/.test(role)) A.sprites[role].scale = DEMO.bossScale;   // the demo's stand-in bosses are oversized units
   }
   loadFonts();
   A.titleUrl = null;
@@ -1093,7 +1175,8 @@ function rebuildSprites() {
   const main = findMain(), icd = main && Core.safeEntry(A.wars[main], ICON_ENTRY);
   if (icd && Core.isGfu(icd)) {
     const n = Core.u16(icd, 0), iw = Core.u16(icd, 2), ih = Core.u16(icd, 4);
-    for (const [id, ix] of [...Object.entries(HERO_ICONS), ...Object.entries(ITEM_ICONS)]) {
+    for (const [id, ix0] of [...Object.entries(HERO_ICONS), ...Object.entries(ITEM_ICONS)]) {
+      const ix = A.demo && DEMO.heroIcons[id] !== undefined ? DEMO.heroIcons[id] : ix0;
       if (ix >= n) continue;
       const c = document.createElement('canvas'); c.width = iw; c.height = ih;
       try { c.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(icd, ix, iw, ih), iw, ih, A.pal), 0, 0); A.icons[id] = c; } catch (e) {}
@@ -1105,7 +1188,8 @@ function rebuildSprites() {
 }
 function assetSummary() {
   const files = warNames().length, sprites = Object.keys(A.sprites).length, sounds = Object.keys(cfg.sounds).filter(k => A.wars[cfg.sounds[k].file]).length;
-  if (!files) return 'No Warcraft II files loaded, so you\'ll see placeholder shapes. Open the Asset Lab and load <b>TOME.1</b> and <b>War2Dat.mpq</b> from your own copy of the game.';
+  if (!files) return `No Warcraft II files loaded, so you'll see placeholder shapes. Open the Asset Lab and import your Warcraft II folder. No copy? Download the free 1996 demo (<a href="${DEMO.download}" target="_blank" rel="noopener">DOSBOX_WAR2.ZIP from dosgames.com</a>) and load the zip in the Asset Lab to play a taste of the game.`;
+  if (A.demo) return `Playing the Warcraft II demo: Alterac Mountains and six heroes. Get ${fullGameLink()} and import it in the Asset Lab to unlock everything.`;
   const extra = (mu.names.size ? `, ${mu.names.size} music tracks` : '') + (A.wars['GAMESFX/VOICES.WAR'] ? ', hero voices' : '');
   return `Using your Warcraft II files: ${sprites} sprite${sprites === 1 ? '' : 's'}, ${sounds} sound${sounds === 1 ? '' : 's'}${extra}.` + (sprites ? '' : ' Assign some sprites in the Asset Lab.')
     + (mu.names.size ? '' : ' Re-import your game folder to add the music.');
@@ -1526,7 +1610,10 @@ const HERO_UNLOCKS = {
   khadgar:  { cost: 2500, goal: 'Win any battlefield as an Alliance hero', done: () => P_().won.Alliance, best: () => 'not won yet' },
   teron:    { cost: 2500, goal: 'Win any battlefield as a Horde hero',     done: () => P_().won.Horde,    best: () => 'not won yet' },
 };
-const heroOpen = id => START_HEROES.includes(id) || meta.heroes.includes(id);
+const demoLocked = id => !!A.demo && !DEMO.heroes.includes(id);   // heroes whose sprites the demo doesn't have
+const heroOpen = id => !demoLocked(id) && (START_HEROES.includes(id) || meta.heroes.includes(id));
+const levelOpen = i => A.demo ? LEVELS[i].id === DEMO.level : i <= meta.unlocked;
+const fullGameLink = () => `<a href="${DEMO.shop}" target="_blank" rel="noopener">Warcraft II: Battle.net Edition</a>`;
 // Record what this run achieved, then unlock any hero whose goal is now met. Returns the newly unlocked heroes.
 function recordProgress() {
   const p = P_(), side = G.HD.side, t = Math.floor(G.t);
@@ -1535,18 +1622,19 @@ function recordProgress() {
   p.lv[G.LV.id] = Math.max(p.lv[G.LV.id] || 0, t);
   if (G.won) p.won[side] = true;
   const got = [];
-  for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!heroOpen(id) && U.done()) { meta.heroes.push(id); got.push(id); }
+  for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!meta.heroes.includes(id) && U.done()) { meta.heroes.push(id); if (!demoLocked(id)) got.push(id); }
   return got;
 }
 function buyHero(id) {
-  const U = HERO_UNLOCKS[id]; if (!U || heroOpen(id) || meta.gold < U.cost) return false;
+  const U = HERO_UNLOCKS[id]; if (!U || heroOpen(id) || demoLocked(id) || meta.gold < U.cost) return false;
   meta.gold -= U.cost; meta.heroes.push(id); saveMeta(); sfx('s_buy', 0); return true;
 }
 // The next goals worth chasing, for the end-of-run screen.
 function nextUp() {
   const out = [], i = meta.unlocked;
-  if (i + 1 < LEVELS.length) out.push(`Next battlefield: ${LEVELS[i + 1].name}. Survive ${fmtTime(UNLOCK_T)} in ${LEVELS[i].name} (best ${fmtTime(P_().lv[LEVELS[i].id] || 0)}).`);
-  const h = Object.keys(HERO_UNLOCKS).find(id => !heroOpen(id));
+  if (A.demo) out.push(`Three more battlefields and two more heroes are waiting in the full game: get ${fullGameLink()} and import it in the Asset Lab. Your progress carries over.`);
+  else if (i + 1 < LEVELS.length) out.push(`Next battlefield: ${LEVELS[i + 1].name}. Survive ${fmtTime(UNLOCK_T)} in ${LEVELS[i].name} (best ${fmtTime(P_().lv[LEVELS[i].id] || 0)}).`);
+  const h = Object.keys(HERO_UNLOCKS).find(id => !heroOpen(id) && !demoLocked(id));
   if (h) out.push(`Next hero: ${HEROES[h].name}. ${HERO_UNLOCKS[h].goal} (${HERO_UNLOCKS[h].best()}), or buy for ${HERO_UNLOCKS[h].cost} gold in hero select.`);
   return out;
 }
@@ -2201,12 +2289,12 @@ function spriteFrame(s, dir, t, atkP, dieT) {
 function drawSprite(role, x, y, dir, t, flash, atkP, dieT) {
   const s = A.sprites[role]; if (!s) return false;
   const { fi, flip } = spriteFrame(s, dir, t, atkP, dieT);
-  const sx = (fi % s.cols) * s.fw, sy = Math.floor(fi / s.cols) * s.fh;
-  const dx = Math.round(x - camX - s.fw / 2), dy = Math.round(y - camY - s.fh / 2);
+  const sx = (fi % s.cols) * s.fw, sy = Math.floor(fi / s.cols) * s.fh, k = s.scale || 1, w = Math.round(s.fw * k), h = Math.round(s.fh * k);
+  const dx = Math.round(x - camX - w / 2), dy = Math.round(y - camY - h / 2);
   const a0 = ctx.globalAlpha;
   if (flash) ctx.globalAlpha = a0 * 0.55;
-  if (flip) { ctx.save(); ctx.translate(dx + s.fw, dy); ctx.scale(-1, 1); ctx.drawImage(s.canvas, sx, sy, s.fw, s.fh, 0, 0, s.fw, s.fh); ctx.restore(); }
-  else ctx.drawImage(s.canvas, sx, sy, s.fw, s.fh, dx, dy, s.fw, s.fh);
+  if (flip) { ctx.save(); ctx.translate(dx + w, dy); ctx.scale(-1, 1); ctx.drawImage(s.canvas, sx, sy, s.fw, s.fh, 0, 0, w, h); ctx.restore(); }
+  else ctx.drawImage(s.canvas, sx, sy, s.fw, s.fh, dx, dy, w, h);
   ctx.globalAlpha = a0;
   return true;
 }
@@ -2442,7 +2530,7 @@ function drawHud() {
     txt(String(left), bx + 22, by + 5, 7, '#ffffff'); bx += 34; }
   if (boss) {
     const bw = Math.min(200, W - 120);
-    uiBar((W - bw) / 2, 32, bw, 7, boss.hp / boss.maxHp, '#b8261a', '#ff7a5c', '#5e100a', G.HD.side === 'Horde' ? 'Gryphon Rider' : 'Dragon');
+    uiBar((W - bw) / 2, 32, bw, 7, boss.hp / boss.maxHp, '#b8261a', '#ff7a5c', '#5e100a', A.demo ? DEMO.bossNames[G.HD.side] : G.HD.side === 'Horde' ? 'Gryphon Rider' : 'Dragon');
   }
   if (G.banner) {
     const b = G.banner, y = 24; ctx.globalAlpha = Math.min(1, b.t / 0.4);
@@ -2629,8 +2717,8 @@ overlay.addEventListener('click', e => {
   else if (act === 'choose') showChoose();
   else if (act === 'hero') { if (!heroOpen(b.dataset.id)) return; heroVoice('yes', 1, b.dataset.id); showLevels(b.dataset.id); }
   else if (act === 'buyhero') { if (buyHero(b.dataset.id)) { heroVoice('yes', 1, b.dataset.id); showChoose(b.dataset.id); } }
-  else if (act === 'start') { if (heroOpen(b.dataset.id)) newRun(b.dataset.id, b.dataset.level); }
-  else if (act === 'quick') { const l = meta.last; if (heroOpen(l.hero)) newRun(l.hero, l.level); }
+  else if (act === 'start') { if (heroOpen(b.dataset.id) && levelOpen(LEVELS.findIndex(L => L.id === b.dataset.level))) newRun(b.dataset.id, b.dataset.level); }
+  else if (act === 'quick') { const l = meta.last; if (heroOpen(l.hero) && levelOpen(LEVELS.findIndex(L => L.id === l.level))) newRun(l.hero, l.level); }
   else if (act === 'continue') continueRun();
   else if (act === 'history') showHistory();
   else if (act === 'exportsave') showSaveCode('export');
@@ -2659,11 +2747,11 @@ function showTitle() {
   const l = meta.last, lv = l && LEVELS.find(x => x.id === l.level);
   if (A.menuBg && A.btn) {
     const sr = savedRun(), quick = sr ? `<button class="opt" data-act="continue">Continue: ${HEROES[sr.hero].name.split(' ')[0]} ${fmtTime(sr.t)}</button>`
-      : l && HEROES[l.hero] && heroOpen(l.hero) && lv ? `<button class="opt" data-act="quick">Quick Start: ${HEROES[l.hero].name.split(' ')[0]}</button>` : '';
+      : l && HEROES[l.hero] && heroOpen(l.hero) && lv && levelOpen(LEVELS.indexOf(lv)) ? `<button class="opt" data-act="quick">Quick Start: ${HEROES[l.hero].name.split(' ')[0]}</button>` : '';
     overlay.innerHTML = `<div class="wcstage"><img class="bg" src="${A.menuBg}" alt="">
       <div class="wcbtns"><button class="opt" data-act="choose">Start a Run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
       <button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="lab">Asset Lab</button></div>
-      ${mu.names.size ? '' : '<div class="note">Re-import your game folder in the Asset Lab to add the music and hero voices.</div>'}
+      ${A.demo ? `<div class="note">Demo version: Alterac Mountains and six heroes. Get ${fullGameLink()} and import it in the Asset Lab to unlock everything.</div>` : mu.names.size ? '' : '<div class="note">Re-import your game folder in the Asset Lab to add the music and hero voices.</div>'}
       <div class="ver" data-wcsmall="TIDES OF SURVIVAL"></div></div>`;
     overlay.className = 'wcmenu'; overlay.style.display = 'flex'; overlay.style.backgroundImage = '';
     sel = 0; wcify(overlay);
@@ -2672,7 +2760,7 @@ function showTitle() {
   }
   const b = '';
   const sr = savedRun(), quick = (sr ? `<button class="opt" data-act="continue">Continue: ${HEROES[sr.hero].name.split(' ')[0]}, ${fmtTime(sr.t)}</button>` : '')
-    + (l && HEROES[l.hero] && heroOpen(l.hero) && lv ? `<button class="opt" data-act="quick">Quick start: ${HEROES[l.hero].name.split(' ')[0]}, ${lv.name}</button>` : '');
+    + (l && HEROES[l.hero] && heroOpen(l.hero) && lv && levelOpen(LEVELS.indexOf(lv)) ? `<button class="opt" data-act="quick">Quick start: ${HEROES[l.hero].name.split(' ')[0]}, ${lv.name}</button>` : '');
   showMenu(`<h1>Tides of Survival</h1><p class="sub">A Warcraft II survivors-like fan game</p>
     <div class="status">${assetSummary()}</div>
     <div class="opts"><button class="opt" data-act="choose">Start a run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
@@ -2683,14 +2771,14 @@ function showTitle() {
 }
 function showLevels(heroId) {
   const cards = LEVELS.map((L, i) => {
-    const open = i <= meta.unlocked;
+    const open = levelOpen(i);
     return `<button class="opt card" data-act="start" data-id="${heroId}" data-level="${L.id}" ${open ? '' : 'disabled'}>
       <span class="nm">${L.name}</span><span class="lv">${open ? 'Difficulty: ' + ['easy', 'normal', 'hard', 'very hard'][Math.min(i, 3)] : 'Locked'}</span>
-      <span class="ds">${open ? L.blurb : `Survive ${UNLOCK_T / 60} minutes in ${LEVELS[i - 1].name} to unlock.`}</span></button>`;
+      <span class="ds">${open ? L.blurb : A.demo ? 'Requires the full game.' : `Survive ${UNLOCK_T / 60} minutes in ${LEVELS[i - 1].name} to unlock.`}</span></button>`;
   }).join('');
   showMenu(`<h2>Choose a battlefield</h2><p class="sub">Playing as ${HEROES[heroId].name}</p><div class="cards">${cards}</div>
     <div class="opts" style="margin-top:14px"><button class="opt" data-act="choose" data-back>Back</button></div>`);
-  sel = Math.min(meta.unlocked, LEVELS.length - 1); highlight();
+  sel = A.demo ? LEVELS.findIndex(L => L.id === DEMO.level) : Math.min(meta.unlocked, LEVELS.length - 1); highlight();
 }
 const OPT_DEFS = {
   speed: { label: 'Game speed', vals: SPEEDS, fmt: v => v + 'x' },
@@ -2788,6 +2876,10 @@ function showShop(focus) {
 }
 function heroCard(id) {
   const H_ = HEROES[id], spd = H_.speed >= 82 ? 'fast' : H_.speed >= 72 ? 'average speed' : 'slow';
+  if (demoLocked(id)) return `<button class="opt card hero locked" data-act="hero" data-id="${id}" aria-disabled="true">
+    <span class="hrow"><canvas class="hpic" width="48" height="48" data-hero="${id}"></canvas>
+    <span><span class="nm">${H_.name}</span><span class="lv ${H_.side === 'Horde' ? 'horde' : 'ally'}">${H_.unit}: locked</span></span></span>
+    <span class="ds">Requires the full game: Warcraft II: Battle.net Edition, from the Battle.net Shop.</span></button>`;
   if (!heroOpen(id)) { const U = HERO_UNLOCKS[id];
     return `<button class="opt card hero locked" data-act="hero" data-id="${id}" aria-disabled="true">
     <span class="hrow"><canvas class="hpic" width="48" height="48" data-hero="${id}"></canvas>
@@ -2817,7 +2909,7 @@ function drawHeroPics() {
 }
 function showChoose(focus) {
   const ids = Object.keys(HEROES), ally = ids.filter(i => HEROES[i].side === 'Alliance'), horde = ids.filter(i => HEROES[i].side === 'Horde');
-  const buys = list => { const l = list.filter(id => !heroOpen(id)); return l.length ? `<div class="opts buyrow">${l.map(id => `<button class="opt" data-act="buyhero" data-id="${id}" ${meta.gold < HERO_UNLOCKS[id].cost ? 'disabled' : ''}>Buy ${HEROES[id].name.split(' ')[0]} (${HERO_UNLOCKS[id].cost} gold)</button>`).join('')}</div>` : ''; };
+  const buys = list => { const l = list.filter(id => !heroOpen(id) && !demoLocked(id)); return l.length ? `<div class="opts buyrow">${l.map(id => `<button class="opt" data-act="buyhero" data-id="${id}" ${meta.gold < HERO_UNLOCKS[id].cost ? 'disabled' : ''}>Buy ${HEROES[id].name.split(' ')[0]} (${HERO_UNLOCKS[id].cost} gold)</button>`).join('')}</div>` : ''; };
   showMenu(`<h2>Choose your hero</h2><p class="sub">You have <b class="chestgold">${meta.gold} gold</b>.</p>
     <h3 class="side ally">The Alliance</h3><div class="cards">${ally.map(heroCard).join('')}</div>${buys(ally)}
     <h3 class="side horde">The Horde</h3><div class="cards">${horde.map(heroCard).join('')}</div>${buys(horde)}
@@ -3048,7 +3140,24 @@ async function importFolderFiles(all) {
 };
 $('#labInput').onchange = async e => { const fs = [...e.target.files]; e.target.value = ''; await loadFiles(fs); };
 async function loadFiles(list) {
-  const errs = [], notes = [];
+  const errs = [], notes = [], wasDemo = A.demo;
+  // The shareware demo's zip (DOSBOX_WAR2.ZIP): read its data files straight out of the zip.
+  for (const z of list.filter(f => /\.zip$/i.test(f.name))) {
+    labSide.innerHTML = `<div class="hint">Reading ${z.name}…</div>`;
+    try {
+      const got = await Core.unzip(await z.arrayBuffer(), n => /(^|\/)(MAINDAT\.WAR|REZDAT\.WAR|SFXDAT\.SUD)$/i.test(n));
+      const files = {}; for (const g of got) files[g.name.split('/').pop().toUpperCase()] = g.data;
+      if (!files['MAINDAT.WAR']) { errs.push(`${z.name}: no Warcraft II demo data inside. Use DOSBOX_WAR2.ZIP from dosgames.com.`); continue; }
+      const full = A.wars['MAINDAT.WAR'] && !isDemoMain(A.wars['MAINDAT.WAR']);
+      if (full) { notes.push(`${z.name}: you already have the full game loaded, so the demo isn't needed.`); continue; }
+      for (const w of buildDemoWars(files)) {
+        addWar(w.name, w.buf); await DB.put(w.name, w.buf);
+        if (w.names) { A.wars[w.name].names = w.names; store.set('tos_sndnames_' + w.name, w.names); }
+      }
+      notes.push(`${z.name}: loaded the Warcraft II demo. You can play Alterac Mountains with six heroes; import the full game any time to unlock everything.`);
+    } catch (err) { errs.push(`${z.name}: ${err.message}`); }
+  }
+  list = list.filter(f => !/\.zip$/i.test(f.name));
   const wavs = list.filter(f => /\.wav$/i.test(f.name)); list = list.filter(f => !/\.wav$/i.test(f.name));
   if (wavs.length) {
     const items = [];
@@ -3100,7 +3209,12 @@ async function loadFiles(list) {
         : `${f.name}: nothing the game can use inside.${failed ? ' Its sounds use a compression I can\'t read yet.' : ''}`);
     } catch (err) { errs.push(`${f.name}: ${err.message}`); }
   }
-  const auto = autoAssign(false);
+  A.demo = isDemoMain(A.wars['MAINDAT.WAR']);
+  if (!A.demo && A.wars['DEMODATA/SOUNDS.WAR'] && Object.keys(A.wars).some(n => /SOUNDS\.WAR$/.test(n) && n !== 'DEMODATA/SOUNDS.WAR')) {   // the full game's sounds replace the demo's
+    delete A.wars['DEMODATA/SOUNDS.WAR']; await DB.del('DEMODATA/SOUNDS.WAR'); for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k];
+  }
+  if (A.demo !== wasDemo) for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k];
+  const auto = autoAssign(A.demo !== wasDemo);   // switching between the demo and the full game redoes every assignment
   if (auto) notes.push(`Assigned ${auto} sprites and sounds automatically.`);
   else if (!findMain()) notes.push('For the unit sprites, also load <code>Support/TOMES/TOME.1</code> from the game folder.');
   rebuildSprites(); labRefresh();
@@ -3142,7 +3256,8 @@ function labRenderGrid() {
       <br>• <code>Support/TOMES/TOME.1</code>: all the unit sprites
       <br>• <code>War2Dat.mpq</code>: sound effects
       <br><br>${installPathsHtml()}
-      <br>Heroes, enemies, missiles and sounds are then assigned automatically. Files stay in this browser only, so you do this once per device and nothing is uploaded. Old DOS installs work too: load <code>MAINDAT.WAR</code> and <code>SNDDAT.WAR</code>.</div>`;
+      <br>Heroes, enemies, missiles and sounds are then assigned automatically. Files stay in this browser only, so you do this once per device and nothing is uploaded. Old DOS installs work too: load <code>MAINDAT.WAR</code> and <code>SNDDAT.WAR</code>.
+      <br><br><b>No copy of Warcraft II?</b> Try the free 1996 demo: download <code>DOSBOX_WAR2.ZIP</code> from <a href="${DEMO.download}" target="_blank" rel="noopener">dosgames.com</a> (the main Download button), then click <i>Load single files</i> and choose that zip. You get Alterac Mountains and six heroes. To play everything, get ${fullGameLink()} from the Battle.net Shop and import it here; your progress carries over.</div>`;
     return;
   }
   const filter = labFilter.value, frag = document.createDocumentFragment();
@@ -3316,7 +3431,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, LATE, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, LATE, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
