@@ -751,7 +751,7 @@ const ANIM = {
   45: { atk: rr(5, 8), die: rr(9, 11) }, 46: { atk: rr(5, 8), die: rr(9, 11) }, 51: { atk: rr(5, 8), die: rr(9, 13) }, 52: { atk: rr(5, 8), die: rr(9, 13) },
   53: { atk: rr(5, 6), die: rr(7, 9) }, 54: { atk: rr(5, 8), die: rr(9, 11) }, 55: { atk: rr(5, 8), die: rr(9, 15) }, 58: { atk: rr(5, 8), die: rr(9, 12) },
   33: { walk: [0, 2, 3, 5], die: [7, 10, 12] }, 34: { walk: [0, 2, 3, 5], die: [7, 10, 12, 14] }, 35: { atk: rr(4, 6), die: rr(7, 12) }, 36: { atk: [4], die: rr(5, 9) },
-  38: { walk: [0, 1], die: [2, 3] }, 47: { atk: rr(5, 9), die: rr(10, 12) }, 48: { atk: rr(5, 9), die: rr(10, 12) }, 63: { walk: [0, 1] }, 49: { walk: [0, 1], atk: [2, 3] }, 50: { walk: [0, 1], atk: [2, 3] } };
+  38: { walk: [0, 1], die: [2, 3] }, 47: { atk: rr(5, 9), die: rr(10, 12) }, 69: { walk: rr(0, 4), atk: rr(5, 8), die: rr(9, 13) }, 70: { atk: rr(5, 9), die: rr(10, 14) }, 48: { atk: rr(5, 9), die: rr(10, 12) }, 63: { walk: [0, 1] }, 49: { walk: [0, 1], atk: [2, 3] }, 50: { walk: [0, 1], atk: [2, 3] } };
 // Portrait icons (46x38) in MAINDAT.WAR entry 356.
 const ICON_ENTRY = 356, HERO_ICONS = { lothar: 32, uther: 34, alleria: 187, khadgar: 195, grom: 190, zuljin: 35, chogall: 36, teron: 189, peasant: 0, peon: 1,
   danath: 188, turalyon: 193, kurdran: 191, kargath: 186, dentarg: 194, guldan: 33, deathwing: 192 };   // the icon sheet's hero portraits (Wargus order)
@@ -990,7 +990,7 @@ const overlay = $('#overlay'), pauseBtn = $('#pauseBtn'), speedBtn = $('#speedBt
 const SPEEDS = [1, 1.5, 2];
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedBtn.textContent = cfg.opts.speed + 'x'; }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedBtn.textContent = cfg.opts.speed + 'x'; if (G && G.state === 'play') banner(`Game speed ${cfg.opts.speed}x`); }
-const RUN_LEN = 15 * 60;
+const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
 // so a fresh save has time to find its feet. After that the pressure is the same as before.
 const EASE = t => Math.min(1, 0.35 + t / 650);
@@ -1061,6 +1061,8 @@ const ROLES = [
   ['ally_flyer', 'Alliance flyer (gryphon rider)'], ['ally_scout', 'Alliance scout (flying machine)'], ['ally_siege', 'Alliance siege (ballista)'], ['ally_stone', 'Ballista bolt'], ['hammer', 'Storm hammer'],
   ['ally_elite1', 'Alliance elite: paladin'], ['ally_elite2', 'Alliance elite: ranger'], ['ally_elite3', 'Alliance elite: mage'],
   ['ally_boss1', 'Alliance boss: Daelin Proudmoore'], ['ally_boss2', 'Alliance boss: Turalyon'], ['ally_boss3', 'Alliance boss: Kurdran Wildhammer'],
+  ['tank_up', 'Horde upgraded: ogre-mage'], ['ranged_up', 'Horde upgraded: troll berserker'], ['caster', 'Horde caster: death knight'], ['skel', 'Horde: skeleton'], ['daemon', 'Daemon'],
+  ['ally_tank_up', 'Alliance upgraded: paladin'], ['ally_ranged_up', 'Alliance upgraded: ranger'], ['ally_caster', 'Alliance caster: mage'],
   ['proj', 'Missile: arrow'], ['bolt', 'Missile: ballista bolt'], ['rune', 'Rune'],
   ['axe', 'Missile: thrown axe'], ['fire', 'Missile: fireball'], ['coil', 'Missile: death coil'], ['boom', 'Explosion'], ['gem', 'XP pickup']
 ];
@@ -1083,10 +1085,11 @@ const AUTO_ROLES = {
   stone: { e: 348, mode: 'dir5', r0: 0, r1: 0 }, ally_stone: { e: 338, mode: 'dir5', r0: 0, r1: 0 }, hammer: { e: 325, mode: 'dir5', r0: 0, r1: 2 },
   elite1: unitR(52), ally_elite1: unitR(51), elite2: unitR(54), ally_elite2: unitR(53), elite3: unitR(58), ally_elite3: unitR(55),
   boss1: unitR(58), ally_boss1: unitR(45), boss2: unitR(46), ally_boss2: unitR(51), boss3: unitR(36, 3), ally_boss3: unitR(35, 3),
+  tank_up: unitR(52), ally_tank_up: unitR(51), ranged_up: unitR(54), ally_ranged_up: unitR(53), caster: unitR(58), ally_caster: unitR(55), skel: unitR(69), daemon: unitR(70),
   boom: { e: 347, mode: 'cycle', r0: 0, r1: 19 }, rune: { e: 335, mode: 'cycle', r0: 0, r1: 3 },
 };
 const SWING = 0.45, HSWING = 0.35;
-const ROLE_SCALE = { hero_kurdran: 0.8, hero_deathwing: 0.85, flyer: 0.8, scout: 0.8, ally_scout: 0.7, siege: 0.8, ally_siege: 0.8, boss1: 1.5, ally_boss1: 1.6, boss2: 1.6, ally_boss2: 1.4, boss3: 1.3, ally_boss3: 1.35 };
+const ROLE_SCALE = { daemon: 0.9, hero_kurdran: 0.8, hero_deathwing: 0.85, flyer: 0.8, scout: 0.8, ally_scout: 0.7, siege: 0.8, ally_siege: 0.8, boss1: 1.5, ally_boss1: 1.6, boss2: 1.6, ally_boss2: 1.4, boss3: 1.3, ally_boss3: 1.35 };
 // Sound files inside War2Dat.mpq (paths from the Wargus project).
 const MPQ_SOUNDS = [['s_hit', 'Gamesfx\\misc\\bowhit.wav'], ['s_hurt', 'Gamesfx\\misc\\punch.wav'], ['s_die', 'Gamesfx\\orc\\odead.wav'], ['s_die_ally', 'Gamesfx\\human\\hdead.wav'],
   ['s_level', 'Gamesfx\\misc\\hcapture.wav'], ['s_boom', 'Gamesfx\\misc\\explode.wav'], ['s_sword', 'Gamesfx\\misc\\sword1.wav'], ['s_bow', 'Gamesfx\\misc\\bowfire.wav'],
@@ -1249,11 +1252,20 @@ function frameImage(px, w, h, pal) {
 }
 // Warcraft II draws every unit in red (palette colours 208-211) and swaps in the owner's colour.
 // As in the campaigns, the Alliance is blue (colours 212-215) and the Horde stays red.
-function teamPalette(pal, human) {
-  if (!human) return pal;
-  const p = pal.slice(); for (let i = 0; i < 12; i++) p[208 * 3 + i] = pal[212 * 3 + i]; return p;
+// Phase G: the other player colours mark upgraded troops, elites and bosses (Warcraft II's eight player colours sit
+// in fours from 208: red, blue, green, violet, orange, black, white, yellow).
+const TEAM = { red: 0, blue: 1, green: 2, violet: 3, orange: 4, black: 5, white: 6, yellow: 7 };
+function teamPalette(pal, team) {
+  const k = team === true ? 1 : team || 0; if (!k) return pal;
+  const p = pal.slice(); for (let i = 0; i < 12; i++) p[208 * 3 + i] = pal[(208 + 4 * k) * 3 + i]; return p;
 }
-const HUMAN_ROLE = /^(hero|hero_lothar|hero_uther|hero_alleria|hero_khadgar|hero_peasant|hero_danath|hero_turalyon|hero_kurdran|ally_(basic|fast|tank|ranged|boss|flyer|scout|siege|elite[123]|boss[123]))$/;
+const ROLE_TEAM = {
+  elite1: 'orange', elite2: 'orange', elite3: 'orange', ally_elite1: 'yellow', ally_elite2: 'yellow', ally_elite3: 'yellow',
+  tank_up: 'black', ranged_up: 'black', ally_tank_up: 'white', ally_ranged_up: 'white',
+};
+const BOSS_TEAM = { Horde: 'violet', Alliance: 'green' };
+const roleTeam = role => ROLE_TEAM[role] ? TEAM[ROLE_TEAM[role]] : HUMAN_ROLE.test(role) ? TEAM.blue : TEAM.red;
+const HUMAN_ROLE = /^(hero|hero_lothar|hero_uther|hero_alleria|hero_khadgar|hero_peasant|hero_danath|hero_turalyon|hero_kurdran|ally_(basic|fast|tank|ranged|boss|flyer|scout|siege|elite[123]|boss[123]|caster))$/;
 function buildAtlas(g, pal, cols) {
   cols = Math.max(1, Math.min(cols, g.count));
   const rows = Math.ceil(g.count / cols);
@@ -1263,6 +1275,21 @@ function buildAtlas(g, pal, cols) {
   return { canvas: c, fw: g.w, fh: g.h, count: g.count, cols };
 }
 function decodeAny(d) { if (Core.isGfu(d)) return Core.decodeGfu(d); if (Core.isImg(d)) return Core.decodeImg(d); return null; }
+// The skeleton sheet interleaves its death frames (rows 1, 4, 7, 10, 13) with walking and attacking; reordered so it
+// animates like every other unit: walk 0-4, attack 5-8, die 9-13.
+const SKEL_ROWS = [0, 2, 3, 5, 6, 8, 9, 11, 12, 1, 4, 7, 10, 13];
+// Each boss's own sprite again, in its side's boss colour.
+function buildBossSprites() {
+  for (const side of ['Horde', 'Alliance']) for (const P of Object.values(BOSS_POOL[side])) {
+    const role = P.sprite, r = cfg.roles[role], base = A.sprites[role]; if (!r || !base || A.sprites[role + '~boss']) continue;
+    const war = A.wars[r.file], d = war && Core.safeEntry(war, r.entry); if (!d) continue;
+    let g = null; try { g = decodeAny(d); } catch (e) {} if (!g) continue;
+    const at = buildAtlas(g, teamPalette(A.pal, TEAM[BOSS_TEAM[side]]), r.mode === 'dir5' ? 5 : 10);
+    let canvas = at.canvas;
+    if (r.entry === 36) { const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; const x = c.getContext('2d'); x.filter = 'grayscale(0.6) brightness(0.62) contrast(1.25)'; x.drawImage(canvas, 0, 0); canvas = c; }   // Deathwing stays black
+    A.sprites[role + '~boss'] = { ...base, canvas, scale: base.scale };
+  }
+}
 function rebuildSprites() {
   A.demo = isDemoMain(A.wars['MAINDAT.WAR']);
   A.pal = resolvePalette(); A.sprites = {}; A.tilesets = {}; A.bldSpr = {};
@@ -1271,7 +1298,8 @@ function rebuildSprites() {
     const d = Core.safeEntry(war, r.entry); if (!d) continue;
     let g = null; try { g = decodeAny(d) || (r.force ? Core.decodeGfu(d) : null); } catch (e) {}
     if (!g) continue;
-    const at = buildAtlas(g, teamPalette(A.pal, HUMAN_ROLE.test(role)), r.mode === 'dir5' ? 5 : 10);
+    if (r.entry === 69 && /(^|\/)MAINDAT\.WAR$/.test(r.file) && g.count === 70) g = { ...g, frames: SKEL_ROWS.flatMap(row => g.frames.slice(row * 5, row * 5 + 5)) };   // the skeleton's rows, put in order
+    const at = buildAtlas(g, teamPalette(A.pal, roleTeam(role)), r.mode === 'dir5' ? 5 : 10);
     const an = (r.mode || 'dir5') === 'dir5' && /(^|\/)MAINDAT\.WAR$/.test(r.file) ? ANIM[r.entry] : null;
     A.sprites[role] = { ...at, mode: r.mode || 'dir5', r0: r.r0 ?? 0, r1: r.r1 ?? 4, walk: an && an.walk, atk: an && an.atk, die: an && an.die };
     if (A.demo && /^(ally_)?boss$/.test(role)) A.sprites[role].scale = DEMO.bossScale;   // the demo's stand-in bosses are oversized units
@@ -1281,6 +1309,7 @@ function rebuildSprites() {
       x.filter = 'grayscale(0.6) brightness(0.62) contrast(1.25)'; x.drawImage(at.canvas, 0, 0); A.sprites[role].canvas = c;
     }
   }
+  buildBossSprites();
   loadFonts();
   A.titleUrl = null;
   const tmain = findMain();
@@ -1899,7 +1928,13 @@ const ET = {
   flyer:  { hp: 34, spd: 38, dmg: 10, r: 10, xp: 5, col: '#c0392b', fly: true },
   scout:  { hp: 9, spd: 80, dmg: 5, r: 8, xp: 2, col: '#d9a441', fly: true },
   siege:  { hp: 45, spd: 20, dmg: 22, r: 12, xp: 8, col: '#7a5a2e', range: 200 },
-  // Elites: a gold glow and a crown, more health, and one small ability each.
+  // Phase G: stronger kinds that take over gradually, casters from mid-run, skeletons (Horde) and daemons.
+  tank_up:   { hp: 80, spd: 24, dmg: 17, r: 10, xp: 9, col: '#3a3a3a' },
+  ranged_up: { hp: 18, spd: 32, dmg: 10, r: 7, xp: 4, col: '#3a3a3a', range: 140 },
+  caster:    { hp: 30, spd: 26, dmg: 9, r: 8, xp: 6, col: '#6a3a8a', range: 175 },
+  skel:      { hp: 6, spd: 36, dmg: 5, r: 7, xp: 1, col: '#ddd' },
+  daemon:    { hp: 230, spd: 34, dmg: 20, r: 13, xp: 25, col: '#a01010', fly: true },
+  // Elites: their own player colour, more health, and one small ability each.
   elite1: { hp: 170, spd: 30, dmg: 14, r: 11, xp: 20, col: '#e0b030', elite: true },
   elite2: { hp: 115, spd: 32, dmg: 7, r: 9, xp: 20, col: '#e0b030', elite: true, range: 140 },
   elite3: { hp: 115, spd: 28, dmg: 11, r: 9, xp: 20, col: '#e0b030', elite: true, range: 170 },
@@ -1913,12 +1948,17 @@ const FOES = {
   scout: { Horde: 'Goblin Zeppelin', Alliance: 'Gnomish Flying Machine', desc: 'Fast, frail scouts that fly over trees and water. From 2:00.' },
   flyer: { Horde: 'Dragon', Alliance: 'Gryphon Rider', desc: 'Tough fliers that cross trees and water to reach you. From 4:30.' },
   siege: { Horde: 'Catapult', Alliance: 'Ballista', desc: 'Stops at range and marks a circle where its shot will land. Step out of it. From 3:30.' },
+  tank_up: { Horde: 'Ogre-Mage', Alliance: 'Paladin', desc: 'Ogres and knights give way to these, more and more of them as the run goes on. In black (Horde) or white (Alliance).' },
+  ranged_up: { Horde: 'Troll Berserker', Alliance: 'Elven Ranger', desc: 'Axethrowers and archers are slowly replaced by these: tougher, longer reach. In black or white.' },
+  caster: { Horde: 'Death Knight', Alliance: 'Mage', desc: 'Casters join the ranks from 8:00, hurling bolts from range. Death knights raise skeletons.' },
+  skel: { Horde: 'Skeleton', Alliance: '', desc: 'Raised by death knights, and by Gul\'dan and Teron. Weak, but many. Horde only.' },
+  daemon: { Horde: 'Daemon', Alliance: 'Daemon', desc: 'A rare, terrible flier that answers to neither side. From 12:00.' },
   elite1: { Horde: 'Ogre-Mage', Alliance: 'Paladin', elite: true, move: { Horde: 'Bloodlust', Alliance: 'Holy Light' }, desc: 'Every few seconds it heals the troops around it and spurs them on to move faster.' },
   elite2: { Horde: 'Troll Berserker', Alliance: 'Ranger', elite: true, move: { Horde: 'Volley', Alliance: 'Volley' }, desc: 'Throws three at once in a spread.' },
   elite3: { Horde: 'Death Knight', Alliance: 'Mage', elite: true, move: { Horde: 'Death Coil', Alliance: 'Fireball' }, desc: 'Casts a slow missile that follows you. Outrun it until it fades.' },
 };
-// Named bosses at 5:00, 10:00 and 15:00. The last one comes when the clock runs out: slay it to win.
-const BOSSES = [{ at: 300 }, { at: 600 }, { at: RUN_LEN, final: true }];
+// Named bosses at 5:00, 10:00 and 15:00. The last one comes when the clock runs out at 20:00: slay it to win.
+const BOSSES = [{ at: 300 }, { at: 600 }, { at: 900 }, { at: RUN_LEN, final: true }];
 const SIG_DESC = {
   summon: 'Summons a ring of troops around himself.',
   charge: 'Marks a line, then charges down it. Step aside.',
@@ -1928,11 +1968,11 @@ const SIG_DESC = {
 // 5:00 and 10:00 bosses are drawn from the rest at the start of every run.
 const BOSS_POOL = {
   Horde: {
-    guldan:    { name: "Gul'dan", sprite: 'hero_guldan', scale: 1.5, sig: 'summon', move: 'Dark Ritual' },
+    guldan:    { name: "Gul'dan", sprite: 'hero_guldan', scale: 1.5, sig: 'summon', move: 'Raise the Dead', minion: 'skel' },
     orgrim:    { name: 'Orgrim Doomhammer', sprite: 'boss2', scale: 1.6, sig: 'charge', move: 'Charge' },
     kargath:   { name: 'Kargath Bladefist', sprite: 'hero_kargath', scale: 1.6, sig: 'charge', move: 'Bladefist Charge' },
     grom:      { name: 'Grom Hellscream', sprite: 'hero_grom', scale: 1.6, sig: 'charge', move: 'Hellscream Charge' },
-    teron:     { name: 'Teron Gorefiend', sprite: 'hero_teron', scale: 1.5, sig: 'summon', move: 'Raise the Fallen' },
+    teron:     { name: 'Teron Gorefiend', sprite: 'hero_teron', scale: 1.5, sig: 'summon', move: 'Raise the Fallen', minion: 'skel' },
     chogall:   { name: "Cho'gall", sprite: 'hero_chogall', scale: 1.4, sig: 'summon', move: 'Twilight Ritual' },
     dentarg:   { name: 'Dentarg', sprite: 'hero_dentarg', scale: 1.4, sig: 'barrage', move: 'Earthquake', drop: 'stone' },
     zuljin:    { name: "Zul'jin", sprite: 'hero_zuljin', scale: 1.6, sig: 'barrage', move: 'Axe Storm', drop: 'axe' },
@@ -1954,10 +1994,10 @@ const FINALS = {
   forest: { Horde: 'orgrim', Alliance: 'lothar' }, winter: { Horde: 'guldan', Alliance: 'turalyon' },
   waste: { Horde: 'deathwing', Alliance: 'kurdran' }, swamp: { Horde: 'chogall', Alliance: 'khadgar' },
 };
-function planBosses() {   // [5:00, 10:00, final]
+function planBosses() {   // [5:00, 10:00, 15:00, final]
   const side = foeSide(), fin = FINALS[G.LV.id][side], rest = Object.keys(BOSS_POOL[side]).filter(k => k !== fin);
   for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
-  return [rest[0], rest[1], fin];
+  return [rest[0], rest[1], rest[2], fin];
 }
 const foeSide = () => G.HD.side === 'Horde' ? 'Alliance' : 'Horde';
 
@@ -1988,7 +2028,7 @@ function continueRun() {
   G.passives = Object.fromEntries(Object.entries(s.p || {}).filter(([k]) => PASSIVES[k]));   // drops retired passives
   // Saves from before the named bosses counted bosses due every 4 minutes from 5:00; they map onto the new 5, 10, 15.
   Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(PACE.elite, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives, rerolls: s.rerolls, pending: s.pending || 0, chestQueue: s.chests || [] });
-  Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next }); G.labour = s.lab || 0; G.bossPlan = s.bp || null;
+  Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next }); G.labour = s.lab || 0; G.bossPlan = s.bp && s.bp.length === BOSSES.length ? s.bp : null;   // runs saved before 20-minute runs plan again
   recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
   if (s.bs && BOSSES[s.bs.n - 1]) spawnBoss(s.bs.n, s.bs.f);   // the boss you were fighting comes back, wounded as he was
   for (const c of s.camps || []) {
@@ -2170,19 +2210,23 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 /* ---------- spawning ---------- */
 // The late game: from 8:00 enemies grow tougher faster, and in the last 3:00 they come thicker and hit harder.
 // Tuned with scripts/balance.js so a full Armoury can win, but has to work for it (docs/TESTING.md).
-const LATE = { from: 480, hp: 2.6, push: 720, spawn: 1.4, dmg: 0.55 };
+const LATE = { from: 640, hp: 2.6, push: 960, spawn: 1.4, dmg: 0.55 };   // scaled to 20-minute runs
 // The middle of a run: from 3:00 the army grows tougher and thicker, reaching full strength at 7:00 (tuned to a
 // player who has finished Vampire Survivors; the first three minutes stay gentle for newcomers).
 const MID = { from: 180, to: 420, hp: 0.8, spawn: 0.6 };
+// After 8:00 the base toughness and numbers grow more slowly, so a 20-minute run ends about as hard as a 15-minute
+// run used to (the extra minutes bring new kinds of enemy rather than ever-bigger numbers).
+const STRETCH = { from: 480, rate: 0.7 };
+const paceT = t => t <= STRETCH.from ? t : STRETCH.from + (t - STRETCH.from) * STRETCH.rate;
 const midK = t => Math.max(0, Math.min(1, (t - MID.from) / (MID.to - MID.from)));
 // When each kind of enemy first appears, in seconds.
-const PACE = { scout: 120, siege: 210, elite: 180, flyer: 270 };
+const PACE = { scout: 120, siege: 210, elite: 180, flyer: 270, caster: 480, daemon: 720, flock: 600 };
 const FINAL = { spawn: 0.25, dmg: 0.6, hp: 1 };   // hp: the final boss's toughness
 const BOSS_HIT = { mark: 0.45, final: 0.5, spd: 0.8 };   // spd: the final boss flies over trees and water, so he's a little slower   // a barrage circle hurts less than a bite; the final boss bites a little softer than his size suggests   // when the final boss comes the army falls back, then trickles in again more thinly
 const lateHp = t => t > LATE.from ? 1 + LATE.hp * ((t - LATE.from) / (RUN_LEN - LATE.from)) ** 1.4 : 1;
 const pushK = t => t > LATE.push ? (t - LATE.push) / (RUN_LEN - LATE.push) : 0;
 // The sprite for an enemy role on the side you're fighting, falling back to a stand-in (the demo lacks some units).
-const FALLBACK = { boss1: 'boss', boss2: 'boss', boss3: 'boss', elite1: 'tank', elite2: 'ranged', elite3: 'ranged', scout: 'fast', flyer: 'boss', siege: 'tank', stone: 'eshot' };
+const FALLBACK = { tank_up: 'tank', ranged_up: 'ranged', caster: 'ranged', skel: 'basic', daemon: 'boss', boss1: 'boss', boss2: 'boss', boss3: 'boss', elite1: 'tank', elite2: 'ranged', elite3: 'ranged', scout: 'fast', flyer: 'boss', siege: 'tank', stone: 'eshot' };
 function foeSprite(r) { const k = (G.HD.side === 'Horde' ? 'ally_' : '') + r; return A.sprites[k] ? k : A.sprites[r] ? r : FALLBACK[r] ? foeSprite(FALLBACK[r]) : r; }
 const hasFoe = r => { const k = foeSprite(r); return k === r || k === 'ally_' + r; };   // its own picture, not a stand-in
 function spawnEnemy(type, x, y, boss) {
@@ -2192,12 +2236,12 @@ function spawnEnemy(type, x, y, boss) {
     for (let k = 0; k < 10; k++) { const a = rnd(0, TAU); x = h.x + Math.cos(a) * d; y = h.y + Math.sin(a) * d; if (free || !footBlocked(x, y, 6)) break; }
   } else if (!free && footBlocked(x, y, 4)) return;
   // Each boss is tougher than the last: the first is a fair fight, the second close to full strength, the last a real test.
-  const bossK = boss ? [0.45, 0.85, FINAL.hp][boss.n - 1] : 1;
-  const hpMul = (1 + t / 240 + (t / 360) ** 2) * G.LV.hp * (0.6 + 0.4 * EASE(t)) * bossK * lateHp(t) * (1 + MID.hp * midK(t)); G.stats.hp += T.hp * hpMul;
+  const bossK = boss ? [0.45, 0.8, 0.95, FINAL.hp][boss.n - 1] : 1;
+  const tp = paceT(t), hpMul = (1 + tp / 240 + (tp / 360) ** 2) * G.LV.hp * (0.6 + 0.4 * EASE(t)) * bossK * lateHp(t) * (1 + MID.hp * midK(t)); G.stats.hp += T.hp * hpMul;
   const e = { type, role: boss ? 'boss' + boss.n : type, sprite: boss && boss.sprite, scale: boss && boss.scale, x, y, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (1 + Math.min(0.3, t / 3000)) * rnd(0.92, 1.08),
-    dmg: T.dmg * (1 + t / 600) * (0.6 + 0.4 * EASE(t)) * (bossK < 1 ? 0.7 : 1) * (boss && boss.final ? BOSS_HIT.final : G.final ? FINAL.dmg : 1) * (1 + LATE.dmg * pushK(t)), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0,
+    dmg: T.dmg * (1 + tp / 600) * (0.6 + 0.4 * EASE(t)) * (bossK < 1 ? 0.7 : 1) * (boss && boss.final ? BOSS_HIT.final : G.final ? FINAL.dmg : 1) * (1 + LATE.dmg * pushK(t)), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0,
     shootT: rnd(1, 3), sigT: 3, dir: 4, t: rnd(0, 5), fly: !!(T.fly || (boss && boss.fly && A.sprites[boss.sprite])), free, elite: !!T.elite };
-  if (boss) { e.boss = boss.n; e.bid = boss.id; e.sig = boss.sig; e.drop = boss.drop; if (boss.final) e.spd *= BOSS_HIT.spd; e.final = !!boss.final; e.name = bossName(boss); }
+  if (boss) { e.boss = boss.n; e.bid = boss.id; e.sig = boss.sig; e.drop = boss.drop; if (boss.final) e.spd *= BOSS_HIT.spd; e.final = !!boss.final; e.minion = boss.minion; e.name = bossName(boss); }
   if (e.elite || boss) { seeFoe(boss ? 'b:' + boss.id : type); if (e.elite) banner(`An elite ${FOES[type][foeSide()]} has joined the fight!`); }
   G.enemies.push(e); return e;
 }
@@ -2216,22 +2260,33 @@ function spawnBoss(n, frac) {
   if (B.final) { G.final = true; G.finalName = e.name; }
   return e;
 }
+// Gradually, ogres and knights become ogre-mages and paladins, and axethrowers and archers berserkers and rangers.
+const UPGRADE = { from: 360, to: 1080, max: 0.75 };
+const upShare = t => Math.max(0, Math.min(1, (t - UPGRADE.from) / (UPGRADE.to - UPGRADE.from))) * UPGRADE.max;
+function upgrade(k, t) { const u = { tank: 'tank_up', ranged: 'ranged_up' }[k]; return u && hasFoe(u) && Math.random() < upShare(t) ? u : k; }
 function pickType(t) {
   const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 210 ? 0.25 : 0, tank: t > 240 ? Math.min(0.4, 0.05 + t / 1500) : 0,
     scout: t > PACE.scout ? 0.1 : 0, flyer: t > PACE.flyer ? Math.min(0.14, 0.04 + (t - PACE.flyer) / 4000) : 0, siege: t > PACE.siege ? 0.05 : 0 };
   for (const k in w) w[k] *= G.LV.mix[k] || 1;
-  for (const k of ['scout', 'flyer', 'siege']) if (w[k] && !hasFoe(k)) w[k] = 0;   // only units with their own pictures
+  w.caster = t > PACE.caster ? Math.min(0.15, 0.05 + (t - PACE.caster) / 6000) : 0;
+  w.daemon = t > PACE.daemon ? 0.025 : 0;
+  for (const k of ['scout', 'flyer', 'siege', 'caster', 'daemon']) if (w[k] && !hasFoe(k)) w[k] = 0;   // only units with their own pictures
   let s = 0; for (const k in w) s += w[k];
-  let r = Math.random() * s; for (const k in w) { r -= w[k]; if (r <= 0) return k === 'siege' && G.enemies.filter(e => e.type === 'siege').length >= 3 ? 'basic' : k; }
+  let r = Math.random() * s; for (const k in w) { r -= w[k]; if (r <= 0) return upgrade(k === 'siege' && G.enemies.filter(e => e.type === 'siege').length >= 3 ? 'basic' : k, t); }
   return 'basic';
 }
 function spawn(dt) {
   const t = Math.min(G.t, RUN_LEN);
-  G.spawnAcc += (0.7 + t / 50) * EASE(t) * (1 + LATE.spawn * pushK(t)) * (1 + MID.spawn * midK(t)) * (G.final ? FINAL.spawn : 1) * dt;
+  G.spawnAcc += (0.7 + paceT(t) / 50) * EASE(t) * (1 + LATE.spawn * pushK(t)) * (1 + MID.spawn * midK(t)) * (G.final ? FINAL.spawn : 1) * dt;
   while (G.spawnAcc >= 1) { G.spawnAcc--; if (G.enemies.length < 330) spawnEnemy(pickType(t)); }
   if (G.bossN < BOSSES.length && G.t >= BOSSES[G.bossN].at) spawnBoss(++G.bossN);
   // An elite every 50 seconds from 3:00 (every 35 from 10:00), taking turns.
   if (G.t >= G.eliteNext && !G.final) { G.eliteNext += G.t >= 600 ? 35 : 50; spawnEnemy('elite' + (G.eliteN++ % 3 + 1)); }
+  // The Alliance's late swarms: gnomish flying machines and dwarves, all from one side.
+  if (foeSide() === 'Alliance' && t >= (G.flockNext ?? PACE.flock) && !G.final) {
+    G.flockNext = (G.flockNext ?? PACE.flock) + 80; const h = G.hero, a0 = rnd(0, TAU), d = Math.hypot(W, H) / 2 + 20;
+    for (let i = 0; i < 18; i++) { const a = a0 + rnd(-0.5, 0.5), dd = d + rnd(0, 60); spawnEnemy(i < 10 && hasFoe('scout') ? 'scout' : 'fast', h.x + Math.cos(a) * dd, h.y + Math.sin(a) * dd); }
+  }
   if (t >= G.swarmNext && !G.final) {
     G.swarmNext += 100; const h = G.hero, d = Math.hypot(W, H) / 2 + 10;
     for (let i = 0; i < 26; i++) { const a = i / 26 * TAU; spawnEnemy('fast', h.x + Math.cos(a) * d, h.y + Math.sin(a) * d); }
@@ -2619,6 +2674,10 @@ function special(e, d, dx, dy, dt) {
   if (e.type === 'elite3' && e.shootT <= 0 && d < e.range * 1.3) {   // Death Coil / Fireball: slow, and it follows you
     e.shootT = 4.5; e.swing = SWING; G.eshots.push({ x: e.x, y: e.y, vx: dx * 62, vy: dy * 62, dmg: e.dmg * 1.6, life: 5, dir: dirOf(dx, dy), homing: true, role: foeSide() === 'Horde' ? 'coil' : 'fire' });
   }
+  if ((e.type === 'caster' || e.type === 'elite3') && foeSide() === 'Horde' && hasFoe('skel') && (e.raiseT = (e.raiseT ?? rnd(3, 8)) - dt) <= 0 && d < 300) {   // death knights raise the dead
+    e.raiseT = e.type === 'elite3' ? 8 : 11; G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 30, t: 0, life: 0.5, col: '120,200,120' });
+    for (let i = 0; i < (e.type === 'elite3' ? 3 : 2); i++) { const a = rnd(0, TAU); spawnEnemy('skel', e.x + Math.cos(a) * 22, e.y + Math.sin(a) * 22); }
+  }
   if (e.type === 'siege' && e.shootT <= 0 && d < e.range * 1.15) {   // aims a little ahead of where you're going
     e.shootT = 5.5; e.swing = SWING;
     addMark(h.x + G.hv[0] * 0.6, h.y + G.hv[1] * 0.6, 24, 1.15, e.dmg, 'siege', { x: e.x, y: e.y });
@@ -2637,7 +2696,8 @@ function special(e, d, dx, dy, dt) {
   if ((e.sigT -= dt) > 0) return;
   if (e.sig === 'summon') {   // a ring of troops around him
     e.sigT = 9; e.swing = SWING; G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 60, t: 0, life: 0.6, col: '160,90,255' });
-    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; spawnEnemy('basic', e.x + Math.cos(a) * 44, e.y + Math.sin(a) * 44); }
+    const minion = e.minion && hasFoe(e.minion) ? e.minion : 'basic';   // Gul'dan and Teron raise skeletons
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; spawnEnemy(minion, e.x + Math.cos(a) * 44, e.y + Math.sin(a) * 44); }
   } else if (e.sig === 'barrage') {   // circles round you, then fire (or hammers) falls on them
     e.sigT = 7; e.swing = SWING;
     addMark(h.x + G.hv[0] * 0.5, h.y + G.hv[1] * 0.5, 28, 1.25, e.dmg * BOSS_HIT.mark, 'barrage', null, e.drop);
@@ -2656,7 +2716,8 @@ function updateEnemies(dt) {
     if (e.range) {   // ranged units keep their distance
       if (d < e.range * (e.type === 'siege' ? 0.55 : 0.75)) sp = -sp * 0.6; else if (d < e.range) sp = 0;
     }
-    if (e.type === 'ranged' && e.shootT <= 0 && d < e.range * 1.3) { e.shootT = 2.6 + 1.2 * (1 - EASE(G.t)); e.swing = SWING; G.eshots.push({ x: e.x, y: e.y, vx: dx * 95, vy: dy * 95, dmg: e.dmg, life: 3, dir: dirOf(dx, dy) }); }
+    if ((e.type === 'ranged' || e.type === 'ranged_up') && e.shootT <= 0 && d < e.range * 1.3) { e.shootT = (e.type === 'ranged_up' ? 2.0 : 2.6) + 1.2 * (1 - EASE(G.t)); e.swing = SWING; G.eshots.push({ x: e.x, y: e.y, vx: dx * 95, vy: dy * 95, dmg: e.dmg, life: 3, dir: dirOf(dx, dy) }); }
+    if (e.type === 'caster' && e.shootT <= 0 && d < e.range * 1.3) { e.shootT = 3.2; e.swing = SWING; G.eshots.push({ x: e.x, y: e.y, vx: dx * 75, vy: dy * 75, dmg: e.dmg, life: 3.5, dir: dirOf(dx, dy), role: foeSide() === 'Horde' ? 'coil' : 'fire' }); }
     special(e, d, dx, dy, dt);
     if (e.charge) { const c = e.charge; dx = c.dx; dy = c.dy; sp = c.phase === 'aim' ? 0 : 270; }
     let vx = dx * sp, vy = dy * sp;
@@ -2844,16 +2905,12 @@ function drawBuilding(e) {
   else { ctx.fillStyle = '#6b4518'; ctx.fillRect(x - e.r, y - e.r, e.r * 2, e.r * 2); }
   if (e.maxHp && e.hp < e.maxHp) { const bw = 30; ctx.fillStyle = '#000'; ctx.fillRect(x - bw / 2 - 1, y - (sp ? sp.height / 2 : e.r) - 5, bw + 2, 4); ctx.fillStyle = '#c92a1e'; ctx.fillRect(x - bw / 2, y - (sp ? sp.height / 2 : e.r) - 4, bw * Math.max(0, e.hp / e.maxHp), 2); }
 }
-// Elites and named bosses: a gold glow under them and a crown over them.
-function crown(x, y, k = 1) {
-  ctx.fillStyle = '#ffd24a'; ctx.strokeStyle = '#5a3a08'; ctx.lineWidth = 1; ctx.beginPath();
-  ctx.moveTo(x - 5 * k, y); ctx.lineTo(x - 5 * k, y - 5 * k); ctx.lineTo(x - 2.5 * k, y - 2.5 * k); ctx.lineTo(x, y - 6 * k); ctx.lineTo(x + 2.5 * k, y - 2.5 * k); ctx.lineTo(x + 5 * k, y - 5 * k); ctx.lineTo(x + 5 * k, y); ctx.closePath(); ctx.fill(); ctx.stroke();
-}
 const FLY_UP = 12;   // fliers are drawn this far above their shadow
 function drawEnemy(e) {
   if (e.static) return drawBuilding(e);
-  const x = e.x - camX, y = e.y - camY, up = e.fly ? FLY_UP : 0, role = e.sprite && A.sprites[e.sprite] ? e.sprite : foeSprite(e.role || e.type), sp = A.sprites[role];
-  const oldScale = sp && sp.scale; if (sp && e.sprite === role && e.scale) sp.scale = e.scale;   // a hero's own sprite, at boss size
+  const own = e.sprite && (A.sprites[e.sprite + '~boss'] ? e.sprite + '~boss' : A.sprites[e.sprite] ? e.sprite : null);   // a boss in its side's boss colour
+  const x = e.x - camX, y = e.y - camY, up = e.fly ? FLY_UP : 0, role = own || foeSprite(e.role || e.type), sp = A.sprites[role];
+  const oldScale = sp && sp.scale; if (sp && own && e.scale) sp.scale = e.scale;   // a hero's own sprite, at boss size
   try { return drawEnemyAt(e, x, y, up, role, sp); } finally { if (sp) sp.scale = oldScale; }
 }
 function drawEnemyAt(e, x, y, up, role, sp) {
@@ -2862,13 +2919,8 @@ function drawEnemyAt(e, x, y, up, role, sp) {
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + c.dx * 150, y + c.dy * 150); ctx.stroke();
   }
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y + e.r * 0.8, e.r * (e.fly ? 0.8 : 1), e.r * 0.4, 0, 0, TAU); ctx.fill();
-  if (e.elite || e.boss) {
-    const g = 0.3 + 0.15 * Math.sin(e.t * 5), col = e.boss ? '#ff6a3a' : '#ffd24a';
-    ctx.globalAlpha = g; circle(x, y - up, e.r * (e.boss ? 1.7 : 1.6), col, null); ctx.globalAlpha = g + 0.35;
-    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y + e.r * 0.8, e.r * 1.3, e.r * 0.55, 0, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
-  }
-  const top = sp ? (sp.fh * (sp.scale || 1)) * 0.32 : e.r;
-  if (drawSprite(role, e.x, e.y - up, e.dir, e.t, e.flash > 0, e.swing > 0 ? 1 - e.swing / SWING : null)) { if (e.elite || e.boss) crown(Math.round(x), Math.round(y - up - top - 2), e.boss ? 1.4 : 1); return; }
+
+  if (drawSprite(role, e.x, e.y - up, e.dir, e.t, e.flash > 0, e.swing > 0 ? 1 - e.swing / SWING : null)) return;   // elites and bosses wear their own player colours
   const T = ET[e.type];
   circle(x, y, e.r, e.flash > 0 ? '#fff' : T.col, '#1a0d08');
   const a = Math.atan2(G.hero.y - e.y, G.hero.x - e.x);
@@ -3427,16 +3479,17 @@ function changeOpt(k) {
 const BOOK_TABS = [['weapons', 'Weapons'], ['passives', 'Passives'], ['evos', 'Evolutions'], ['heroes', 'Heroes'], ['foes', 'Foes']];
 // Foes: troops are always listed; elites and bosses stay hidden until you've met them. Horde picture first, then Alliance.
 function foesBook(card) {
-  const pics = (r, dim) => `<span class="fpics"><canvas class="fpic${dim ? ' dim' : ''}" width="48" height="48" data-role="${r}"></canvas><canvas class="fpic${dim ? ' dim' : ''}" width="48" height="48" data-role="ally_${r}"></canvas></span>`;
-  const both = o => o.Horde === o.Alliance ? o.Horde : `${o.Horde} / ${o.Alliance}`;
-  const troops = ['basic', 'fast', 'tank', 'ranged', 'scout', 'flyer', 'siege'].map(k => card(pics(k), both(FOES[k]), '', [FOES[k].desc])).join('');
+  const one = r => FOES[r] && (!FOES[r].Alliance || FOES[r].Alliance === FOES[r].Horde);   // skeletons are Horde only; daemons serve neither side
+  const pics = (r, dim) => `<span class="fpics"><canvas class="fpic${dim ? ' dim' : ''}" width="48" height="48" data-role="${r}"></canvas>${one(r) ? '' : `<canvas class="fpic${dim ? ' dim' : ''}" width="48" height="48" data-role="ally_${r}"></canvas>`}</span>`;
+  const both = o => o.Horde === o.Alliance || !o.Alliance ? o.Horde : `${o.Horde} / ${o.Alliance}`;
+  const troops = ['basic', 'fast', 'tank', 'ranged', 'scout', 'flyer', 'siege', 'tank_up', 'ranged_up', 'caster', 'skel', 'daemon'].map(k => card(pics(k), both(FOES[k]), '', [FOES[k].desc])).join('');
   const elites = ['elite1', 'elite2', 'elite3'].map(k => meta.seen.includes(k) ? card(pics(k), both(FOES[k]), `Elite. ${both(FOES[k].move)}`, [FOES[k].desc])
     : card(pics(k, true), '???', 'Elite', ['Not met yet. Elites join the fight from 3:00, marked with a crown.'])).join('');
   // Bosses, by side: who they are, their move, and where each is the final boss. Hidden until met.
   const finalOf = (side, id) => LEVELS.filter(L => FINALS[L.id][side] === id).map(L => L.name);
   const bossCard = (side, id) => { const P = BOSS_POOL[side][id], met = meta.seen.includes('b:' + id), fin = finalOf(side, id);
     const pic = `<span class="fpics"><canvas class="fpic${met ? '' : ' dim'}" width="48" height="48" data-role="${P.sprite}"></canvas></span>`;
-    const when = fin.length ? `Final boss of ${fin.join(' and ')}` : 'At 5:00 or 10:00';
+    const when = fin.length ? `Final boss of ${fin.join(' and ')}` : 'At 5:00, 10:00 or 15:00';
     return met ? card(pic, P.name, `${when}. ${P.move}`, [SIG_DESC[P.sig] + (P.fly ? ' Flies.' : '')]) : card(pic, '???', when, ['Not met yet.']); };
   const bosses = ['Horde', 'Alliance'].map(side => `<h3 class="bookhead">${side} bosses</h3>` + Object.keys(BOSS_POOL[side]).map(id => bossCard(side, id)).join('')).join('');
   return `<h3 class="bookhead">Troops</h3>${troops}<h3 class="bookhead">Elites</h3>${elites}${bosses}`;
@@ -3751,7 +3804,8 @@ function openChest(kind) {
     <div class="opts"><button class="opt" data-act="chestok" data-back>Continue</button></div>`);
 }
 const KILLER = { basic: 'Infantry', fast: 'Sappers', tank: 'Heavy units', ranged: 'Ranged units', boss: 'A boss', shot: 'Missiles', bld: 'A tower',
-  flyer: 'Fliers', scout: 'Scouts', siege: 'Siege engines', elite1: 'Elites', elite2: 'Elites', elite3: 'Elites', barrage: 'A boss' };
+  flyer: 'Fliers', scout: 'Scouts', siege: 'Siege engines', elite1: 'Elites', elite2: 'Elites', elite3: 'Elites', barrage: 'A boss',
+  tank_up: 'Heavy units', ranged_up: 'Ranged units', caster: 'Casters', skel: 'Skeletons', daemon: 'A daemon' };
 function runRecord(won) {
   return { at: Date.now(), hero: G.heroId, level: G.LV.id, t: Math.floor(G.t), won: !!won, kills: G.kills, gold: G.gold, lvl: G.hero.level,
     by: won ? null : G.stats.lastHit, w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), e: Object.keys(G.weapons).filter(k => G.weapons[k].evo), p: { ...G.passives }, ups: Object.values(meta.ups).reduce((a, b) => a + b, 0) };
@@ -3763,7 +3817,7 @@ function endRun(won) {
   if (G.t > best.time || (won && G.kills > best.kills)) { best = { time: Math.floor(G.t), kills: G.kills, level: G.hero.level, hero: G.HD.name }; store.set('tos_best', best); }
   const unlocked = bankRun();
   playMusic(won ? 'victory' : 'defeat');
-  showMenu(G.endHtml = `<h2>${won ? 'Victory!' : 'You have fallen'}</h2><p class="sub">${won ? `You held the line for fifteen minutes and slew ${G.finalName || 'the final boss'}.` : G.final ? `${G.finalName || 'The final boss'} was too much this time.` : 'The horde was too much this time.'}</p>
+  showMenu(G.endHtml = `<h2>${won ? 'Victory!' : 'You have fallen'}</h2><p class="sub">${won ? `You held the line for twenty minutes and slew ${G.finalName || 'the final boss'}.` : G.final ? `${G.finalName || 'The final boss'} was too much this time.` : 'The horde was too much this time.'}</p>
     <div class="stats"><b>Hero</b><span>${G.HD.name}</span><b>Battlefield</b><span>${G.LV.name}</span><b>Survived</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>+${G.gold}${G.bonus ? ` (+${G.bonus} for surviving)` : ''}</span></div>
     ${unlocked || G.newHeroes.length ? `<h3 class="chestgold">Unlocked</h3>${[unlocked && `New battlefield: ${unlocked}`, ...G.newHeroes.filter(id => !HEROES[id].secret).map(id => `New hero: ${HEROES[id].name}`),
       G.newHeroes.includes('peasant') && 'Someone has been watching from the woodpile. Secret heroes: the Peasant and the Peon!',
@@ -4193,7 +4247,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, fitStage, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, fitStage, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
