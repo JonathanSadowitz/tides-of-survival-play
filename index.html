@@ -662,7 +662,38 @@ const Core = (() => {
     }
     return out;
   }
-  return { u16, u32, parseWar, lzDecode, getEntry, safeEntry, unzip, isGfu, decodeGfu, decodeGfuFrame, isImg, decodeImg, classify, kindOf, toPalette, greyPalette, isGfu, decodeGfu, decodeGfuFrame, isImg, decodeImg, classify, kindOf, toPalette, greyPalette,
+  // Read chosen files from a zip on a web server, fetching only the bytes they need (HTTP ranges).
+  // Falls back to downloading the whole zip when the server doesn't do ranges. onProgress(bytesSoFar, bytesNeeded).
+  async function unzipRemote(url, want = () => true, onProgress = () => {}) {
+    const get = async (a, b) => { const r = await fetch(url, { headers: { Range: `bytes=${a}-${b}` } }); if (!r.ok) throw new Error(`Couldn't download the demo (${r.status})`); return r; };
+    const tailR = await fetch(url, { headers: { Range: 'bytes=-66000' } });
+    if (!tailR.ok) throw new Error(`Couldn't download the demo (${tailR.status})`);
+    if (tailR.status !== 206) { const all = await tailR.arrayBuffer(); onProgress(all.byteLength, all.byteLength); return unzip(all, want); }
+    const total = +(tailR.headers.get('content-range') || '').split('/')[1], tail = new Uint8Array(await tailR.arrayBuffer()), t0 = total - tail.length;
+    let e = -1; for (let i = tail.length - 22; i >= 0; i--) if (u32(tail, i) === 0x06054b50) { e = i; break; }
+    if (e < 0) throw new Error('Not a zip file');
+    const n = u16(tail, e + 10), cdSize = u32(tail, e + 12), cdOff = u32(tail, e + 16);
+    const cd = cdOff >= t0 ? tail.subarray(cdOff - t0, cdOff - t0 + cdSize) : new Uint8Array(await (await get(cdOff, cdOff + cdSize - 1)).arrayBuffer());
+    const items = []; let p = 0;
+    for (let k = 0; k < n; k++) {
+      const method = u16(cd, p + 10), csize = u32(cd, p + 20), nlen = u16(cd, p + 28), xlen = u16(cd, p + 30), clen = u16(cd, p + 32), lho = u32(cd, p + 42);
+      const name = new TextDecoder('latin1').decode(cd.subarray(p + 46, p + 46 + nlen)); p += 46 + nlen + xlen + clen;
+      if (!name.endsWith('/') && want(name)) items.push({ name, method, csize, lho, nlen });
+    }
+    const need = items.reduce((a, it) => a + it.csize, 0), out = []; let got = 0;
+    for (const it of items) {
+      // The local header's extra field can differ from the central one, so read a little slack and find the data start.
+      const buf = new Uint8Array(await (await get(it.lho, it.lho + 30 + it.nlen + 1024 + it.csize - 1)).arrayBuffer());
+      const start = 30 + u16(buf, 26) + u16(buf, 28), raw = buf.subarray(start, start + it.csize);
+      let data;
+      if (it.method === 0) data = raw.slice();
+      else if (it.method === 8) data = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+      else continue;
+      out.push({ name: it.name, data }); got += it.csize; onProgress(got, need);
+    }
+    return out;
+  }
+  return { u16, u32, parseWar, lzDecode, getEntry, safeEntry, unzip, unzipRemote, isGfu, decodeGfu, decodeGfuFrame, isImg, decodeImg, classify, kindOf, toPalette, greyPalette, isGfu, decodeGfu, decodeGfuFrame, isImg, decodeImg, classify, kindOf, toPalette, greyPalette,
     explode: Blast.explode, huffDecompress, adpcmDecompress, hashStr, decrypt, parseMpq, mpqFind, mpqRead, mpqDetectKey, mpqExtractWars };
 })();
 if (typeof module !== 'undefined') module.exports = Core;
@@ -1062,10 +1093,36 @@ const DEMO = {
   sounds: { s_hit: 'Bow Hit', s_hurt: 'Punch', s_die: 'O:Basic Orc Voices/Death', s_die_ally: 'H:Basic Human Voices/Death', s_level: 'H:Basic Human Voices/Ready', s_boom: 'Explosion',
     s_sword: 'Sword Attack 1', s_bow: 'Bow Fire', s_axe: 'Axe Throw', s_fire: 'Fireball Hit', s_coil: 'Fireball', s_start: 'Placement Success', s_level_orc: 'O:Basic Orc Voices/Ready',
     s_power: 'Fist', s_buy: 'Placement Success' },
-  // Only the footman, grunt, elven archer and troll voices have data in the demo.
-  voices: { lothar: 'H:Basic Human Voices', uther: 'H:Basic Human Voices', alleria: 'H:Elven Archer/Ranger', grom: 'O:Basic Orc Voices', zuljin: 'O:Troll Axethrower/Berserker', chogall: 'O:Basic Orc Voices' },
+  // Each hero's own unit voices where the demo has them (the CD has the knight's), else the footman's or grunt's.
+  voices: { lothar: ['H:Knight', 'H:Basic Human Voices'], uther: ['H:Paladin', 'H:Knight', 'H:Basic Human Voices'], alleria: ['H:Elven Archer/Ranger'], grom: ['O:Basic Orc Voices'],
+    zuljin: ['O:Troll Axethrower/Berserker'], chogall: ['O:Ogre-Mage', 'O:Ogre', 'O:Basic Orc Voices'] },
   shop: 'https://shop.battle.net/product/warcraft-2-battle-net-edition', download: 'https://www.dosgames.com/game/warcraft-2-tides-of-darkness',
+  // Blizzard's Warcraft II shareware CD (v1.08), shipped unmodified next to the game; on itch.io it's fetched from the play site.
+  urls: ['demo/war2sw108.zip', 'https://jonathansadowitz.github.io/tides-of-survival-play/demo/war2sw108.zip'],
+  files: /(^|\/)(MAINDAT\.WAR|REZDAT\.WAR|SFXDAT\.SUD)$/i,
 };
+// Turn the demo's files into the game's archives and keep them. Returns false if the files aren't the demo.
+async function installDemo(got) {
+  const files = {}; for (const g of got) files[g.name.split('/').pop().toUpperCase()] = g.data;
+  if (!files['MAINDAT.WAR']) return false;
+  for (const w of buildDemoWars(files)) {
+    addWar(w.name, w.buf); await DB.put(w.name, w.buf);
+    if (w.names) { A.wars[w.name].names = w.names; store.set('tos_sndnames_' + w.name, w.names); }
+  }
+  return true;
+}
+// First launch with no game files: load the shareware demo that ships with the game, so anyone can play straight away.
+async function autoLoadDemo() {
+  for (const url of DEMO.urls) {
+    try {
+      overlay.className = ''; overlay.style.display = 'flex';
+      overlay.innerHTML = `<div class="panel"><h2>Tides of Survival</h2><p class="sub">Loading the free Warcraft II demo…</p><p class="help" id="demoProg">Starting</p></div>`;
+      const got = await Core.unzipRemote(url, n => DEMO.files.test(n), (a, b) => { const el = $('#demoProg'); if (el) el.textContent = `${(a / 1048576).toFixed(1)} of ${(b / 1048576).toFixed(1)} MB`; });
+      if (await installDemo(got)) { A.demo = true; for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k]; autoAssign(true); return true; }
+    } catch (e) { console.warn('demo', url, e); }
+  }
+  return false;
+}
 function demoIndex(i) {
   if (DEMO.extra[i] !== undefined) return DEMO.extra[i];
   for (const [a, b, n] of DEMO.runs) if (i >= a && i < a + n) return b + i - a;
@@ -1089,10 +1146,11 @@ function buildDemoWars(files) {
     const snd = MPQ_SOUNDS.map(([role]) => ({ role, data: find(DEMO.sounds[role]) })).filter(x => x.data && x.data[0] === 0x52);
     if (snd.length === MPQ_SOUNDS.length) out.push({ name: 'DEMODATA/SOUNDS.WAR', buf: packWar(snd), names: snd.map(x => x.role) });
     const vo = [];
-    for (const [hero, grp] of Object.entries(DEMO.voices)) rec.forEach((r, k) => {
+    const hasData = g => rec.some((r, k) => r.g === g && (Core.safeEntry(S, k + 2) || []).length);
+    for (const [hero, groups] of Object.entries(DEMO.voices)) { const grp = groups.find(hasData); if (grp) rec.forEach((r, k) => {
       if (r.g !== grp) return; const kind = /^Ready/.test(r.n) ? 'ready' : /^Selected/.test(r.n) ? 'what' : /^Acknowledgement/.test(r.n) ? 'yes' : /^Annoyed/.test(r.n) ? 'pissed' : null;
       const d = kind && Core.safeEntry(S, k + 2); if (d && d[0] === 0x52) vo.push({ role: hero + ':' + kind, data: d });
-    });
+    }); }
     if (vo.length) out.push({ name: 'GAMESFX/VOICES.WAR', buf: packWar(vo), names: vo.map(x => x.role) });
   }
   return out;
@@ -1188,7 +1246,7 @@ function rebuildSprites() {
 }
 function assetSummary() {
   const files = warNames().length, sprites = Object.keys(A.sprites).length, sounds = Object.keys(cfg.sounds).filter(k => A.wars[cfg.sounds[k].file]).length;
-  if (!files) return `No Warcraft II files loaded, so you'll see placeholder shapes. Open the Asset Lab and import your Warcraft II folder. No copy? Download the free 1996 demo (<a href="${DEMO.download}" target="_blank" rel="noopener">DOSBOX_WAR2.ZIP from dosgames.com</a>) and load the zip in the Asset Lab to play a taste of the game.`;
+  if (!files) return `No Warcraft II files loaded, so you'll see placeholder shapes. Open the Asset Lab and import your Warcraft II folder. (The free demo that comes with the game couldn't be loaded: check your connection and reload.)`;
   if (A.demo) return `Playing the Warcraft II demo: Alterac Mountains and six heroes. Get ${fullGameLink()} and import it in the Asset Lab to unlock everything.`;
   const extra = (mu.names.size ? `, ${mu.names.size} music tracks` : '') + (A.wars['GAMESFX/VOICES.WAR'] ? ', hero voices' : '');
   return `Using your Warcraft II files: ${sprites} sprite${sprites === 1 ? '' : 's'}, ${sounds} sound${sounds === 1 ? '' : 's'}${extra}.` + (sprites ? '' : ' Assign some sprites in the Asset Lab.')
@@ -3145,15 +3203,9 @@ async function loadFiles(list) {
   for (const z of list.filter(f => /\.zip$/i.test(f.name))) {
     labSide.innerHTML = `<div class="hint">Reading ${z.name}…</div>`;
     try {
-      const got = await Core.unzip(await z.arrayBuffer(), n => /(^|\/)(MAINDAT\.WAR|REZDAT\.WAR|SFXDAT\.SUD)$/i.test(n));
-      const files = {}; for (const g of got) files[g.name.split('/').pop().toUpperCase()] = g.data;
-      if (!files['MAINDAT.WAR']) { errs.push(`${z.name}: no Warcraft II demo data inside. Use DOSBOX_WAR2.ZIP from dosgames.com.`); continue; }
       const full = A.wars['MAINDAT.WAR'] && !isDemoMain(A.wars['MAINDAT.WAR']);
       if (full) { notes.push(`${z.name}: you already have the full game loaded, so the demo isn't needed.`); continue; }
-      for (const w of buildDemoWars(files)) {
-        addWar(w.name, w.buf); await DB.put(w.name, w.buf);
-        if (w.names) { A.wars[w.name].names = w.names; store.set('tos_sndnames_' + w.name, w.names); }
-      }
+      if (!await installDemo(await Core.unzip(await z.arrayBuffer(), n => DEMO.files.test(n)))) { errs.push(`${z.name}: no Warcraft II demo data inside.`); continue; }
       notes.push(`${z.name}: loaded the Warcraft II demo. You can play Alterac Mountains with six heroes; import the full game any time to unlock everything.`);
     } catch (err) { errs.push(`${z.name}: ${err.message}`); }
   }
@@ -3257,7 +3309,7 @@ function labRenderGrid() {
       <br>• <code>War2Dat.mpq</code>: sound effects
       <br><br>${installPathsHtml()}
       <br>Heroes, enemies, missiles and sounds are then assigned automatically. Files stay in this browser only, so you do this once per device and nothing is uploaded. Old DOS installs work too: load <code>MAINDAT.WAR</code> and <code>SNDDAT.WAR</code>.
-      <br><br><b>No copy of Warcraft II?</b> Try the free 1996 demo: download <code>DOSBOX_WAR2.ZIP</code> from <a href="${DEMO.download}" target="_blank" rel="noopener">dosgames.com</a> (the main Download button), then click <i>Load single files</i> and choose that zip. You get Alterac Mountains and six heroes. To play everything, get ${fullGameLink()} from the Battle.net Shop and import it here; your progress carries over.</div>`;
+      <br><br><b>No copy of Warcraft II?</b> The free 1996 shareware demo comes with the game and loads by itself the first time you play: Alterac Mountains and six heroes. To play everything, get ${fullGameLink()} from the Battle.net Shop and import it here; your progress carries over.</div>`;
     return;
   }
   const filter = labFilter.value, frag = document.createDocumentFragment();
@@ -3419,6 +3471,7 @@ async function boot() {
   const files = (await DB.all()) || [];
   for (const f of files) { if (!f.buf) continue; try { const w = addWar(f.name, f.buf); const nm = store.get('tos_sndnames_' + f.name, null); if (nm) w.names = nm; } catch (e) {} }
   try { for (const k of (await DB.musicNames()) || []) mu.names.add(k); } catch (e) {}
+  if (!Object.keys(A.wars).length && !/[?&]nodemo/.test(location.search)) await autoLoadDemo();
   autoAssign(false);
   rebuildSprites();
   showTitle();

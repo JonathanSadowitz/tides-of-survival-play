@@ -11,6 +11,7 @@ self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', e => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;
+  if (req.headers.has('range') || url.pathname.includes('/demo/')) return;   // the demo zip: read in parts straight from the network
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
