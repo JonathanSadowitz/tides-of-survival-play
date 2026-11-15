@@ -664,12 +664,13 @@ const Core = (() => {
   }
   // Read chosen files from a zip on a web server, fetching only the bytes they need (HTTP ranges).
   // Falls back to downloading the whole zip when the server doesn't do ranges. onProgress(bytesSoFar, bytesNeeded).
-  async function unzipRemote(url, want = () => true, onProgress = () => {}) {
+  // size: the zip's length when known, so only plain "bytes=a-b" ranges are needed (other sites allow those without asking first).
+  async function unzipRemote(url, want = () => true, onProgress = () => {}, size = 0) {
     const get = async (a, b) => { const r = await fetch(url, { headers: { Range: `bytes=${a}-${b}` } }); if (!r.ok) throw new Error(`Couldn't download the demo (${r.status})`); return r; };
-    const tailR = await fetch(url, { headers: { Range: 'bytes=-66000' } });
+    const tailR = size ? await get(Math.max(0, size - 66000), size - 1) : await fetch(url, { headers: { Range: 'bytes=-66000' } });
     if (!tailR.ok) throw new Error(`Couldn't download the demo (${tailR.status})`);
     if (tailR.status !== 206) { const all = await tailR.arrayBuffer(); onProgress(all.byteLength, all.byteLength); return unzip(all, want); }
-    const total = +(tailR.headers.get('content-range') || '').split('/')[1], tail = new Uint8Array(await tailR.arrayBuffer()), t0 = total - tail.length;
+    const total = size || +(tailR.headers.get('content-range') || '').split('/')[1], tail = new Uint8Array(await tailR.arrayBuffer()), t0 = total - tail.length;
     let e = -1; for (let i = tail.length - 22; i >= 0; i--) if (u32(tail, i) === 0x06054b50) { e = i; break; }
     if (e < 0) throw new Error('Not a zip file');
     const n = u16(tail, e + 10), cdSize = u32(tail, e + 12), cdOff = u32(tail, e + 16);
@@ -1099,7 +1100,7 @@ const DEMO = {
   shop: 'https://shop.battle.net/product/warcraft-2-battle-net-edition', download: 'https://www.dosgames.com/game/warcraft-2-tides-of-darkness',
   // Blizzard's Warcraft II shareware CD (v1.08), shipped unmodified next to the game; on itch.io it's fetched from the play site.
   urls: ['demo/war2sw108.zip', 'https://jonathansadowitz.github.io/tides-of-survival-play/demo/war2sw108.zip'],
-  files: /(^|\/)(MAINDAT\.WAR|REZDAT\.WAR|SFXDAT\.SUD)$/i,
+  files: /(^|\/)(MAINDAT\.WAR|REZDAT\.WAR|SFXDAT\.SUD)$/i, size: 37372714,   // the zip never changes (it must stay as released)
 };
 // Turn the demo's files into the game's archives and keep them. Returns false if the files aren't the demo.
 async function installDemo(got) {
@@ -1117,7 +1118,7 @@ async function autoLoadDemo() {
     try {
       overlay.className = ''; overlay.style.display = 'flex';
       overlay.innerHTML = `<div class="panel"><h2>Tides of Survival</h2><p class="sub">Loading the free Warcraft II demo…</p><p class="help" id="demoProg">Starting</p></div>`;
-      const got = await Core.unzipRemote(url, n => DEMO.files.test(n), (a, b) => { const el = $('#demoProg'); if (el) el.textContent = `${(a / 1048576).toFixed(1)} of ${(b / 1048576).toFixed(1)} MB`; });
+      const got = await Core.unzipRemote(url, n => DEMO.files.test(n), (a, b) => { const el = $('#demoProg'); if (el) el.textContent = `${(a / 1048576).toFixed(1)} of ${(b / 1048576).toFixed(1)} MB`; }, DEMO.size);
       if (await installDemo(got)) { A.demo = true; for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k]; autoAssign(true); return true; }
     } catch (e) { console.warn('demo', url, e); }
   }
