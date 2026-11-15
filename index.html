@@ -50,7 +50,12 @@
   .chead{display:flex;gap:8px;align-items:center}
   .ctitle{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
   .evohint{color:#ffd24a;margin-top:3px}
-  img.cicon.evo{box-shadow:0 0 0 2px #ffd24a,0 0 6px 2px rgba(255,210,74,.7)}
+  .card.locked{opacity:.55;filter:grayscale(.8);cursor:default}
+  .card.locked .hpic{filter:grayscale(1) brightness(.6)}
+  .opts.buyrow{flex-direction:row;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0 2px}
+  .opts.buyrow .opt{width:auto!important;min-width:0;padding:3px 10px;font-size:.9em}
+  .nextup{opacity:.9}
+  p.unl{margin:2px 0}box-shadow:0 0 0 2px #ffd24a,0 0 6px 2px rgba(255,210,74,.7)}
   img.cicon{width:46px;height:38px;image-rendering:pixelated;flex:none;border:1px solid #000;box-shadow:0 0 0 1px #8c6a2c}
   .loot img.cicon{float:left;margin:0 8px 0 0;width:34px;height:28px}
   .stats.hist{grid-template-columns:auto auto;text-align:left;max-width:640px}
@@ -1508,6 +1513,43 @@ const MAX_LVL = 5, MAX_SLOTS = 6;
 
 let meta = store.get('tos_meta', null) || { gold: 0, spent: 0, ups: {}, unlocked: 0, last: null };
 meta.ups ||= {};
+// Heroes: Lothar and Grom from the start; the rest unlock by reaching a goal or by buying them with Armoury gold.
+const START_HEROES = ['lothar', 'grom'];
+const freshProg = () => ({ kills: { Alliance: 0, Horde: 0 }, time: {}, won: { Alliance: false, Horde: false }, lv: {} });
+meta.heroes ||= [...START_HEROES]; meta.prog ||= freshProg();
+const P_ = () => meta.prog;
+const HERO_UNLOCKS = {
+  alleria:  { cost: 800,  goal: 'Kill 2,000 enemies in one run as an Alliance hero', done: () => P_().kills.Alliance >= 2000, best: () => `best ${P_().kills.Alliance.toLocaleString('en-GB')} kills` },
+  zuljin:   { cost: 800,  goal: 'Kill 2,000 enemies in one run as a Horde hero',     done: () => P_().kills.Horde >= 2000,    best: () => `best ${P_().kills.Horde.toLocaleString('en-GB')} kills` },
+  uther:    { cost: 1500, goal: 'Survive 10:00 as Lothar', done: () => (P_().time.lothar || 0) >= 600, best: () => `best ${fmtTime(P_().time.lothar || 0)}` },
+  chogall:  { cost: 1500, goal: 'Survive 10:00 as Grom',   done: () => (P_().time.grom || 0) >= 600,   best: () => `best ${fmtTime(P_().time.grom || 0)}` },
+  khadgar:  { cost: 2500, goal: 'Win any battlefield as an Alliance hero', done: () => P_().won.Alliance, best: () => 'not won yet' },
+  teron:    { cost: 2500, goal: 'Win any battlefield as a Horde hero',     done: () => P_().won.Horde,    best: () => 'not won yet' },
+};
+const heroOpen = id => START_HEROES.includes(id) || meta.heroes.includes(id);
+// Record what this run achieved, then unlock any hero whose goal is now met. Returns the newly unlocked heroes.
+function recordProgress() {
+  const p = P_(), side = G.HD.side, t = Math.floor(G.t);
+  p.kills[side] = Math.max(p.kills[side] || 0, G.kills);
+  p.time[G.heroId] = Math.max(p.time[G.heroId] || 0, t);
+  p.lv[G.LV.id] = Math.max(p.lv[G.LV.id] || 0, t);
+  if (G.won) p.won[side] = true;
+  const got = [];
+  for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!heroOpen(id) && U.done()) { meta.heroes.push(id); got.push(id); }
+  return got;
+}
+function buyHero(id) {
+  const U = HERO_UNLOCKS[id]; if (!U || heroOpen(id) || meta.gold < U.cost) return false;
+  meta.gold -= U.cost; meta.heroes.push(id); saveMeta(); sfx('s_buy', 0); return true;
+}
+// The next goals worth chasing, for the end-of-run screen.
+function nextUp() {
+  const out = [], i = meta.unlocked;
+  if (i + 1 < LEVELS.length) out.push(`Next battlefield: ${LEVELS[i + 1].name}. Survive ${fmtTime(UNLOCK_T)} in ${LEVELS[i].name} (best ${fmtTime(P_().lv[LEVELS[i].id] || 0)}).`);
+  const h = Object.keys(HERO_UNLOCKS).find(id => !heroOpen(id));
+  if (h) out.push(`Next hero: ${HEROES[h].name}. ${HERO_UNLOCKS[h].goal} (${HERO_UNLOCKS[h].best()}), or buy for ${HERO_UNLOCKS[h].cost} gold in hero select.`);
+  return out;
+}
 const saveMeta = () => store.set('tos_meta', meta);
 const up = id => meta.ups[id] || 0;
 // Each level costs more than the last: base x 1, 2.5, 4.5, 7, 10 (rather than 1, 2, 3, 4, 5), so a full Armoury takes many runs.
@@ -2585,9 +2627,10 @@ overlay.addEventListener('click', e => {
   if (b.disabled) return;
   if (act === 'title') showTitle();
   else if (act === 'choose') showChoose();
-  else if (act === 'hero') { heroVoice('yes', 1, b.dataset.id); showLevels(b.dataset.id); }
-  else if (act === 'start') newRun(b.dataset.id, b.dataset.level);
-  else if (act === 'quick') { const l = meta.last; newRun(l.hero, l.level); }
+  else if (act === 'hero') { if (!heroOpen(b.dataset.id)) return; heroVoice('yes', 1, b.dataset.id); showLevels(b.dataset.id); }
+  else if (act === 'buyhero') { if (buyHero(b.dataset.id)) { heroVoice('yes', 1, b.dataset.id); showChoose(b.dataset.id); } }
+  else if (act === 'start') { if (heroOpen(b.dataset.id)) newRun(b.dataset.id, b.dataset.level); }
+  else if (act === 'quick') { const l = meta.last; if (heroOpen(l.hero)) newRun(l.hero, l.level); }
   else if (act === 'continue') continueRun();
   else if (act === 'history') showHistory();
   else if (act === 'exportsave') showSaveCode('export');
@@ -2616,7 +2659,7 @@ function showTitle() {
   const l = meta.last, lv = l && LEVELS.find(x => x.id === l.level);
   if (A.menuBg && A.btn) {
     const sr = savedRun(), quick = sr ? `<button class="opt" data-act="continue">Continue: ${HEROES[sr.hero].name.split(' ')[0]} ${fmtTime(sr.t)}</button>`
-      : l && HEROES[l.hero] && lv ? `<button class="opt" data-act="quick">Quick Start: ${HEROES[l.hero].name.split(' ')[0]}</button>` : '';
+      : l && HEROES[l.hero] && heroOpen(l.hero) && lv ? `<button class="opt" data-act="quick">Quick Start: ${HEROES[l.hero].name.split(' ')[0]}</button>` : '';
     overlay.innerHTML = `<div class="wcstage"><img class="bg" src="${A.menuBg}" alt="">
       <div class="wcbtns"><button class="opt" data-act="choose">Start a Run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
       <button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="lab">Asset Lab</button></div>
@@ -2629,7 +2672,7 @@ function showTitle() {
   }
   const b = '';
   const sr = savedRun(), quick = (sr ? `<button class="opt" data-act="continue">Continue: ${HEROES[sr.hero].name.split(' ')[0]}, ${fmtTime(sr.t)}</button>` : '')
-    + (l && HEROES[l.hero] && lv ? `<button class="opt" data-act="quick">Quick start: ${HEROES[l.hero].name.split(' ')[0]}, ${lv.name}</button>` : '');
+    + (l && HEROES[l.hero] && heroOpen(l.hero) && lv ? `<button class="opt" data-act="quick">Quick start: ${HEROES[l.hero].name.split(' ')[0]}, ${lv.name}</button>` : '');
   showMenu(`<h1>Tides of Survival</h1><p class="sub">A Warcraft II survivors-like fan game</p>
     <div class="status">${assetSummary()}</div>
     <div class="opts"><button class="opt" data-act="choose">Start a run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
@@ -2704,7 +2747,7 @@ function showSaveCode(mode, msg) {
 function loadSaveCode() {
   let d; try { d = readSaveCode($('#saveCode').value); } catch (e) { return showSaveCode('import', e.message); }
   for (const k of Object.keys(meta)) delete meta[k];
-  Object.assign(meta, { gold: 0, spent: 0, ups: {}, unlocked: 0, last: null }, d.meta); saveMeta();
+  Object.assign(meta, { gold: 0, spent: 0, ups: {}, unlocked: 0, last: null, heroes: [...START_HEROES], prog: freshProg() }, d.meta); saveMeta();
   if (d.best) { best = d.best; store.set('tos_best', best); }
   if (d.opts) { cfg.opts = Object.assign(cfg.opts, d.opts); saveCfg(); musicVolume(); }
   if (d.hero) store.set('tos_hero', d.hero);
@@ -2745,6 +2788,11 @@ function showShop(focus) {
 }
 function heroCard(id) {
   const H_ = HEROES[id], spd = H_.speed >= 82 ? 'fast' : H_.speed >= 72 ? 'average speed' : 'slow';
+  if (!heroOpen(id)) { const U = HERO_UNLOCKS[id];
+    return `<button class="opt card hero locked" data-act="hero" data-id="${id}" aria-disabled="true">
+    <span class="hrow"><canvas class="hpic" width="48" height="48" data-hero="${id}"></canvas>
+    <span><span class="nm">${H_.name}</span><span class="lv ${H_.side === 'Horde' ? 'horde' : 'ally'}">${H_.unit}: locked</span></span></span>
+    <span class="ds">${U.goal} (${U.best()}).</span><span class="ds chestgold">Or buy for ${U.cost} gold.</span></button>`; }
   return `<button class="opt card hero" data-act="hero" data-id="${id}">
     <span class="hrow"><canvas class="hpic" width="48" height="48" data-hero="${id}"></canvas>
     <span><span class="nm">${H_.name}</span><span class="lv ${H_.side === 'Horde' ? 'horde' : 'ally'}">${H_.unit}</span></span></span>
@@ -2767,13 +2815,15 @@ function drawHeroPics() {
     }
   });
 }
-function showChoose() {
+function showChoose(focus) {
   const ids = Object.keys(HEROES), ally = ids.filter(i => HEROES[i].side === 'Alliance'), horde = ids.filter(i => HEROES[i].side === 'Horde');
-  showMenu(`<h2>Choose your hero</h2>
-    <h3 class="side ally">The Alliance</h3><div class="cards">${ally.map(heroCard).join('')}</div>
-    <h3 class="side horde">The Horde</h3><div class="cards">${horde.map(heroCard).join('')}</div>
+  const buys = list => { const l = list.filter(id => !heroOpen(id)); return l.length ? `<div class="opts buyrow">${l.map(id => `<button class="opt" data-act="buyhero" data-id="${id}" ${meta.gold < HERO_UNLOCKS[id].cost ? 'disabled' : ''}>Buy ${HEROES[id].name.split(' ')[0]} (${HERO_UNLOCKS[id].cost} gold)</button>`).join('')}</div>` : ''; };
+  showMenu(`<h2>Choose your hero</h2><p class="sub">You have <b class="chestgold">${meta.gold} gold</b>.</p>
+    <h3 class="side ally">The Alliance</h3><div class="cards">${ally.map(heroCard).join('')}</div>${buys(ally)}
+    <h3 class="side horde">The Horde</h3><div class="cards">${horde.map(heroCard).join('')}</div>${buys(horde)}
     <div class="opts" style="margin-top:14px"><button class="opt" data-act="title" data-back>Back</button></div>`);
-  const i = [...ally, ...horde].indexOf(store.get('tos_hero', 'lothar'));
+  if (focus) { const i = opts().findIndex(o => o.dataset.act === 'hero' && o.dataset.id === focus); if (i >= 0) { sel = i; highlight(); drawHeroPics(); return; } }
+  const last = store.get('tos_hero', 'lothar'), i = opts().findIndex(o => o.dataset.act === 'hero' && o.dataset.id === (heroOpen(last) ? last : 'lothar'));
   if (i >= 0) { sel = i; highlight(); }
   drawHeroPics();
 }
@@ -2903,7 +2953,8 @@ function endRun(won) {
   playMusic(won ? 'victory' : 'defeat');
   showMenu(`<h2>${won ? 'Victory!' : 'You have fallen'}</h2><p class="sub">${won ? 'You held the line for fifteen minutes.' : 'The horde was too much this time.'}</p>
     <div class="stats"><b>Hero</b><span>${G.HD.name}</span><b>Battlefield</b><span>${G.LV.name}</span><b>Survived</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>+${G.gold}${G.bonus ? ` (+${G.bonus} for surviving)` : ''}</span></div>
-    ${unlocked ? `<p class="sub chestgold">New battlefield unlocked: ${unlocked}!</p>` : ''}
+    ${unlocked || G.newHeroes.length ? `<h3 class="chestgold">Unlocked</h3>${[unlocked && `New battlefield: ${unlocked}`, ...G.newHeroes.map(id => `New hero: ${HEROES[id].name}`)].filter(Boolean).map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}` : ''}
+    ${nextUp().map(t => `<p class="help nextup">${t}</p>`).join('')}
     <div class="opts"><button class="opt" data-act="retry">Retry</button><button class="opt" data-act="choose">Change hero</button><button class="opt" data-act="quit" data-back>Title screen</button></div>`);
 }
 // Bank the run's gold and unlock the next level. Returns the name of a newly unlocked level, if any.
@@ -2912,6 +2963,7 @@ function bankRun() {
   G.banked = true; G.bonus = Math.floor(G.t / 60) * 6; meta.gold += G.gold + G.bonus; store.del(RUN_KEY);   // a little extra for every minute survived
   const i = LEVELS.indexOf(G.LV); let unlocked = null;
   if (G.t >= UNLOCK_T && i === meta.unlocked && i + 1 < LEVELS.length) { meta.unlocked = i + 1; unlocked = LEVELS[i + 1].name; }
+  G.newHeroes = recordProgress();
   saveMeta(); return unlocked;
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) pauseRun(); });
@@ -3264,7 +3316,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, LATE, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, LATE, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
