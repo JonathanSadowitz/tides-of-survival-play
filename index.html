@@ -24,6 +24,7 @@
   #speedBtn{position:fixed;top:calc(env(safe-area-inset-top) + 34px);right:calc(env(safe-area-inset-right) + 54px);
     height:40px;min-width:46px;border-radius:8px;border:2px solid var(--gold2);background:rgba(20,14,8,.7);color:var(--gold);
     font-weight:900;font-size:14px;display:none;z-index:5}
+  #overlay.locked .card, #overlay.locked .lvlrow .opt, #overlay.locked [data-act=chestok]{opacity:.55;filter:saturate(.6);transition:opacity .15s}
   #overlay.titled{background-size:cover;background-position:center top;image-rendering:pixelated;align-items:flex-end}
   #overlay.titled .panel{background:linear-gradient(rgba(59,47,34,.9),rgba(36,27,18,.94));max-width:640px;padding:10px 14px;margin-bottom:2vh}
   #overlay.titled .sub,#overlay.titled .help.long{display:none}
@@ -985,7 +986,13 @@ if (typeof module !== 'undefined') module.exports = Terrain;
 (() => {
 'use strict';
 const $ = s => document.querySelector(s);
-const cv = $('#c'), ctx = cv.getContext('2d');
+const cv = $('#c'), screenCtx = cv.getContext('2d');
+// The battlefield is drawn at the art's own size into a small buffer, then scaled up to the screen in one
+// go. Drawing every unit straight onto the full-size screen filled SCALE² times as many pixels (9 to 25
+// times), which is what made big crowds slow. Damage numbers, effects and the HUD go on the screen itself
+// so text stays crisp. `ctx` is whichever of the two is being drawn on.
+const wcv = document.createElement('canvas'), worldCtx = wcv.getContext('2d');
+let ctx = screenCtx;
 const overlay = $('#overlay'), pauseBtn = $('#pauseBtn'), speedBtn = $('#speedBtn');
 const SPEEDS = [1, 1.5, 2];
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedBtn.textContent = cfg.opts.speed + 'x'; }
@@ -2334,8 +2341,16 @@ function drop(e) {
   maybePowerup(e);
   if (Math.random() < 0.012) G.gems.push({ x: e.x + rnd(-4, 4), y: e.y + rnd(-4, 4), meat: true });
   if (Math.random() < 0.06 + 0.03 * (e.type === 'tank')) G.gems.push({ x: e.x + rnd(-5, 5), y: e.y + rnd(-5, 5), coin: Math.round((e.type === 'tank' ? 8 : 3) * goldMul()) });
+  if (!G.dropTip && G.gems.length && G.gems[G.gems.length - 1].v === undefined) tipDrops(G.gems[G.gems.length - 1]);
   G.gems.push({ x: e.x, y: e.y, v: e.xp });
   if (G.gems.length > 420) { const i = G.gems.findIndex(g => g.v); if (i >= 0) gainXp(G.gems.splice(i, 1)[0].v); }
+}
+// The first few runs point out the first gold, meat or power-up that drops: players were missing them.
+function tipDrops(g) {
+  G.dropTip = true;
+  if ((meta.dropTips || 0) >= 3) return;
+  meta.dropTips = (meta.dropTips || 0) + 1; saveMeta();
+  G.banner = { text: g.pow ? 'A power-up dropped! Walk over it to use it' : 'Foes drop gold, meat and power-ups. Walk over them!', icon: g.pow ? A.pick && A.pick.pow && A.pick.pow[g.pow] : A.pick && A.pick.gold, t: 4 };
 }
 function hurtHero(d, src) {
   const h = G.hero; G.stats.lastHit = src || null; let dm = Math.max(1, d - h.armour);
@@ -2892,10 +2907,47 @@ function drawSprite(role, x, y, dir, t, flash, atkP, dieT) {
   const dx = Math.round(x - camX - w / 2), dy = Math.round(y - camY - h / 2);
   const a0 = ctx.globalAlpha;
   if (flash) ctx.globalAlpha = a0 * 0.55;
-  if (flip) { ctx.save(); ctx.translate(dx + w, dy); ctx.scale(-1, 1); ctx.drawImage(s.canvas, sx, sy, s.fw, s.fh, 0, 0, w, h); ctx.restore(); }
+  if (flip) { const m = mirrored(s); ctx.drawImage(m, m.width - sx - s.fw, sy, s.fw, s.fh, dx, dy, w, h); }   // a mirrored copy of the sheet: no save/restore per sprite
   else ctx.drawImage(s.canvas, sx, sy, s.fw, s.fh, dx, dy, w, h);
   ctx.globalAlpha = a0;
   return true;
+}
+// A soft column of light over power-ups and treasure, as loot is marked in most games of the kind.
+function lootBeam(x, y, col, now) {
+  const a = 0.5 + 0.15 * Math.sin(now / 300), g = ctx.createLinearGradient(0, y - 56, 0, y + 6);
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.75, col); g.addColorStop(1, '#fff');
+  ctx.globalAlpha = a * 0.55; ctx.fillStyle = g; ctx.fillRect(x - 7, y - 56, 14, 62);
+  ctx.globalAlpha = a; ctx.fillRect(x - 3, y - 56, 6, 62);
+  ctx.globalAlpha = a * 0.6; circle(x, y + 4, 9, col, null); ctx.globalAlpha = 1;
+}
+// A four-pointed glint that flashes for a moment once per cycle (p runs 0 to 1).
+function sparkle(x, y, p) {
+  if (p > 0.18) return; const k = Math.sin(p / 0.18 * Math.PI), r = Math.round(1 + 2 * k);
+  ctx.globalAlpha = k; ctx.fillStyle = '#fffbe0'; ctx.fillRect(x - r, y, r * 2 + 1, 1); ctx.fillRect(x, y - r, 1, r * 2 + 1); ctx.globalAlpha = 1;
+}
+// Arrows at the screen's edge pointing at power-ups and treasure that have dropped out of sight.
+function drawLootArrows() {
+  const h = G.hero, m = 14, cx = W / 2, cy = H / 2, now = performance.now();
+  for (const g of G.gems) {
+    if (!g.pow && !g.chest) continue;
+    const dx = g.x - camX - cx, dy = g.y - camY - cy;
+    if (Math.abs(dx) < cx - 4 && Math.abs(dy) < cy - 4) continue;
+    if (Math.hypot(g.x - h.x, g.y - h.y) > 900) continue;
+    const k = Math.min((cx - m) / Math.abs(dx || 1e-6), (cy - m) / Math.abs(dy || 1e-6)), x = cx + dx * k, y = cy + dy * k, a = Math.atan2(dy, dx);
+    const col = g.pow ? POWERUPS[g.pow].col : '#ffd24a';
+    ctx.globalAlpha = 0.75 + 0.25 * Math.sin(now / 200);
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 9, y + Math.sin(a) * 9); ctx.lineTo(x + Math.cos(a + 2.4) * 8, y + Math.sin(a + 2.4) * 8); ctx.lineTo(x + Math.cos(a - 2.4) * 8, y + Math.sin(a - 2.4) * 8); ctx.fill();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7); ctx.lineTo(x + Math.cos(a + 2.4) * 6, y + Math.sin(a + 2.4) * 6); ctx.lineTo(x + Math.cos(a - 2.4) * 6, y + Math.sin(a - 2.4) * 6); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+// Units facing west are the east-facing frames flipped. Flipping the whole sheet once is far cheaper than
+// a save, transform and restore for every unit, every frame, which slowed big crowds down.
+function mirrored(s) {
+  if (s.mirSrc === s.canvas) return s.mir;
+  const c = document.createElement('canvas'); c.width = s.canvas.width; c.height = s.canvas.height;
+  const x = c.getContext('2d'); x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(s.canvas, 0, 0);
+  s.mir = c; s.mirSrc = s.canvas; return c;
 }
 function circle(x, y, r, fill, stroke) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); } }
 function foeRole(r) { const k = (G.HD.side === 'Horde' ? 'ally_' : '') + r; return A.sprites[k] ? k : r; }
@@ -2918,7 +2970,7 @@ function drawEnemyAt(e, x, y, up, role, sp) {
     const c = e.charge; ctx.strokeStyle = `rgba(255,60,40,${0.35 + 0.3 * Math.sin(e.t * 20)})`; ctx.lineWidth = e.r * 1.4;
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + c.dx * 150, y + c.dy * 150); ctx.stroke();
   }
-  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y + e.r * 0.8, e.r * (e.fly ? 0.8 : 1), e.r * 0.4, 0, 0, TAU); ctx.fill();
+  if (!G.shadowsDrawn) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y + e.r * 0.8, e.r * (e.fly ? 0.8 : 1), e.r * 0.4, 0, 0, TAU); ctx.fill(); }
 
   if (drawSprite(role, e.x, e.y - up, e.dir, e.t, e.flash > 0, e.swing > 0 ? 1 - e.swing / SWING : null)) return;   // elites and bosses wear their own player colours
   const T = ET[e.type];
@@ -3199,20 +3251,38 @@ function drawJoy() {   // the touch stick, where your thumb went down
   }
 }
 function render() {
-  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0); ctx.imageSmoothingEnabled = false;
-  if (!G) { camX = attract * 12 - W / 2; camY = attract * 5 - H / 2; drawGround(); return; }
+  const bw = Math.ceil(W), bh = Math.ceil(H);
+  if (wcv.width !== bw || wcv.height !== bh) { wcv.width = bw; wcv.height = bh; }
+  ctx = worldCtx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
+  try { renderWorld(); } finally {
+    ctx = screenCtx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(wcv, 0, 0, bw, bh, 0, 0, bw * SCALE, bh * SCALE);
+    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  }
+  if (!G) return;
+  for (const f of G.fx) drawFx(f);
+  if (G.state === 'play') drawLootArrows();
+  drawHudSafe();
+}
+function renderWorld() {
+  if (!G) { camX = Math.round(attract * 12 - W / 2); camY = Math.round(attract * 5 - H / 2); drawGround(); return; }
   const h = G.hero; camX = Math.round(h.x - W / 2); camY = Math.round(h.y - H / 2);
   drawGround();
   if (G.weapons.aura) { const r = (26 + 5 * G.weapons.aura.lvl + (G.weapons.aura.lvl >= 5 ? 5 : 0)) * h.area; circle(h.x - camX, h.y - camY, r, 'rgba(255,236,150,.10)', 'rgba(255,236,150,.35)'); }
   for (const c of G.corpses) drawCorpse(c);
   for (const s of G.shots) if (s.k === 'rune') drawShot(s);
+  const now = performance.now();
   for (const g of G.gems) {
-    const x = Math.round(g.x - camX), y = Math.round(g.y - camY);
-    if (x < -10 || y < -10 || x > W + 10 || y > H + 10) continue;
+    let x = Math.round(g.x - camX), y = Math.round(g.y - camY);
+    if (x < -20 || y < -40 || x > W + 20 || y > H + 20) continue;
     const pk = A.pick || {};
+    if (!g.v) {   // anything but experience: pops out of the fallen foe, then glows so it can't be missed
+      if (g.born === undefined) g.born = G.t;
+      const age = G.t - g.born; if (age < 0.45 && !g.pull) y -= Math.round(Math.sin(age / 0.45 * Math.PI) * 8);
+      if (g.pow || g.chest) lootBeam(x, y, g.pow ? POWERUPS[g.pow].col : '#ffd24a', now);
+    }
     if (g.chest) {
       if (g.look === undefined) g.look = (G.chestLook = (G.chestLook || 0) + 1) % 2;
-      const now = performance.now();
       if (g.look === 0 && pk.circle) { ctx.globalAlpha = 0.7 + 0.3 * Math.sin(now / 220); ctx.drawImage(pk.circle, x - 16, y - 16, 32, 32); ctx.globalAlpha = 1; continue; }
       if (pk.runestone) { ctx.globalAlpha = 0.1 + 0.08 * Math.sin(now / 200); circle(x, y + 7, 11, '#8fd0ff', null); ctx.globalAlpha = 1; ctx.drawImage(pk.runestone, x - 16, y - 20, 32, 32); continue; }
       if (pk.crate) { const bob = Math.round(Math.sin(now / 300) * 1); ctx.drawImage(pk.crate, x - 10, y - 9 + bob, 20, 18); continue; }
@@ -3225,8 +3295,19 @@ function render() {
       if (im) ctx.drawImage(im, x - 9, y - 8 + bob, 18, 16); else { ctx.fillStyle = pw.col; ctx.fillRect(x - 5, y - 5 + bob, 10, 10); }
       continue;
     }
-    if (g.coin) { if (pk.gold) { ctx.drawImage(pk.gold, x - 4, y - 4, 8, 8); continue; } circle(x, y, 3, '#e7c04a', '#6b4518'); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x - 1, y - 2, 1, 2); continue; }
-    if (g.meat) { circle(x, y, 3, '#b84a3a', '#3a1208'); ctx.fillStyle = '#eee'; ctx.fillRect(x + 2, y - 3, 3, 2); continue; }
+    if (g.coin) {
+      const ph = (g.x * 7 + g.y * 13) % 1000;   // each coin twinkles at its own moment
+      ctx.globalAlpha = 0.28 + 0.14 * Math.sin((now + ph) / 260); circle(x, y, 8, '#ffd24a', null); ctx.globalAlpha = 1;
+      if (pk.gold) ctx.drawImage(pk.gold, x - 6, y - 6, 12, 12); else { circle(x, y, 4, '#e7c04a', '#6b4518'); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x - 1, y - 2, 1, 2); }
+      sparkle(x + 3, y - 4, ((now + ph * 3) % 1600) / 1600);
+      continue;
+    }
+    if (g.meat) {
+      ctx.globalAlpha = 0.4 + 0.15 * Math.sin(now / 240); circle(x, y, 9, '#ff6a50', null); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#eee'; ctx.fillRect(x + 2, y - 5, 2, 5); ctx.fillRect(x + 1, y - 6, 4, 2);   // the bone
+      circle(x - 1, y + 1, 4.5, '#b84a3a', '#3a1208'); ctx.fillStyle = '#e07a5a'; ctx.fillRect(x - 3, y - 1, 2, 2);
+      continue;
+    }
     if (A.sprites.gem && drawSprite('gem', g.x, g.y, 0, attract, false)) continue;
     if (pk.xp) { const sz = g.v >= 5 ? 14 : g.v >= 3 ? 12 : 10; ctx.drawImage(pk.xp, x - sz / 2, y - sz / 2, sz, sz); continue; }
     ctx.fillStyle = g.v >= 5 ? '#ffd24a' : g.v >= 3 ? '#5ee08a' : '#5aa8ff';
@@ -3239,14 +3320,17 @@ function render() {
   list.sort((a, b) => sy(a) - sy(b));
   for (const m of G.marks) drawMark(m);
   for (const w of G.whirls || []) drawWhirl(w);
+  // Every unit's shadow in one path and one fill, rather than one fill per unit.
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath();
+  for (const e of list) if (e && e.type && !e.static) { const x = e.x - camX, y = e.y - camY + e.r * 0.8, rx = e.r * (e.fly ? 0.8 : 1); ctx.moveTo(x + rx, y); ctx.ellipse(x, y, rx, e.r * 0.4, 0, 0, TAU); }
+  ctx.fill(); G.shadowsDrawn = true;
   for (const e of list) !e ? (G.HD.fly ? 0 : drawHero()) : e.fly ? 0 : e.spr && !e.type ? drawBuilding(e) : drawEnemy(e);
   for (const e of list) if (e && e.fly) drawEnemy(e);   // fliers over trees and buildings
   if (G.HD.fly) drawHero();   // Kurdran and Deathwing too
+  G.shadowsDrawn = false;
   for (const m of G.marks) drawMarkShot(m);
   for (const s of G.shots) if (s.k !== 'rune') drawShot(s);
   for (const s of G.eshots) { if (!drawSprite(s.role && A.sprites[s.role] ? s.role : foeRole('eshot'), s.x, s.y, s.dir, attract, false)) circle(s.x - camX, s.y - camY, s.homing ? 4 : 2.5, s.homing ? '#c060ff' : '#9be04a', '#203a08'); }
-  for (const f of G.fx) drawFx(f);
-  drawHudSafe();
 }
 
 /* ---------- input ---------- */
@@ -3328,9 +3412,16 @@ let sel = 0;
 const menuOpen = () => overlay.style.display === 'flex';
 // A menu that pops up mid-fight (level-up, chest) must not react to the keys or stick you were already
 // holding to move: those are ignored until released, and choosing is locked for a moment.
-let heldAtOpen = new Set(), menuLockUntil = 0;
-function guardMenu(lockMs = 0) { heldAtOpen = new Set(keys); pad.needNeutral = true; menuLockUntil = performance.now() + lockMs; }
+// The mouse gets the same guard: a press only counts if it began after the lock ended, so clicking to walk
+// as the cards appear can't pick one by accident. The cards stay dimmed while locked, to show why.
+let heldAtOpen = new Set(), menuLockUntil = 0, pressAt = 0, lockTimer = 0;
+function guardMenu(lockMs = 0) {
+  heldAtOpen = new Set(keys); pad.needNeutral = true; menuLockUntil = performance.now() + lockMs;
+  clearTimeout(lockTimer); if (lockMs) lockTimer = setTimeout(() => overlay.classList.remove('locked'), lockMs);
+}
 const menuLocked = () => performance.now() < menuLockUntil;
+const MENU_LOCK = 600;   // ms after a level-up or chest appears before a choice counts
+const RUN_MENU = new Set(['pick', 'reroll', 'skip', 'chestok']);
 function showMenu(html) {
   overlay.className = ''; overlay.innerHTML = `<div class="panel">${html}</div>`; overlay.style.display = 'flex'; sel = 0; titleArt(false);
   if (!G && A.menuBg) { overlay.classList.add('parch'); overlay.style.backgroundImage = `url(${A.menuBg})`; if (!overlay.querySelector('.cards, .hsel')) overlay.classList.add('bare'); }
@@ -3373,9 +3464,11 @@ function menuKey(code) {
   else if (code === 'Escape') { const back = overlay.querySelector('[data-back]'); if (back) back.click(); }
 }
 overlay.addEventListener('pointermove', e => { const b = e.target.closest('button.opt'); if (b) { const i = opts().indexOf(b); if (i >= 0 && i !== sel) { sel = i; highlight(); } } });
+overlay.addEventListener('pointerdown', () => { pressAt = performance.now(); });
 overlay.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act;
+  if (e.detail > 0 && RUN_MENU.has(act) && pressAt < menuLockUntil) return;   // a real click that began too early
   ensureAudio();
   if (b.disabled) return;
   if (act === 'title') showTitle();
@@ -3767,7 +3860,7 @@ function itemInfo(c) {
 const levelSnd = () => G && G.HD.side === 'Horde' && A.sbuf.s_level_orc ? 's_level_orc' : 's_level';
 function openLevelUp(reroll) {
   G.state = 'levelup'; if (!reroll) G.pending--; joy = null; showHudBtns(false);
-  if (!reroll) guardMenu(350);
+  if (!reroll) guardMenu(MENU_LOCK);
   if (!reroll && !heroVoice('any')) sfx(levelSnd(), 0);   // a random line from the hero, or the jingle if no voices were imported
   const offer = choices(); G.offer = offer.map(c => c.id);
   const cards = offer.map((c, i) => {
@@ -3776,6 +3869,7 @@ function openLevelUp(reroll) {
   }).join('');
   showMenu(`<h2>Level ${G.hero.level}</h2><div class="cards">${cards}</div>
     <div class="lvlrow"><button class="opt" data-act="reroll" ${G.rerolls > 0 ? '' : 'disabled'}>Reroll (${G.rerolls})</button><button class="opt" data-act="skip">Skip (+10% health)</button></div>`);
+  if (menuLocked()) overlay.classList.add('locked');
 }
 function resumeOrNext() {
   if (G.chestQueue.length) openChest(G.chestQueue.shift());
@@ -3789,7 +3883,7 @@ function pickCard(kind, id) {
 }
 // Treasure chests: boss chests give 1, 3 or 5 upgrades; camp chests give gold and sometimes an upgrade.
 function openChest(kind) {
-  G.state = 'chest'; joy = null; showHudBtns(false); sfx(levelSnd(), 0); guardMenu(350);
+  G.state = 'chest'; joy = null; showHudBtns(false); sfx(levelSnd(), 0); guardMenu(MENU_LOCK);
   const r = Math.random(), n = kind === 'boss' ? (r < 0.15 ? 5 : r < 0.5 ? 3 : 1) : (r < 0.35 ? 1 : 0);
   const got = [], evo = kind === 'boss' ? evolvable()[0] : null;
   if (evo) { evolve(evo); got.push({ nm: EVOS[evo].name, lv: '<span class="lv new">Evolved!</span>', ds: `${WEAPONS[evo].name} has evolved. ${EVOS[evo].desc}`, ic: itemIcon('w', evo) }); }
@@ -3802,6 +3896,7 @@ function openChest(kind) {
   G.chestAt = performance.now();
   showMenu(`<h2>${kind === 'boss' ? 'Treasure!' : 'Supply cache'}</h2><ul class="loot${step ? '' : ' fast'}" id="loot">${items}</ul>
     <div class="opts"><button class="opt" data-act="chestok" data-back>Continue</button></div>`);
+  if (menuLocked()) overlay.classList.add('locked');
 }
 const KILLER = { basic: 'Infantry', fast: 'Sappers', tank: 'Heavy units', ranged: 'Ranged units', boss: 'A boss', shot: 'Missiles', bld: 'A tower',
   flyer: 'Fliers', scout: 'Scouts', siege: 'Siege engines', elite1: 'Elites', elite2: 'Elites', elite3: 'Elites', barrage: 'A boss',
