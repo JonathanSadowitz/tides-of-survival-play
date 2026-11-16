@@ -24,7 +24,6 @@
   #speedBtn{position:fixed;top:calc(env(safe-area-inset-top) + 34px);right:calc(env(safe-area-inset-right) + 54px);
     height:40px;min-width:46px;border-radius:8px;border:2px solid var(--gold2);background:rgba(20,14,8,.7);color:var(--gold);
     font-weight:900;font-size:14px;display:none;z-index:5}
-  #overlay.locked .card, #overlay.locked .lvlrow .opt, #overlay.locked [data-act=chestok]{opacity:.55;filter:saturate(.6);transition:opacity .15s}
   #overlay.titled{background-size:cover;background-position:center top;image-rendering:pixelated;align-items:flex-end}
   #overlay.titled .panel{background:linear-gradient(rgba(59,47,34,.9),rgba(36,27,18,.94));max-width:640px;padding:10px 14px;margin-bottom:2vh}
   #overlay.titled .sub,#overlay.titled .help.long{display:none}
@@ -3412,15 +3411,15 @@ let sel = 0;
 const menuOpen = () => overlay.style.display === 'flex';
 // A menu that pops up mid-fight (level-up, chest) must not react to the keys or stick you were already
 // holding to move: those are ignored until released, and choosing is locked for a moment.
-// The mouse gets the same guard: a press only counts if it began after the lock ended, so clicking to walk
-// as the cards appear can't pick one by accident. The cards stay dimmed while locked, to show why.
+// The mouse gets the same guard: a press only counts if it began after the menu opened, so clicking to walk
+// as the cards appear can't pick one by accident. Keys held at the time and a tilted stick are ignored too.
 let heldAtOpen = new Set(), menuLockUntil = 0, pressAt = 0, lockTimer = 0;
 function guardMenu(lockMs = 0) {
   heldAtOpen = new Set(keys); pad.needNeutral = true; menuLockUntil = performance.now() + lockMs;
   clearTimeout(lockTimer); if (lockMs) lockTimer = setTimeout(() => overlay.classList.remove('locked'), lockMs);
 }
 const menuLocked = () => performance.now() < menuLockUntil;
-const MENU_LOCK = 600;   // ms after a level-up or chest appears before a choice counts
+const MENU_LOCK = 0;   // no wait on level-ups or chests: the press and held-key checks are enough
 const RUN_MENU = new Set(['pick', 'reroll', 'skip', 'chestok']);
 function showMenu(html) {
   overlay.className = ''; overlay.innerHTML = `<div class="panel">${html}</div>`; overlay.style.display = 'flex'; sel = 0; titleArt(false);
