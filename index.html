@@ -767,7 +767,7 @@ const LEVELS = [
   { id: 'swamp', name: 'Swamp of Sorrows', blurb: 'Murky water and twisted trees. Only the hardiest survive.', ts: [438, 439, 440, 441], ground: '#3f4a2a',
     bld: { pal: 438, human: [479, 491, 80, 487, 489, 483, 495], orc: [480, 492, 81, 488, 490, 484, 496] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.55, forestLakes: 6, trees: 0.5, rocks: 0.9, dark: 0.35, camps: 0.75 }, hp: 2, mix: { ranged: 1.6, tank: 1.3 } },
 ];
-const UNLOCK_T = 600; // surviving 10 minutes unlocks the next level
+const UNLOCK_T = 480; // surviving 8 minutes unlocks the next level
 const UPGRADES = {
   might:   { name: 'Might', desc: '+5% damage', max: 5, cost: 120 },
   armour:  { name: 'Armour', desc: '+1 armour', max: 3, cost: 200 },
@@ -1756,7 +1756,7 @@ const evolvable = () => Object.keys(G.weapons).filter(id => { const w = G.weapon
 function evolve(id) { logEvent('evolved ' + id); if (!meta.evos.includes(id)) { meta.evos.push(id); saveMeta(); } G.weapons[id].evo = true; G.weapons[id].cd = 0.3; G.weapons[id].tick = 0; }
 function evoStats(id) {
   switch (id) {
-    case 'sword': return '80 damage, reach about 75, front and back, heavy knockback.';
+    case 'sword': return '80 damage, reach about 85, front and back, heavy knockback.';
     case 'arrows': return '7 arrows, 28 damage, each pierces 6.';
     case 'axes': return '5 axes, 44 damage each, heal 1 per kill.';
     case 'aura': return '21 damage every 0.4 s, wider, and a 60-damage burst every 2.5 s.';
@@ -1835,19 +1835,21 @@ const freshMeta = () => ({ gold: 0, spent: 0, ups: {}, unlocked: 0, last: null, 
 const freshProg = () => ({ kills: { Alliance: 0, Horde: 0 }, time: {}, won: { Alliance: false, Horde: false }, lv: {}, boss: { Alliance: 0, Horde: 0 } });
 meta.heroes ||= [...START_HEROES]; meta.prog ||= freshProg(); meta.prog.boss ||= { Alliance: 0, Horde: 0 }; meta.evos ||= []; meta.maxed ||= []; meta.seen ||= [];   // evolutions found and weapons maxed, for the Book of War
 const P_ = () => meta.prog;
+// An easy ladder: the first heroes come within a few runs, the later ones take real mastery.
+const sideTime = side => Math.max(0, ...Object.keys(HEROES).filter(i => HEROES[i].side === side).map(i => P_().time[i] || 0));
 const HERO_UNLOCKS = {
-  alleria:  { cost: 800,  goal: 'Kill 2,000 enemies in one run as an Alliance hero', done: () => P_().kills.Alliance >= 2000, best: () => `best ${P_().kills.Alliance.toLocaleString('en-GB')} kills` },
-  zuljin:   { cost: 800,  goal: 'Kill 2,000 enemies in one run as a Horde hero',     done: () => P_().kills.Horde >= 2000,    best: () => `best ${P_().kills.Horde.toLocaleString('en-GB')} kills` },
-  uther:    { cost: 1500, goal: 'Survive 10:00 as Lothar', done: () => (P_().time.lothar || 0) >= 600, best: () => `best ${fmtTime(P_().time.lothar || 0)}` },
-  chogall:  { cost: 1500, goal: 'Survive 10:00 as Grom',   done: () => (P_().time.grom || 0) >= 600,   best: () => `best ${fmtTime(P_().time.grom || 0)}` },
-  khadgar:  { cost: 2500, goal: 'Win any battlefield as an Alliance hero', done: () => P_().won.Alliance, best: () => 'not won yet' },
-  teron:    { cost: 2500, goal: 'Win any battlefield as a Horde hero',     done: () => P_().won.Horde,    best: () => 'not won yet' },
-  danath:   { cost: 1200, goal: 'Slay the 5:00 boss as an Alliance hero', done: () => (P_().boss.Alliance || 0) >= 1, best: () => 'not slain yet' },
-  kargath:  { cost: 1200, goal: 'Slay the 5:00 boss as a Horde hero',     done: () => (P_().boss.Horde || 0) >= 1,    best: () => 'not slain yet' },
-  turalyon: { cost: 2000, goal: 'Survive 10:00 as Uther',   done: () => (P_().time.uther || 0) >= 600,   best: () => `best ${fmtTime(P_().time.uther || 0)}` },
-  dentarg:  { cost: 2000, goal: "Survive 10:00 as Cho'gall", done: () => (P_().time.chogall || 0) >= 600, best: () => `best ${fmtTime(P_().time.chogall || 0)}` },
-  kurdran:  { cost: 3000, goal: 'Slay the 10:00 boss as an Alliance hero', done: () => (P_().boss.Alliance || 0) >= 2, best: () => (P_().boss.Alliance || 0) >= 1 ? 'slain the 5:00 boss' : 'not slain yet' },
-  guldan:   { cost: 3000, goal: 'Slay the 10:00 boss as a Horde hero',     done: () => (P_().boss.Horde || 0) >= 2,    best: () => (P_().boss.Horde || 0) >= 1 ? 'slain the 5:00 boss' : 'not slain yet' },
+  alleria:  { cost: 300,  goal: 'Survive 4:00 as an Alliance hero', done: () => sideTime('Alliance') >= 240, best: () => `best ${fmtTime(sideTime('Alliance'))}` },
+  zuljin:   { cost: 300,  goal: 'Survive 4:00 as a Horde hero',     done: () => sideTime('Horde') >= 240,    best: () => `best ${fmtTime(sideTime('Horde'))}` },
+  danath:   { cost: 600,  goal: 'Kill 1,000 enemies in one run as an Alliance hero', done: () => P_().kills.Alliance >= 1000, best: () => `best ${P_().kills.Alliance.toLocaleString('en-GB')} kills` },
+  kargath:  { cost: 600,  goal: 'Kill 1,000 enemies in one run as a Horde hero',     done: () => P_().kills.Horde >= 1000,    best: () => `best ${P_().kills.Horde.toLocaleString('en-GB')} kills` },
+  uther:    { cost: 1000, goal: 'Survive 7:00 as Lothar', done: () => (P_().time.lothar || 0) >= 420, best: () => `best ${fmtTime(P_().time.lothar || 0)}` },
+  chogall:  { cost: 1000, goal: 'Survive 7:00 as Grom',   done: () => (P_().time.grom || 0) >= 420,   best: () => `best ${fmtTime(P_().time.grom || 0)}` },
+  turalyon: { cost: 1500, goal: 'Slay the 5:00 boss as an Alliance hero', done: () => (P_().boss.Alliance || 0) >= 1, best: () => 'not slain yet' },
+  dentarg:  { cost: 1500, goal: 'Slay the 5:00 boss as a Horde hero',     done: () => (P_().boss.Horde || 0) >= 1,    best: () => 'not slain yet' },
+  kurdran:  { cost: 2500, goal: 'Slay the 10:00 boss as an Alliance hero', done: () => (P_().boss.Alliance || 0) >= 2, best: () => (P_().boss.Alliance || 0) >= 1 ? 'slain the 5:00 boss' : 'not slain yet' },
+  guldan:   { cost: 2500, goal: 'Slay the 10:00 boss as a Horde hero',     done: () => (P_().boss.Horde || 0) >= 2,    best: () => (P_().boss.Horde || 0) >= 1 ? 'slain the 5:00 boss' : 'not slain yet' },
+  khadgar:  { cost: 3500, goal: 'Win any battlefield as an Alliance hero', done: () => P_().won.Alliance, best: () => 'not won yet' },
+  teron:    { cost: 3500, goal: 'Win any battlefield as a Horde hero',     done: () => P_().won.Horde,    best: () => 'not won yet' },
 };
 const demoLocked = id => !!A.demo && !DEMO.heroes.includes(id);   // heroes whose sprites the demo doesn't have
 const rosterDone = () => Object.keys(HERO_UNLOCKS).every(id => meta.heroes.includes(id));   // every hero you can earn or buy
@@ -1875,6 +1877,15 @@ function buyHero(id) {
   const U = HERO_UNLOCKS[id]; if (!U || heroOpen(id) || demoLocked(id) || meta.gold < U.cost) return false;
   meta.gold -= U.cost; meta.heroes.push(id); saveMeta(); sfx('s_buy', 0); return true;
 }
+// Goals were made easier (November 2026): a save that already meets them gets the heroes and battlefields at once.
+let caughtUp = false;
+function catchUpUnlocks() {
+  const got = [];
+  for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!meta.heroes.includes(id) && !demoLocked(id) && U.done()) { meta.heroes.push(id); got.push(HEROES[id].name); }
+  while (!A.demo && meta.unlocked + 1 < LEVELS.length && (P_().lv[LEVELS[meta.unlocked].id] || 0) >= UNLOCK_T) { meta.unlocked++; got.push(LEVELS[meta.unlocked].name); }
+  if (got.length) saveMeta();
+  return got;
+}
 // The next goals worth chasing, for the end-of-run screen.
 function nextUp() {
   const out = [], i = meta.unlocked;
@@ -1887,7 +1898,7 @@ function nextUp() {
 const saveMeta = () => store.set('tos_meta', meta);
 const up = id => meta.ups[id] || 0;
 // Each level costs more than the last: base x 1, 2.5, 4.5, 7, 10 (rather than 1, 2, 3, 4, 5), so a full Armoury takes many runs.
-const upCost = id => { const n = up(id); return Math.round(UPGRADES[id].cost * (n + 1) * (1 + 0.25 * n) / 5) * 5; };
+const upCost = id => { const n = up(id), U = UPGRADES[id]; return Math.round(U.cost * (n + 1) * (1 + 0.25 * n) * (n === 0 && U.max > 1 ? 0.4 : 1) / 5) * 5; };   // the first step is cheap
 const goldMul = () => 1 + 0.15 * up('greed');
 // All gold collected in a run is scaled by GOLD_RATE (tuned from real runs: the Armoury should take
 // roughly 15 to 20 runs to fill). Fractions carry over so small coins still count.
@@ -2219,7 +2230,14 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 const LATE = { from: 640, hp: 2.6, push: 960, spawn: 1.4, dmg: 0.55 };   // scaled to 20-minute runs
 // The middle of a run: from 3:00 the army grows tougher and thicker, reaching full strength at 7:00 (tuned to a
 // player who has finished Vampire Survivors; the first three minutes stay gentle for newcomers).
-const MID = { from: 180, to: 420, hp: 0.8, spawn: 0.6 };
+const MID = { from: 180, to: 540, hp: 0.6, spawn: 0.35 };   // softened 18 November 2026: Jon's runs hit a wall at 5:00
+// The first minutes bring more enemies (so levels come sooner), tapering to normal by 4:00.
+const EARLY = { until: 240, spawn: 0.8 };
+const earlyK = t => t < EARLY.until ? 1 + EARLY.spawn * (1 - t / EARLY.until) : 1;
+// While a boss (not the final one) is on the field, the army arrives more slowly, so the fight is with him.
+const BOSSFIGHT = { spawn: 0.6 };
+// How close enemies may crowd each other (1 is touching): a little more room makes crowds easier to read and to kite.
+const SPACING = 0.95;
 // After 8:00 the base toughness and numbers grow more slowly, so a 20-minute run ends about as hard as a 15-minute
 // run used to (the extra minutes bring new kinds of enemy rather than ever-bigger numbers).
 const STRETCH = { from: 480, rate: 0.7 };
@@ -2231,6 +2249,7 @@ const FINAL = { spawn: 0.25, dmg: 0.6, hp: 1 };   // hp: the final boss's toughn
 const BOSS_HIT = { mark: 0.45, final: 0.5, spd: 0.8 };   // spd: the final boss flies over trees and water, so he's a little slower   // a barrage circle hurts less than a bite; the final boss bites a little softer than his size suggests   // when the final boss comes the army falls back, then trickles in again more thinly
 const lateHp = t => t > LATE.from ? 1 + LATE.hp * ((t - LATE.from) / (RUN_LEN - LATE.from)) ** 1.4 : 1;
 const pushK = t => t > LATE.push ? (t - LATE.push) / (RUN_LEN - LATE.push) : 0;
+const BOSS_K = [0.35, 0.75, 0.95];   // the 5:00, 10:00 and 15:00 bosses' toughness
 // The sprite for an enemy role on the side you're fighting, falling back to a stand-in (the demo lacks some units).
 const FALLBACK = { tank_up: 'tank', ranged_up: 'ranged', caster: 'ranged', skel: 'basic', daemon: 'boss', boss1: 'boss', boss2: 'boss', boss3: 'boss', elite1: 'tank', elite2: 'ranged', elite3: 'ranged', scout: 'fast', flyer: 'boss', siege: 'tank', stone: 'eshot' };
 function foeSprite(r) { const k = (G.HD.side === 'Horde' ? 'ally_' : '') + r; return A.sprites[k] ? k : A.sprites[r] ? r : FALLBACK[r] ? foeSprite(FALLBACK[r]) : r; }
@@ -2242,9 +2261,9 @@ function spawnEnemy(type, x, y, boss) {
     for (let k = 0; k < 10; k++) { const a = rnd(0, TAU); x = h.x + Math.cos(a) * d; y = h.y + Math.sin(a) * d; if (free || !footBlocked(x, y, 6)) break; }
   } else if (!free && footBlocked(x, y, 4)) return;
   // Each boss is tougher than the last: the first is a fair fight, the second close to full strength, the last a real test.
-  const bossK = boss ? [0.45, 0.8, 0.95, FINAL.hp][boss.n - 1] : 1;
+  const bossK = boss ? [BOSS_K[0], BOSS_K[1], BOSS_K[2], FINAL.hp][boss.n - 1] : 1;
   const tp = paceT(t), hpMul = (1 + tp / 240 + (tp / 360) ** 2) * G.LV.hp * (0.6 + 0.4 * EASE(t)) * bossK * lateHp(t) * (1 + MID.hp * midK(t)); G.stats.hp += T.hp * hpMul;
-  const e = { type, role: boss ? 'boss' + boss.n : type, sprite: boss && boss.sprite, scale: boss && boss.scale, x, y, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (1 + Math.min(0.3, t / 3000)) * rnd(0.92, 1.08),
+  const e = { type, role: boss ? 'boss' + boss.n : type, sprite: boss && boss.sprite, scale: boss && boss.scale, x, y, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (1 + Math.min(0.15, t / 4000)) * rnd(0.92, 1.08),
     dmg: T.dmg * (1 + tp / 600) * (0.6 + 0.4 * EASE(t)) * (bossK < 1 ? 0.7 : 1) * (boss && boss.final ? BOSS_HIT.final : G.final ? FINAL.dmg : 1) * (1 + LATE.dmg * pushK(t)), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0,
     shootT: rnd(1, 3), sigT: 3, dir: 4, t: rnd(0, 5), fly: !!(T.fly || (boss && boss.fly && A.sprites[boss.sprite])), free, elite: !!T.elite };
   if (boss) { e.boss = boss.n; e.bid = boss.id; e.sig = boss.sig; e.drop = boss.drop; if (boss.final) e.spd *= BOSS_HIT.spd; e.final = !!boss.final; e.minion = boss.minion; e.name = bossName(boss); }
@@ -2271,7 +2290,7 @@ const UPGRADE = { from: 360, to: 1080, max: 0.75 };
 const upShare = t => Math.max(0, Math.min(1, (t - UPGRADE.from) / (UPGRADE.to - UPGRADE.from))) * UPGRADE.max;
 function upgrade(k, t) { const u = { tank: 'tank_up', ranged: 'ranged_up' }[k]; return u && hasFoe(u) && Math.random() < upShare(t) ? u : k; }
 function pickType(t) {
-  const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 210 ? 0.25 : 0, tank: t > 240 ? Math.min(0.4, 0.05 + t / 1500) : 0,
+  const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 210 ? Math.min(0.25, 0.1 + (t - 210) / 1400) : 0, tank: t > 240 ? Math.min(0.4, 0.05 + (t - 240) / 1200) : 0,   // archers and ogres ease in (18 November 2026)
     scout: t > PACE.scout ? 0.1 : 0, flyer: t > PACE.flyer ? Math.min(0.14, 0.04 + (t - PACE.flyer) / 4000) : 0, siege: t > PACE.siege ? 0.05 : 0 };
   for (const k in w) w[k] *= G.LV.mix[k] || 1;
   w.caster = t > PACE.caster ? Math.min(0.15, 0.05 + (t - PACE.caster) / 6000) : 0;
@@ -2283,7 +2302,7 @@ function pickType(t) {
 }
 function spawn(dt) {
   const t = Math.min(G.t, RUN_LEN);
-  G.spawnAcc += (0.7 + paceT(t) / 50) * EASE(t) * (1 + LATE.spawn * pushK(t)) * (1 + MID.spawn * midK(t)) * (G.final ? FINAL.spawn : 1) * dt;
+  G.spawnAcc += (0.7 + paceT(t) / 50) * EASE(t) * earlyK(t) * (1 + LATE.spawn * pushK(t)) * (1 + MID.spawn * midK(t)) * (G.final ? FINAL.spawn : G.enemies.some(e => e.boss && !e.final) ? BOSSFIGHT.spawn : 1) * dt;
   while (G.spawnAcc >= 1) { G.spawnAcc--; if (G.enemies.length < 330) spawnEnemy(pickType(t)); }
   if (G.bossN < BOSSES.length && G.t >= BOSSES[G.bossN].at) spawnBoss(++G.bossN);
   // An elite every 50 seconds from 3:00 (every 35 from 10:00), taking turns.
@@ -2375,7 +2394,7 @@ function fire(id, l) {
   const h = G.hero, ar = h.area;
   if (G.weapons[id] && G.weapons[id].evo && fireEvo(id)) return;
   if (id === 'sword') {
-    const range = (30 + 4 * l + (l >= 5 ? 6 : 0)) * ar, dmg = 14 + 6 * (l - 1), arc = 2.2;
+    const range = (40 + 5 * l + (l >= 5 ? 6 : 0)) * ar, dmg = 14 + 6 * (l - 1), arc = 2.4;   // longer since players found Lothar had to let enemies right up to him
     const dirs = [h.face]; if (l >= 4) dirs.push(h.face + Math.PI);
     for (const a of dirs) {
       G.fx.push({ k: 'arc', a, r: range, arc, t: 0, life: 0.18 });
@@ -2545,7 +2564,7 @@ function fireEvo(id) {
     return true;
   }
   if (id === 'sword') {
-    const range = 75 * ar, dmg = 80, arc = 3.2;
+    const range = 85 * ar, dmg = 80, arc = 3.2;
     for (const a of [h.face, h.face + Math.PI]) {
       G.fx.push({ k: 'arc', a, r: range, arc, t: 0, life: 0.22 });
       query(h.x, h.y, range + 12, e => {
@@ -2750,9 +2769,9 @@ function updateEnemies(dt) {
     } else { e.x += vx * dt + e.kx * dt; e.y += vy * dt + e.ky * dt; }
     const damp = Math.max(0, 1 - dt * 9); e.kx *= damp; e.ky *= damp;
     e.dir = dirOf(dx, dy);
-    if (!e.fly) query(e.x, e.y, e.r * 2, o => {   // fliers pass over everyone
+    if (!e.fly) query(e.x, e.y, e.r * 2.2, o => {   // fliers pass over everyone
       if (o === e || o.fly) return;
-      const sx = e.x - o.x, sy = e.y - o.y, dd = sx * sx + sy * sy, rr = (e.r + o.r) * 0.8;
+      const sx = e.x - o.x, sy = e.y - o.y, dd = sx * sx + sy * sy, rr = (e.r + o.r) * SPACING;
       if (dd < rr * rr && dd > 0.0001) { const dl = Math.sqrt(dd), p = (rr - dl) * 0.25, px = e.x + sx / dl * p, py = e.y + sy / dl * p; if (e.free || !G.terrain || !footBlocked(px, py, e.r * 0.5) || footBlocked(e.x, e.y, e.r * 0.5)) { e.x = px; e.y = py; } }
     });
     if (d < e.r + 7 && e.atkT <= 0) { hurtHero(e.dmg * (e.charge && e.charge.phase === 'go' ? 1.5 : 1), e.boss ? 'boss' : e.type); e.atkT = e.boss ? 1.4 : 1.0; e.swing = SWING; }   // bosses swing more slowly: a chance to break away
@@ -2819,6 +2838,17 @@ function logStart() {
   G.log = { v: 1, hero: G.heroId, level: G.LV.id, ups: { ...meta.ups }, ver: document.title, s: [], picks: [], ev: [] };
   G.lg = { t: 0, dmg: 0, hurt: {}, hits: 0, move: 0, near: 0, nearN: 0, nearMin: 1e9, scan: 0 };
 }
+// Copies a run log or save code. The clipboard API is tried first without touching the text box: on an iPhone,
+// selecting the box focused it and left the page shifted, so later taps landed below their buttons.
+async function copyCode(ta, code, btn, failMsg) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(code); ok = true; } catch (e) {
+    try { ta.focus({ preventScroll: true }); ta.select(); ok = document.execCommand('copy'); } catch (e2) {}
+  }
+  if (ok) { ta.blur(); window.getSelection()?.removeAllRanges(); }
+  window.scrollTo(0, 0); if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+  btn.textContent = ok ? 'Copied!' : failMsg;
+}
 function logEvent(text) { if (G && G.log) G.log.ev.push([Math.round(G.t), text]); }
 function logTick(dt, moving) {
   const L = G.lg; if (!L) return; const h = G.hero;
@@ -2851,8 +2881,8 @@ async function showRunLog(at) {
   showMenu(`<h2>Run log</h2><p class="sub">Copy this and paste it to whoever is tuning the game. It holds what happened every five seconds of the run (health, damage, what hit you, how close enemies got) and every upgrade choice. Nothing about you or your device.</p>
     <textarea id="saveCode" class="savecode" readonly>${code}</textarea>
     <div class="opts"><button class="opt" id="copyCode">Copy to clipboard</button><button class="opt" data-act="${from === 'over' ? 'endscreen' : 'history'}" data-back>Back</button></div>`);
-  const ta = $('#saveCode'); ta.focus(); ta.select();
-  $('#copyCode').onclick = async () => { ta.select(); let ok = false; try { await navigator.clipboard.writeText(code); ok = true; } catch (e) { try { ok = document.execCommand('copy'); } catch (e2) {} } $('#copyCode').textContent = ok ? 'Copied!' : 'Select the code and copy it'; };
+  const ta = $('#saveCode'); if (!matchMedia('(pointer: coarse)').matches) { ta.focus(); ta.select(); }
+  $('#copyCode').onclick = () => copyCode(ta, code, $('#copyCode'), 'Select the code and copy it');
 }
 
 /* ---------- drawing ---------- */
@@ -3517,6 +3547,8 @@ speedBtn.addEventListener('click', () => cycleSpeed());
 
 function showTitle() {
   impOpen = false;
+  if (!caughtUp) { caughtUp = true; const got = catchUpUnlocks();
+    if (got.length) { showHudBtns(false); playMusic('menu'); showMenu(`<h2>New unlocks</h2><p class="sub">The goals for heroes and battlefields are easier now, and your past runs already meet some of them.</p><p>Unlocked: <b>${got.join(', ')}</b>.</p><div class="opts"><button class="opt" data-act="title" data-back>Continue</button></div>`); return; } }
   showHudBtns(false); playMusic('menu');
   const l = meta.last, lv = l && LEVELS.find(x => x.id === l.level);
   if (A.menuBg && A.btn) {
@@ -3661,8 +3693,8 @@ function showSaveCode(mode, msg) {
     showMenu(`<h2>Save code</h2><p class="sub">Copy this code, then choose <b>Load save code</b> in Settings on your other browser or device. It holds your gold, upgrades, unlocked battlefields, best time, settings and any unfinished run. Your game files aren't included: import those once on each device.</p>
       <textarea id="saveCode" class="savecode" readonly>${code}</textarea>
       <div class="opts"><button class="opt" id="copyCode">Copy to clipboard</button><button class="opt" data-act="settings" data-from="title" data-back>Back</button></div>`);
-    const ta = $('#saveCode'); ta.focus(); ta.select();
-    $('#copyCode').onclick = async () => { ta.select(); let ok = false; try { await navigator.clipboard.writeText(code); ok = true; } catch (e) { try { ok = document.execCommand('copy'); } catch (e2) {} } $('#copyCode').textContent = ok ? 'Copied!' : 'Select the code and press Ctrl+C'; };
+    const ta = $('#saveCode'); if (!matchMedia('(pointer: coarse)').matches) { ta.focus(); ta.select(); }
+    $('#copyCode').onclick = () => copyCode(ta, code, $('#copyCode'), 'Select the code and press Ctrl+C');
   } else {
     showMenu(`<h2>Load save code</h2><p class="sub">Paste a code from <b>Copy save code</b> on another browser or device. This replaces the gold, upgrades and unlocks on this one.</p>
       <textarea id="saveCode" class="savecode" placeholder="TOS1-..."></textarea>${msg ? `<p class="sub savemsg">${msg}</p>` : ''}
@@ -3764,6 +3796,10 @@ function showChoose(focus) {
     <div id="heroInfo" class="hinfo"></div>
     <div class="opts" style="margin-top:10px"><button class="opt" data-act="title" data-back>Back</button></div>`);
   overlay.querySelector('.panel').classList.add('wide');
+  // Hold the details box at the height of the longest entry, so the window doesn't jump as the pointer moves
+  // across heroes whose descriptions differ in length.
+  const box = overlay.querySelector('#heroInfo');
+  if (box && !isPhone()) { let hMax = 0; for (const id of ids) { box.innerHTML = heroDetails(id); wcify(box); hMax = Math.max(hMax, box.offsetHeight); } box.innerHTML = ''; box.style.boxSizing = 'border-box'; box.style.minHeight = hMax + 'px'; }
   overlay.querySelectorAll('.tile.hero').forEach(t => t.addEventListener('mouseenter', () => { const i = opts().indexOf(t); if (i >= 0) { sel = i; highlight(); } }));
   const pick = id => { const i = opts().findIndex(o => o.dataset.act === 'hero' && o.dataset.id === id); if (i >= 0) { sel = i; highlight(); return true; } };
   if (!(focus && pick(focus))) { const last = store.get('tos_hero', 'lothar'); pick(heroOpen(last) ? last : 'lothar'); }
@@ -3812,7 +3848,7 @@ function choices() {
 function weaponStats(id, l) {
   const pl = (n, w, ws) => `${n} ${n === 1 ? w : ws || w + 's'}`;
   switch (id) {
-    case 'sword': return `${14 + 6 * (l - 1)} damage, reach ${30 + 4 * l + (l >= 5 ? 6 : 0)}${l >= 4 ? ', front and back' : ''}.`;
+    case 'sword': return `${14 + 6 * (l - 1)} damage, reach ${40 + 5 * l + (l >= 5 ? 6 : 0)}${l >= 4 ? ', front and back' : ''}.`;
     case 'arrows': return `${pl(1 + (l >= 2) + (l >= 4), 'arrow')}, ${10 + 3 * (l - 1) + (l >= 3 ? 3 : 0)} damage${l >= 5 ? ', each pierces 3' : ''}.`;
     case 'axes': return `${pl(1 + (l >= 3) + (l >= 5), 'axe')}, ${12 + 4 * (l - 1) + (l >= 4 ? 4 : 0)} damage each.`;
     case 'aura': return `${3 + 2 * l} damage every 0.4 s, radius ${26 + 5 * l + (l >= 5 ? 5 : 0)}.`;
@@ -3873,7 +3909,12 @@ function openLevelUp(reroll) {
 function resumeOrNext() {
   if (G.chestQueue.length) openChest(G.chestQueue.shift());
   else if (G.pending > 0) openLevelUp();
-  else { hideMenu(); G.state = 'play'; showHudBtns(true); }
+  else { hideMenu(); G.state = 'play'; showHudBtns(true); weaponBurst(); }
+}
+// Back from a level-up or a chest, every weapon fires at once, to help the player get their bearings.
+function weaponBurst() {
+  for (const id in G.weapons) { const w = G.weapons[id]; if (id === 'aura') w.tick = 0; else w.cd = 0; }
+  G.burst = (G.burst || 0) + 1;
 }
 function pickCard(kind, id) {
   if (G.log) G.log.picks.push([Math.round(G.t), G.hero.level, (G.offer || []).join(','), id]);
@@ -4341,7 +4382,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, fitStage, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, fitStage, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
