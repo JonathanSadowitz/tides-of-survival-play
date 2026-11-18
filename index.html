@@ -163,11 +163,23 @@
   .pitem .lv{color:var(--gold);font-size:14px}
   button.card.hero{width:330px}
   .hsel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;max-width:1100px;margin:0 auto}
+  .ftiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  button.tile.field{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;min-height:0;width:auto;min-width:0}
+  button.tile.field .fpic{width:100%;max-width:128px;height:auto;image-rendering:pixelated;border:1px solid #000}
+  button.tile.field .tt{display:flex;flex-direction:column;align-items:center;white-space:normal} button.tile.field .nm{font-size:15px;color:var(--gold)} button.tile.field .lv{font-size:13px} button.tile.field.locked{opacity:.6} button.tile.field.locked .fpic{filter:grayscale(1) brightness(.8)}
+  .fbig{width:160px;height:120px;image-rendering:pixelated;border:1px solid var(--gold2);flex:none}
+  @media (max-width:760px){ .ftiles{grid-template-columns:repeat(2,minmax(0,1fr))} }
   .htiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
   button.tile.hero{display:flex;align-items:center;justify-content:flex-start;gap:8px;text-align:left;padding:3px 8px;min-height:0;width:auto;min-width:0;overflow:hidden}
   button.tile.hero .hpic{width:46px!important;height:38px!important}
   button.tile.hero .tt{display:flex;flex-direction:column;min-width:0;white-space:normal} button.tile.hero .nm{font-size:15px;color:var(--gold)} button.tile.hero .lv{font-size:13px}
   button.tile.hero.locked{opacity:.55} button.tile.hero.locked .hpic{filter:grayscale(1) brightness(.6)}
+  .vernum{position:absolute;right:10px;bottom:6px;font-size:22px;color:rgba(241,230,200,.7);text-shadow:0 1px 2px #000}
+  .about p{text-align:left;margin:6px 0} .about h3{margin:12px 0 4px;color:var(--gold)}
+  .breakdown h3{margin:10px 0 4px;color:var(--gold);font-size:15px} .wrow{display:grid;grid-template-columns:9em 1fr 9em;gap:6px;align-items:center;font-size:13px;margin:2px 0}
+  .wbar{height:8px;background:#16100a;border:1px solid #000} .wbar i{display:block;height:100%;background:linear-gradient(#ffd27a,#b8862a)}
+  .hpgraph{width:100%;height:60px;background:#16100a;border:1px solid #000;margin-top:8px} .hpaxis{display:flex;justify-content:space-between;font-size:11px;color:#c9b88f}
+  .savedago{font-size:12px;color:#e8d9b0;text-align:center;margin:-4px 0 4px;text-shadow:0 1px 2px #000}
   .hinfo{margin-top:8px;border:1px solid var(--gold2);border-radius:6px;padding:8px 12px;background:rgba(0,0,0,.25);min-height:104px;text-align:left}
   .hinfo-in{display:flex;gap:12px;align-items:flex-start} .hinfo .nm{color:var(--gold);font-size:18px} .hinfo .ds{display:block;font-size:15px;margin-top:4px}
   .hinfo .opts{margin-top:8px;justify-content:flex-start}
@@ -996,13 +1008,16 @@ const overlay = $('#overlay'), pauseBtn = $('#pauseBtn'), speedBtn = $('#speedBt
 const SPEEDS = [1, 1.5, 2];
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedBtn.textContent = cfg.opts.speed + 'x'; }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedBtn.textContent = cfg.opts.speed + 'x'; if (G && G.state === 'play') banner(`Game speed ${cfg.opts.speed}x`); }
+// The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
+const VERSION = '0.8.0', BUILD = '36d26ad 2026-11-18';
+const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
 // so a fresh save has time to find its feet. After that the pressure is the same as before.
 const EASE = t => Math.min(1, 0.35 + t / 650);
 const TAU = Math.PI * 2;
 const { ANIM, ICON_ENTRY, HERO_ICONS, LEVELS, UNLOCK_T, UPGRADES, xpFor, decodeFont } = GameData;
-const { TT, TN, TM, tmod } = Terrain;
+const { TT, TN, TM, tmod, T_SOLID } = Terrain;
 // Seeded maps: add ?seed=123 to the page address to replay the same map.
 const SEED_PARAM = (() => { try { const v = new URLSearchParams(location.search).get('seed'); return v === null ? null : (parseInt(v, 10) | 0); } catch (e) { return null; } })();
 function buildTerrain(LV, seed, side) {
@@ -1020,7 +1035,7 @@ const store = {
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(() => {}); } catch (e) {}
 let cfg = store.get('tos_cfg', null) || { roles: {}, sounds: {}, palette: null };
 cfg.roles ||= {}; cfg.sounds ||= {};
-cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, nums: true, quickChest: false }, cfg.opts || {});
+cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fx: 'full', colours: 'std' }, cfg.opts || {});
 if (!cfg.optsV) { if (cfg.opts.music === 0.6) cfg.opts.music = 0.4; cfg.optsV = 2; }   // 60% was the old default: too loud
 const saveCfg = () => store.set('tos_cfg', cfg);
 let best = store.get('tos_best', { time: 0, kills: 0, level: 0 });
@@ -1574,10 +1589,12 @@ const MUSIC = {
   HWARROOM: 'Music\\HWARROOM.WAV', OWARROOM: 'Music\\OWARROOM.WAV', HVICTORY: 'Music\\HVICTORY.WAV', OVICTORY: 'Music\\OVICTORY.WAV', HDEFEAT: 'Music\\HDEFEAT.WAV', ODEFEAT: 'Music\\ODEFEAT.WAV',
 };
 const mu = { names: new Set(), cache: new Map(), gain: null, cur: null, kind: null, list: [], idx: 0, want: null, duck: false, token: 0 };
+// Each battlefield's own music, from your side's six campaign tracks: later battlefields bring new ones.
+const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6] };
 function playlistFor(kind) {
   const horde = G && G.HD.side === 'Horde', pre = horde ? 'ORC' : 'HUMAN', p1 = horde ? 'O' : 'H';
   if (kind === 'menu') return ['OWARROOM'];
-  if (kind === 'battle') { const a = [1, 2, 3, 4, 5, 6].map(i => pre + i).sort(() => Math.random() - 0.5); return a; }
+  if (kind === 'battle') return (FIELD_MUSIC[G && G.LV.id] || [1, 2, 3, 4, 5, 6]).map(i => pre + i);   // each battlefield has its own tracks
   if (kind === 'victory') return [p1 + 'VICTORY'];
   if (kind === 'defeat') return [p1 + 'DEFEAT'];
   return [];
@@ -1642,7 +1659,7 @@ async function nextTrack() {
   if (!mu.gain) { mu.gain = A.actx.createGain(); mu.gain.connect(A.actx.destination); musicVolume(); }
   const src = A.actx.createBufferSource(), g = A.actx.createGain();
   src.buffer = buf; g.gain.value = 0; g.gain.setTargetAtTime(1, A.actx.currentTime, 0.3); src.connect(g).connect(mu.gain);
-  const loop = mu.kind === 'menu'; src.loop = loop;
+  const loop = mu.kind === 'battle' && mu.list.length === 1; src.loop = loop;   // the menu music plays once, not on repeat
   src.onended = () => { if (mu.cur && mu.cur.src === src && !loop && (mu.kind === 'battle')) { mu.cur = null; nextTrack(); } };
   src.start(); mu.cur = { src, g, id };
   if (mu.kind === 'battle') { const nx = mu.list[mu.idx % mu.list.length]; setTimeout(() => loadTrack(nx), 4000); } // prepare the next one in the background
@@ -2035,7 +2052,12 @@ function snapRun() {
     w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), e: Object.keys(G.weapons).filter(k => G.weapons[k].evo), p: G.passives, sh: G.hero.shield || 0,
     camps: [...G.camps.values()].filter(c => c.dead.size || c.chest).map(c => ({ key: c.key, ox: c.ox, oy: c.oy, dead: [...c.dead], chest: c.chest })) };
 }
-function saveRun() { const s = snapRun(); if (s) store.set(RUN_KEY, s); }
+function saveRun() { const s = snapRun(); if (s) { s.at = Date.now(); store.set(RUN_KEY, s); } }
+// "saved 5 minutes ago", for the Continue button.
+function savedAgo(at) {
+  if (!at) return ''; const m = Math.round((Date.now() - at) / 60000);
+  return m < 1 ? 'saved just now' : m < 60 ? `saved ${m} min ago` : m < 1440 ? `saved ${Math.round(m / 60)} h ago` : `saved ${new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+}
 const savedRun = () => { const s = store.get(RUN_KEY, null); return s && s.v === 1 && HEROES[s.hero] && LEVELS.some(l => l.id === s.level) ? s : null; };
 function continueRun() {
   const s = savedRun(); if (!s) return showTitle();
@@ -2077,6 +2099,7 @@ function newRun(heroId, levelId, seed) {
   ensureAudio(); sfx('s_start'); playMusic('battle'); heroVoice('ready', 1);
   hideMenu(); showHudBtns(true);
   if (coarse() && (meta.touchHints = (meta.touchHints || 0) + 1) <= 3) { G.banner = { text: 'Touch and drag anywhere to move', t: 4 }; saveMeta(); }   // the first few runs on a touch screen
+  else if (!coarse() && (meta.ctrlHints = (meta.ctrlHints || 0) + 1) <= 5) { G.ctrlHint = 9; saveMeta(); }   // the first few runs: the controls, along the bottom
 }
 function addItem(kind, id) {
   if (kind === 'w') { const w = G.weapons[id] || (G.weapons[id] = { lvl: 0, cd: 0.3, tick: 0 }); w.lvl++; if (w.lvl >= MAX_LVL && !meta.maxed.includes(id)) { meta.maxed.push(id); saveMeta(); } }
@@ -2155,6 +2178,52 @@ function clearBuilding(c, idx) {
   for (let y = 0; y < b.h * 2; y++) for (let x = 0; x < b.w * 2; x++) T.blk[tmod(b.ty * 2 + y, TM) * TM + tmod(b.tx * 2 + x, TM)] = 0;
 }
 function footBlocked(x, y, r) { return solidAt(x, y + 4) || solidAt(x - r, y + 4) || solidAt(x + r, y + 4) || solidAt(x, y + 4 - r * 0.6) || solidAt(x, y + 4 + r * 0.6); }
+
+/* ---------- minimap ---------- */
+// Each kind of ground gets the average colour of its own tile from the battlefield's tileset, so the minimap and
+// the battlefield previews look like the real thing, as Warcraft II's minimap does.
+function groundColours(LV) {
+  const ts = loadTileset(LV); if (!ts) return null; if (ts.cols0) return ts.cols0;
+  const x = ts.atlas.getContext('2d', { willReadFrequently: true }), out = [];
+  for (let t = 0; t < 7; t++) {
+    const m = (ts.recs[T_SOLID[t]] || [])[0]; if (m === undefined) { out.push([60, 60, 60]); continue; }
+    const d = x.getImageData((m % ts.cols) * 32, Math.floor(m / ts.cols) * 32, 32, 32).data; let r = 0, g = 0, b = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    out.push([r / 1024, g / 1024, b / 1024].map(Math.round));
+  }
+  return (ts.cols0 = out);
+}
+// The whole map as one pixel per half-tile, buildings in dark grey.
+function miniImage(T) {
+  if (T.mini) return T.mini;
+  const cols = groundColours(T.LV); if (!cols) return null;
+  const c = document.createElement('canvas'); c.width = TM; c.height = TM;
+  const x = c.getContext('2d'), im = x.createImageData(TM, TM), o = im.data;
+  for (let i = 0; i < TM * TM; i++) { const [r, g, b] = T.blk[i] === 2 ? [70, 62, 54] : cols[T.q[i]] || [0, 0, 0]; o[i * 4] = r; o[i * 4 + 1] = g; o[i * 4 + 2] = b; o[i * 4 + 3] = 255; }
+  x.putImageData(im, 0, 0); return (T.mini = c);
+}
+// Draws the map around (wx, wy), wrapping as the world does, into a box at (bx, by) of size sz (game pixels).
+const MINI = { span: 96, size: 64 };   // span: half-tiles shown across
+function drawMiniMap(T, wx, wy, bx, by, sz, span = MINI.span) {
+  const img = miniImage(T); if (!img) return false;
+  const k = sz / span, x0 = Math.floor(wx / 16 - span / 2), y0 = Math.floor(wy / 16 - span / 2);
+  ctx.save(); ctx.beginPath(); ctx.rect(bx, by, sz, sz); ctx.clip(); ctx.imageSmoothingEnabled = false;
+  for (const ox of [0, TM]) for (const oy of [0, TM]) ctx.drawImage(img, bx - (tmod(x0, TM) - ox) * k, by - (tmod(y0, TM) - oy) * k, TM * k, TM * k);
+  ctx.restore(); return true;
+}
+function drawMinimap() {
+  const T = G.terrain; if (!T || cfg.opts.minimap === false || W < 320) return;
+  const sz = MINI.size, bx = W - sz - 4, by = H - BAR_H - sz - 6, h = G.hero, k = sz / MINI.span;
+  ctx.fillStyle = '#000'; ctx.fillRect(bx - 2, by - 2, sz + 4, sz + 4);
+  if (!drawMiniMap(T, h.x, h.y, bx, by, sz)) return;
+  const half = MINI.span * 8, cb = cfg.opts.colours === 'cb';
+  ctx.fillStyle = cb ? '#ff9a1a' : '#e0281c';
+  for (const e of G.enemies) { const dx = e.x - h.x, dy = e.y - h.y; if (Math.abs(dx) < half && Math.abs(dy) < half) ctx.fillRect(Math.round(bx + sz / 2 + dx / 16 * k) - (e.boss ? 1 : 0), Math.round(by + sz / 2 + dy / 16 * k) - (e.boss ? 1 : 0), e.boss ? 3 : 1, e.boss ? 3 : 1); }
+  ctx.fillStyle = '#fff'; ctx.fillRect(bx + sz / 2 - 1, by + sz / 2 - 1, 3, 3);
+  // The screen's own view, outlined as in Warcraft II.
+  ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; const vw = W / 16 * k, vh = H / 16 * k;
+  ctx.strokeRect(Math.round(bx + sz / 2 - vw / 2) + 0.5, Math.round(by + sz / 2 - vh / 2) + 0.5, Math.round(vw), Math.round(vh));
+}
 
 /* ---------- camps ---------- */
 function startLevel() {
@@ -2326,6 +2395,7 @@ function hitEnemy(e, dmg, kx = 0, ky = 0) {
   const h = G.hero;
   const dealt = dmg * h.might * (G.HD.fury && h.hp < h.maxHp / 2 ? 1.3 : 1);
   G.stats.dmg += Math.min(dealt, e.hp); if (G.lg) G.lg.dmg += Math.min(dealt, e.hp);
+  if (!e.static) { const w = G.curW || 'other'; (G.wdmg ||= {})[w] = (G.wdmg[w] || 0) + Math.min(dealt, Math.max(0, e.hp)); }   // per weapon, for the end of the run
   e.hp -= dealt; e.flash = 0.1;
   if (cfg.opts.nums && dealt < 9000 && G.numCount < 70) { G.numCount++; G.fx.push({ k: 'num', x: e.x + rnd(-4, 4), y: e.y - e.r - 4, v: Math.max(1, Math.round(dealt)), t: 0, life: 0.6 }); }
   if (e.type !== 'boss' && !e.static) { e.kx += kx; e.ky += ky; }
@@ -2374,6 +2444,7 @@ function hurtHero(d, src) {
   const h = G.hero; G.stats.lastHit = src || null; let dm = Math.max(1, d - h.armour);
   if (h.shield > 0) { const a = Math.min(h.shield, dm); h.shield -= a; dm -= a; if (dm <= 0) return; }
   if (G.lg) { const k = src || '?'; G.lg.hurt[k] = (G.lg.hurt[k] || 0) + Math.min(dm, Math.max(0, h.hp)); G.lg.hits++; }
+  G.taken = (G.taken || 0) + Math.min(dm, Math.max(0, h.hp)); G.takenNow = (G.takenNow || 0) + dm;
   h.hp -= dm; h.hurtT = 0.15; sfx('s_hurt', 0.25);
 }
 function explode(s) {
@@ -2491,7 +2562,7 @@ function fire(id, l) {
 }
 // The evolved weapons. Returns true when it handled the attack.
 // Something to do a moment from now, in game time (so it pauses with the game).
-function later(dt, fn) { (G.later ||= []).push({ t: dt, fn }); }
+function later(dt, fn) { const w = G.curW; (G.later ||= []).push({ t: dt, fn: w ? () => { const k = G.curW; G.curW = w; try { fn(); } finally { G.curW = k; } } : fn }); }
 function runLater(dt) { if (!G.later || !G.later.length) return; const due = []; for (const x of G.later) if ((x.t -= dt) <= 0) due.push(x); G.later = G.later.filter(x => x.t > 0); for (const x of due) x.fn(); }
 // Shared by the signature weapons.
 function arcHit(a, range, arc, dmg, push = 0, stun = 0) {
@@ -2529,11 +2600,11 @@ function addWhirl(dmg, life, size) { const h = G.hero, a = rnd(0, TAU); (G.whirl
 function updateWhirls(dt) {
   if (!G.whirls) return;
   for (const w of G.whirls) {
-    w.life -= dt; w.t += dt; const tg = nearestTo(w.x, w.y, 260);
+    w.life -= dt; w.t += dt; G.curW = w.w || 'whirl'; const tg = nearestTo(w.x, w.y, 260);
     if (tg) { const dx = tg.x - w.x, dy = tg.y - w.y, d = Math.hypot(dx, dy) || 1; w.x += dx / d * 55 * dt; w.y += dy / d * 55 * dt; }
     if ((w.tick -= dt) <= 0) { w.tick = 0.25; const R = 22 * w.size * G.hero.area; query(w.x, w.y, R + 12, e => { if (Math.hypot(e.x - w.x, e.y - w.y) < R + e.r) hitEnemy(e, w.dmg, rnd(-60, 60), rnd(-60, 60)); }); }
   }
-  G.whirls = G.whirls.filter(w => w.life > 0);
+  G.curW = null; G.whirls = G.whirls.filter(w => w.life > 0);
 }
 function nearestTo(x, y, R) { let best = null, bd = R; for (const e of G.enemies) { if (e.dead || e.static) continue; const d = Math.hypot(e.x - x, e.y - y); if (d < bd) { bd = d; best = e; } } return best; }
 function drawWhirl(w) {   // a grey funnel of spinning streaks
@@ -2599,7 +2670,8 @@ function fireEvo(id) {
 function updateWeapons(dt) {
   const h = G.hero;
   for (const id in G.weapons) {
-    const w = G.weapons[id];
+    const w = G.weapons[id]; G.curW = id; const n0 = G.shots.length, wh0 = (G.whirls || []).length;
+    try {
     if (id === 'aura') {
       w.tick -= dt;
       const r = (26 + 5 * w.lvl + (w.lvl >= 5 ? 5 : 0)) * h.area * (w.evo ? 1.25 : 1);
@@ -2624,13 +2696,16 @@ function updateWeapons(dt) {
     w.cd -= dt * (1 + (h.frenzy || 0));   // Kargath's Blade Frenzy
     if (w.cd <= 0) {
       fire(id, w.lvl); w.cd = (w.evo && CD_EVO[id] || CD[id]) * h.haste;
+      for (let i = n0; i < G.shots.length; i++) G.shots[i].w ||= id; for (let i = wh0; i < (G.whirls || []).length; i++) G.whirls[i].w ||= id;
       const tg = ['sword', 'axes', 'cleave', 'shield', 'blades', 'breath', 'slam'].includes(id) ? null : nearest(1, 300)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
       h.atkT = HSWING; h.atkDir = dirOf(Math.cos(a), Math.sin(a)); const snd = { sword: 's_sword', cleave: 's_sword', pick: 's_sword', shield: 's_sword', blades: 's_sword', hammer: 's_axe', slam: 's_boom', breath: 's_fire', smite: 's_coil', arrows: 's_bow', axes: 's_axe', coil: 's_coil', ballista: 's_bow' }[id]; if (snd) sfx(snd, 0.1); }
+    } finally { G.curW = null; }
   }
 }
 function updateShots(dt) {
   const h = G.hero;
   for (const s of G.shots) {
+    G.curW = s.w || null;
     s.age = (s.age || 0) + dt; s.life -= dt;
     if (s.life <= 0) { if (s.k === 'fire') explode(s); s.dead = true; continue; }
     if (s.k === 'rune') {
@@ -2802,6 +2877,10 @@ function updateGems(dt) {
 }
 function update(dt) {
   const h = G.hero; G.t += dt;
+  // Healing since last frame (the change in health plus whatever was taken), and health every 5 s, for the end screen.
+  if (G.hpLast !== undefined && h.hp > 0) G.healed = (G.healed || 0) + Math.max(0, h.hp - G.hpLast + (G.takenNow || 0));
+  G.takenNow = 0; G.hpLast = h.hp;
+  if (G.t >= (G.hpNext || 0)) { (G.hpHist ||= []).push(Math.max(0, h.hp / h.maxHp)); G.hpNext = (G.hpNext || 0) + 5; }
   for (const k in G.buffs) if (G.buffs[k] <= G.t) { delete G.buffs[k]; recalc(); }
   // Once a minute, note how the run is going: used by the run history and the balance report.
   if (G.t >= G.stats.next) { const S = G.stats; S.mins.push({ lvl: h.level, dmg: Math.round(S.dmg), hp: Math.round(S.hp), kills: G.kills, alive: G.enemies.length }); S.dmg = 0; S.hp = 0; S.next += 60; }
@@ -2820,6 +2899,7 @@ function update(dt) {
   for (const f of G.fx) f.t += dt; G.fx = G.fx.filter(f => f.t < f.life); G.numCount = 0; for (const f of G.fx) if (f.k === 'num') G.numCount++;
   for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
   if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
+  if (G.ctrlHint > 0) G.ctrlHint -= dt;
   if (h.hp <= 0) {
     if (G.revives > 0) { G.revives--; h.hp = h.maxHp * 0.5; banner('Revived!'); logEvent('revived'); sfx('s_level', 0); for (const e of G.enemies) if (!e.static && !e.boss && Math.hypot(e.x - h.x, e.y - h.y) < 120) hitEnemy(e, 9999); }
     else { G.state = 'dying'; G.dieT = 0; showHudBtns(false); joy = null; sfx('s_hurt', 0); return; }
@@ -2835,7 +2915,7 @@ function update(dt) {
    Copied from the end-of-run screen or Run history as a code, so real runs can be used to tune the game. */
 const LOG_EVERY = 5, LOGS_KEPT = 8;
 function logStart() {
-  G.log = { v: 1, hero: G.heroId, level: G.LV.id, ups: { ...meta.ups }, ver: document.title, s: [], picks: [], ev: [] };
+  G.log = { v: 1, hero: G.heroId, level: G.LV.id, ups: { ...meta.ups }, ver: `${VERSION} ${BUILD}`, s: [], picks: [], ev: [] };
   G.lg = { t: 0, dmg: 0, hurt: {}, hits: 0, move: 0, near: 0, nearN: 0, nearMin: 1e9, scan: 0 };
 }
 // Copies a run log or save code. The clipboard API is tried first without touching the text box: on an iPhone,
@@ -3208,25 +3288,34 @@ function drawFrame(ui) {
   if (A.pick && A.pick.gold) ctx.drawImage(A.pick.gold, gx - fontWidth(fonts.small || { glyphs: [] }, String(G.gold)) - 13, 3, 10, 10);
   txt(String(G.gold), gx, 4, 7, '#ffd24a', 'right');
   txt(`${G.kills} kills`, gx - 64, 4, 7, '#f1e6c8', 'right');
-  // Unit panel: portrait, name, level, health, experience, then weapons and passives as icons.
-  const wl = Object.keys(G.weapons), pl = Object.keys(G.passives), rows = 1 + (pl.length ? 1 : 0);
-  const pw = 160, ph = 50 + rows * 22, px = 6, py = H - ph - 6;
-  bevel(px, py, pw, ph, lite, dark); ctx.drawImage(ui.panel, 0, 0, pw - 2, ph - 2, px + 1, py + 1, pw - 2, ph - 2);
+  // Speed, when it isn't normal, sits by the clock where it can't be missed.
+  if (cfg.opts.speed !== 1) txt(`${cfg.opts.speed}x speed`, W / 2 + 34, 4, 7, '#7fd0ff');
+  drawBar(ui, lite, dark);
+  drawMinimap();
+}
+// The hero bar: one slim strip along the bottom (portrait, name and level, health and experience, then weapons
+// and passives as icons), so no corner of the battlefield is hidden. Replaced the Warcraft II unit panel.
+const BAR_H = 26;
+function drawBar(ui, lite, dark) {
+  const h = G.hero, y = H - BAR_H, cb = cfg.opts.colours === 'cb';
+  bevel(0, y, W, BAR_H, lite, dark);
+  for (let x = 1; x < W - 1; x += ui.panel.width) ctx.drawImage(ui.panel, 0, 0, Math.min(ui.panel.width, W - 1 - x), BAR_H - 2, x, y + 1, Math.min(ui.panel.width, W - 1 - x), BAR_H - 2);
   const pic = A.icons && A.icons[G.heroId];
-  bevel(px + 6, py + 6, 48, 40, lite, dark); if (pic) ctx.drawImage(pic, px + 7, py + 7); else { ctx.fillStyle = G.HD.col; ctx.fillRect(px + 7, py + 7, 46, 38); }
-  txt(G.HD.name.split(' ')[0], px + 60, py + 5, 9, '#ffd27a');
-  txt(`Level ${h.level}`, px + 60, py + 19, 7, '#f1e6c8');
-  miniBar(px + 60, py + 30, pw - 68, h.hp / h.maxHp, '#3fa53f', '#8fe08f');
-  miniBar(px + 60, py + 38, pw - 68, h.xp / h.next, '#3a6fd0', '#8fb8ff');
-  const icons = (list, kind, lvl, y) => list.forEach((id, i) => {
-    const key = iconKey(kind, id), ic = A.icons && A.icons[key], x = px + 6 + i * 25;
-    if (x + 23 > px + pw) return;
-    ctx.fillStyle = key.startsWith('e:') ? '#ffd24a' : '#000'; ctx.fillRect(x - 1, y - 1, 25, 21);
-    if (ic) ctx.drawImage(ic, x, y, 23, 19); else { ctx.fillStyle = dark; ctx.fillRect(x, y, 23, 19); }
-    txt(String(lvl(id)), x + 22, y + 12, 7, '#ffffff', 'right');
-  });
-  icons(wl, 'w', id => G.weapons[id].lvl, py + 50);
-  if (pl.length) icons(pl, 'p', id => G.passives[id], py + 72);
+  bevel(3, y + 3, 24, 20, lite, dark); if (pic) ctx.drawImage(pic, 4, y + 4, 22, 18); else { ctx.fillStyle = G.HD.col; ctx.fillRect(4, y + 4, 22, 18); }
+  txt(`${G.HD.name.split(' ')[0]}  ${h.level}`, 31, y + 3, 7, '#ffd27a');
+  const bw = 74;
+  miniBar(31, y + 13, bw, h.hp / h.maxHp, cb ? '#2f7fd8' : '#3fa53f', cb ? '#9fd0ff' : '#8fe08f');
+  miniBar(31, y + 19, bw, h.xp / h.next, '#7a5fd0', '#c4b4ff');
+  let x = 31 + bw + 6;
+  const icon = (kind, id, lvl) => {
+    if (x + 19 > W - 2) return; const key = iconKey(kind, id), ic = A.icons && A.icons[key];
+    ctx.fillStyle = key.startsWith('e:') ? '#ffd24a' : kind === 'p' ? '#2a4a6a' : '#000'; ctx.fillRect(x - 1, y + 3, 21, 19);
+    if (ic) ctx.drawImage(ic, x, y + 4, 19, 17); else { ctx.fillStyle = dark; ctx.fillRect(x, y + 4, 19, 17); }
+    txt(String(lvl), x + 19, y + 13, 7, '#ffffff', 'right'); x += 22;
+  };
+  for (const id in G.weapons) icon('w', id, G.weapons[id].lvl);
+  x += 4;
+  for (const id in G.passives) icon('p', id, G.passives[id]);
 }
 function drawHud() {
   const h = G.hero, ui = A.ui && A.ui[G.HD.side];
@@ -3255,6 +3344,12 @@ function drawHud() {
       ctx.drawImage(b.icon, Math.round(W / 2 - tw / 2 - iw - 3), Math.round(y + 3 - ih / 2), iw, ih); }
     txt(b.text, W / 2, y, 7, '#ffd27a', 'center'); ctx.globalAlpha = 1;
   }
+  if (G.ctrlHint > 0) {   // a reminder of the controls for the first few runs
+    const pads = !!getPad();
+    ctx.globalAlpha = Math.min(1, G.ctrlHint / 1.5);
+    txt(pads ? 'Move: left stick    Pause: Start    Speed: Y' : 'Move: WASD, arrow keys or the mouse    Pause: Esc or P    Speed: F or Tab', W / 2, H - BAR_H - 14, 7, '#f1e6c8', 'center');
+    ctx.globalAlpha = 1;
+  }
   if (G.moveTo && !ms.held) {   // where a mouse click sent the hero: a small green cross, as in Warcraft II
     const mx = Math.round(G.moveTo[0] - camX), my = Math.round(G.moveTo[1] - camY);
     ctx.fillStyle = '#000'; ctx.fillRect(mx - 4, my - 1, 9, 3); ctx.fillRect(mx - 1, my - 4, 3, 9);
@@ -3263,12 +3358,10 @@ function drawHud() {
 }
 // The HUD drawn inside the safe area, with the strip under a phone's status bar blacked out.
 function drawHudSafe() {
-  const { t, r, b, l } = SAFE;
-  if (t || r || b || l) {
-    const W0 = W, H0 = H; if (t) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W0, t); }
-    W = W0 - l - r; H = H0 - t - b; ctx.translate(l, t);
-    try { drawHud(); } finally { W = W0; H = H0; ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0); }
-  } else drawHud();
+  const k = cfg.opts.ui || 1, { t, r, b, l } = SAFE, W0 = W, H0 = H;
+  if (t) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W0, t); }
+  ctx.save(); ctx.translate(l, t); ctx.scale(k, k); W = (W0 - l - r) / k; H = (H0 - t - b) / k;   // the Interface size setting
+  try { drawHud(); } finally { W = W0; H = H0; ctx.restore(); }
   drawJoy();
 }
 function drawJoy() {   // the touch stick, where your thumb went down
@@ -3308,7 +3401,7 @@ function renderWorld() {
     if (!g.v) {   // anything but experience: pops out of the fallen foe, then glows so it can't be missed
       if (g.born === undefined) g.born = G.t;
       const age = G.t - g.born; if (age < 0.45 && !g.pull) y -= Math.round(Math.sin(age / 0.45 * Math.PI) * 8);
-      if (g.pow || g.chest) lootBeam(x, y, g.pow ? POWERUPS[g.pow].col : '#ffd24a', now);
+      if ((g.pow || g.chest) && cfg.opts.fx !== 'reduced') lootBeam(x, y, g.pow ? POWERUPS[g.pow].col : '#ffd24a', now);
     }
     if (g.chest) {
       if (g.look === undefined) g.look = (G.chestLook = (G.chestLook || 0) + 1) % 2;
@@ -3328,7 +3421,7 @@ function renderWorld() {
       const ph = (g.x * 7 + g.y * 13) % 1000;   // each coin twinkles at its own moment
       ctx.globalAlpha = 0.28 + 0.14 * Math.sin((now + ph) / 260); circle(x, y, 8, '#ffd24a', null); ctx.globalAlpha = 1;
       if (pk.gold) ctx.drawImage(pk.gold, x - 6, y - 6, 12, 12); else { circle(x, y, 4, '#e7c04a', '#6b4518'); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x - 1, y - 2, 1, 2); }
-      sparkle(x + 3, y - 4, ((now + ph * 3) % 1600) / 1600);
+      if (cfg.opts.fx !== 'reduced') sparkle(x + 3, y - 4, ((now + ph * 3) % 1600) / 1600);
       continue;
     }
     if (g.meat) {
@@ -3453,7 +3546,7 @@ const MENU_LOCK = 0;   // no wait on level-ups or chests: the press and held-key
 const RUN_MENU = new Set(['pick', 'reroll', 'skip', 'chestok']);
 function showMenu(html) {
   overlay.className = ''; overlay.innerHTML = `<div class="panel">${html}</div>`; overlay.style.display = 'flex'; sel = 0; titleArt(false);
-  if (!G && A.menuBg) { overlay.classList.add('parch'); overlay.style.backgroundImage = `url(${A.menuBg})`; if (!overlay.querySelector('.cards, .hsel')) overlay.classList.add('bare'); }
+  if (!G && A.menuBg) { overlay.classList.add('parch'); overlay.style.backgroundImage = `url(${A.menuBg})`; if (!overlay.querySelector('.cards, .hsel, .ftiles, .about')) overlay.classList.add('bare'); }
   wcify(overlay); fitPanel(); highlight();
 }
 // Shrink a menu slightly when it would otherwise need scrolling, but never so far that text drops below
@@ -3481,7 +3574,7 @@ function titleArt(on) {
 }
 function hideMenu() { overlay.style.display = 'none'; overlay.innerHTML = ''; overlay.className = ''; }
 const opts = () => [...overlay.querySelectorAll('button.opt')];
-function highlight() { opts().forEach((b, i) => b.classList.toggle('sel', i === sel)); const b = opts()[sel]; if (b) { b.scrollIntoView?.({ block: 'nearest' }); if (b.dataset.act === 'hero') showHeroInfo(b.dataset.id); } }
+function highlight() { opts().forEach((b, i) => b.classList.toggle('sel', i === sel)); const b = opts()[sel]; if (b) { b.scrollIntoView?.({ block: 'nearest' }); if (b.dataset.act === 'hero') showHeroInfo(b.dataset.id); if (b.dataset.act === 'field') showFieldInfo(b); } }
 function moveSel(d) { const n = opts().length; if (!n) return; sel = (sel + d + n) % n; highlight(); }
 function clickSel() { const b = opts()[sel]; if (b) b.click(); }
 function menuKey(code) {
@@ -3507,13 +3600,17 @@ overlay.addEventListener('click', e => {
     if (!heroOpen(b.dataset.id)) return; heroVoice('yes', 1, b.dataset.id); showLevels(b.dataset.id);
   }
   else if (act === 'play') { if (!heroOpen(b.dataset.id)) return; heroVoice('yes', 1, b.dataset.id); showLevels(b.dataset.id); }
+  else if (act === 'field') {
+    const i = opts().indexOf(b); if (i !== sel || !b.classList.contains('sel')) { sel = i; highlight(); return; }   // first tap: details
+    const li = LEVELS.findIndex(L => L.id === b.dataset.level); if (heroOpen(b.dataset.id) && levelOpen(li)) newRun(b.dataset.id, b.dataset.level);
+  }
   else if (act === 'buyhero') { if (buyHero(b.dataset.id)) { const sec = revealSecret(); if (!sec) heroVoice('yes', 1, b.dataset.id); showChoose(sec ? 'peasant' : b.dataset.id); if (sec) toast('Someone has been watching from the woodpile. The Peasant and the Peon have joined you!'); } }
   else if (act === 'start') { if (heroOpen(b.dataset.id) && levelOpen(LEVELS.findIndex(L => L.id === b.dataset.level))) newRun(b.dataset.id, b.dataset.level); }
   else if (act === 'quick') { const l = meta.last; if (heroOpen(l.hero) && levelOpen(LEVELS.findIndex(L => L.id === l.level))) newRun(l.hero, l.level); }
   else if (act === 'continue') continueRun();
   else if (act === 'history') showHistory();
   else if (act === 'runlog') showRunLog(b.dataset.at ? +b.dataset.at : null);
-  else if (act === 'endscreen') { if (G && G.endHtml) showMenu(G.endHtml); else showTitle(); }
+  else if (act === 'endscreen') { if (G && G.endHtml) { showMenu(G.endHtml); overlay.querySelector('.panel')?.classList.add('wide', 'scrolls'); fitPanel(); } else showTitle(); }
   else if (act === 'exportsave') showSaveCode('export');
   else if (act === 'importsave') showSaveCode('import');
   else if (act === 'loadcode') loadSaveCode();
@@ -3524,6 +3621,7 @@ overlay.addEventListener('click', e => {
   else if (act === 'impagain') { impBusy(); $('#labReimport').click(); }
   else if (act === 'impfiles') { impBusy(); $('#labInput').click(); }
   else if (act === 'settings') showSettings(b.dataset.from);
+  else if (act === 'about') showAbout();
   else if (act === 'opt') { changeOpt(b.dataset.k); showSettings(b.dataset.from, b.dataset.k); }
   else if (act === 'shop') showShop();
   else if (act === 'book') showBook(b.dataset.tab);
@@ -3547,44 +3645,83 @@ speedBtn.addEventListener('click', () => cycleSpeed());
 
 function showTitle() {
   impOpen = false;
-  if (!caughtUp) { caughtUp = true; const got = catchUpUnlocks();
+  if (!caughtUp) { caughtUp = true; const got = meta.ladder === 2 ? [] : catchUpUnlocks(); if (meta.ladder !== 2) { meta.ladder = 2; saveMeta(); }   // once, for saves from before the easier goals
     if (got.length) { showHudBtns(false); playMusic('menu'); showMenu(`<h2>New unlocks</h2><p class="sub">The goals for heroes and battlefields are easier now, and your past runs already meet some of them.</p><p>Unlocked: <b>${got.join(', ')}</b>.</p><div class="opts"><button class="opt" data-act="title" data-back>Continue</button></div>`); return; } }
   showHudBtns(false); playMusic('menu');
   const l = meta.last, lv = l && LEVELS.find(x => x.id === l.level);
   if (A.menuBg && A.btn) {
-    const sr = savedRun(), quick = sr ? `<button class="opt" data-act="continue">Continue: ${HEROES[sr.hero].name.split(' ')[0]} ${fmtTime(sr.t)}</button>`
+    const sr = savedRun(), quick = sr ? `<button class="opt" data-act="continue" title="${savedAgo(sr.at)}">Continue: ${HEROES[sr.hero].name.split(' ')[0]} ${fmtTime(sr.t)}</button>${sr.at ? `<div class="savedago">${savedAgo(sr.at)}</div>` : ''}`
       : l && HEROES[l.hero] && heroOpen(l.hero) && lv && levelOpen(LEVELS.indexOf(lv)) ? `<button class="opt" data-act="quick">Quick Start: ${HEROES[l.hero].name.split(' ')[0]}</button>` : '';
     overlay.innerHTML = `<div class="wcstage"><img class="bg" src="${A.menuBg}" alt="">
       <div class="wcbtns"><button class="opt" data-act="choose">Start a Run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
-      <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="import">Game files</button></div>
+      <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="import">Game files</button><button class="opt" data-act="about">About</button></div>
       ${A.demo ? `<div class="note">Demo version: Alterac Mountains and six heroes. Get ${fullGameLink()} and import it under Game files to unlock everything.</div>` : mu.names.size ? '' : '<div class="note">Import your game folder again under Game files to add the music and hero voices.</div>'}
-      <div class="ver" data-wcsmall="TIDES OF SURVIVAL"></div></div>`;
+      <div class="ver" data-wcsmall="TIDES OF SURVIVAL"></div><div class="vernum">v${VERSION}</div></div>`;
     overlay.className = 'wcmenu'; overlay.style.display = 'flex'; overlay.style.backgroundImage = '';
     sel = 0; wcify(overlay);
     const v = overlay.querySelector('.ver'), vi = fontImage('TIDES OF SURVIVAL', 'small', 'white', 1); if (vi) v.appendChild(vi);
     fitStage(); highlight(); return;
   }
   const b = '';
-  const sr = savedRun(), quick = (sr ? `<button class="opt" data-act="continue">Continue: ${HEROES[sr.hero].name.split(' ')[0]}, ${fmtTime(sr.t)}</button>` : '')
+  const sr = savedRun(), quick = (sr ? `<button class="opt" data-act="continue">Continue: ${HEROES[sr.hero].name.split(' ')[0]}, ${fmtTime(sr.t)}${sr.at ? ` (${savedAgo(sr.at)})` : ''}</button>` : '')
     + (l && HEROES[l.hero] && heroOpen(l.hero) && lv && levelOpen(LEVELS.indexOf(lv)) ? `<button class="opt" data-act="quick">Quick start: ${HEROES[l.hero].name.split(' ')[0]}, ${lv.name}</button>` : '');
   showMenu(`<h1>Tides of Survival</h1><p class="sub">A Warcraft II survivors-like fan game</p>
     <div class="status">${assetSummary()}</div>
     <div class="opts"><button class="opt" data-act="choose">Start a run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
-      <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="import">Game files</button></div>
+      <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="import">Game files</button><button class="opt" data-act="about">About</button></div>
     <p class="help long">Move with WASD, arrow keys, a gamepad stick, or by dragging on the screen. Your weapons attack by themselves. F, Tab or the Y button changes game speed.</p>${b}
     <p class="fine">Unofficial fan project, not affiliated with or endorsed by Blizzard Entertainment. Graphics, music and sounds are read from your own copy of Warcraft II and never leave your device. Nothing from the game is included in this page.</p>`);
   titleArt(true);
 }
+// Battlefield select works like hero select: tap a battlefield to see it (a preview of its ground, what it's
+// like, your best time), tap again or press Fight here to start.
+const PREVIEW_SEED = 20261118;
+function fieldPreview(L, side) {
+  A.previews ||= {}; const key = L.id + side; if (A.previews[key] !== undefined) return A.previews[key];
+  let c = null;
+  try {
+    if (groundColours(L)) {
+      const T = buildTerrain(L, PREVIEW_SEED, side);
+      c = document.createElement('canvas'); c.width = 128; c.height = 96;
+      const keep = ctx; ctx = c.getContext('2d');
+      try { drawMiniMap(T, 0, 0, 0, 0, 128, 128); ctx.fillStyle = '#fff'; ctx.fillRect(63, 47, 3, 3); } finally { ctx = keep; }
+    }
+  } catch (e) { console.warn(e); c = null; }
+  return (A.previews[key] = c);
+}
+function fieldTile(L, i, heroId) {
+  const open = levelOpen(i);
+  return `<button class="opt tile field${open ? '' : ' locked'}" data-act="field" data-id="${heroId}" data-level="${L.id}"${open ? '' : ' aria-disabled="true"'}>
+    <canvas class="fpic" width="128" height="96" data-level="${L.id}"></canvas>
+    <span class="tt"><span class="nm">${L.name}</span><span class="lv">${open ? ['Easy', 'Normal', 'Hard', 'Very hard'][Math.min(i, 3)] : 'Locked'}</span></span></button>`;
+}
+function fieldDetails(L, i, heroId) {
+  const open = levelOpen(i), best = P_().lv[L.id] || 0;
+  const why = open ? L.blurb : A.demo ? 'Requires the full game.' : `Survive ${fmtTime(UNLOCK_T)} in ${LEVELS[i - 1].name} to unlock (best ${fmtTime(P_().lv[LEVELS[i - 1].id] || 0)}).`;
+  return `<div class="hinfo-in"><canvas class="fbig" width="128" height="96"></canvas><div><span class="nm">${L.name}</span>
+    <span class="ds">${why}</span>${open ? `<span class="ds">Difficulty: ${['easy', 'normal', 'hard', 'very hard'][Math.min(i, 3)]}. Your best here: ${best ? fmtTime(best) : 'not played yet'}.</span>` : ''}
+    ${open ? `<div class="opts"><button class="opt primary" data-act="start" data-id="${heroId}" data-level="${L.id}">Fight here</button></div>` : ''}</div></div>`;
+}
+function showFieldInfo(b) {
+  const box = overlay.querySelector('#fieldInfo'); if (!box || box.dataset.level === b.dataset.level) return;
+  const i = LEVELS.findIndex(L => L.id === b.dataset.level), L = LEVELS[i];
+  box.dataset.level = L.id; box.innerHTML = fieldDetails(L, i, b.dataset.id); wcify(box);
+  const pv = fieldPreview(L, foeSideOf(b.dataset.id)), c = box.querySelector('canvas.fbig');
+  if (c) { if (pv) c.getContext('2d').drawImage(pv, 0, 0); else c.remove(); }
+}
+const foeSideOf = heroId => HEROES[heroId].side === 'Horde' ? 'human' : 'orc';
 function showLevels(heroId) {
-  const cards = LEVELS.map((L, i) => {
-    const open = levelOpen(i);
-    return `<button class="opt card" data-act="start" data-id="${heroId}" data-level="${L.id}" ${open ? '' : 'disabled'}>
-      <span class="nm">${L.name}</span><span class="lv">${open ? 'Difficulty: ' + ['easy', 'normal', 'hard', 'very hard'][Math.min(i, 3)] : 'Locked'}</span>
-      <span class="ds">${open ? L.blurb : A.demo ? 'Requires the full game.' : `Survive ${UNLOCK_T / 60} minutes in ${LEVELS[i - 1].name} to unlock.`}</span></button>`;
-  }).join('');
-  showMenu(`<h2>Choose a battlefield</h2><p class="sub">Playing as ${HEROES[heroId].name}</p><div class="cards">${cards}</div>
-    <div class="opts" style="margin-top:14px"><button class="opt" data-act="choose" data-back>Back</button></div>`);
-  sel = A.demo ? LEVELS.findIndex(L => L.id === DEMO.level) : Math.min(meta.unlocked, LEVELS.length - 1); highlight();
+  showMenu(`<h2>Choose a battlefield</h2><p class="sub">Playing as ${HEROES[heroId].name}</p>
+    <div class="ftiles">${LEVELS.map((L, i) => fieldTile(L, i, heroId)).join('')}</div>
+    <div id="fieldInfo" class="hinfo"></div>
+    <div class="opts" style="margin-top:10px"><button class="opt" data-act="choose" data-back>Back</button></div>`);
+  overlay.querySelector('.panel').classList.add('wide');
+  overlay.querySelectorAll('canvas.fpic').forEach(c => { const pv = fieldPreview(LEVELS.find(L => L.id === c.dataset.level), foeSideOf(heroId)); if (pv) c.getContext('2d').drawImage(pv, 0, 0); else c.remove(); });
+  overlay.querySelectorAll('.tile.field').forEach(t => t.addEventListener('mouseenter', () => { const i = opts().indexOf(t); if (i >= 0) { sel = i; highlight(); } }));
+  const box = overlay.querySelector('#fieldInfo');
+  if (box && !isPhone()) { let hMax = 0; LEVELS.forEach((L, i) => { box.innerHTML = fieldDetails(L, i, heroId); wcify(box); hMax = Math.max(hMax, box.offsetHeight); }); box.innerHTML = ''; box.style.boxSizing = 'border-box'; box.style.minHeight = hMax + 'px'; }
+  const start = A.demo ? LEVELS.findIndex(L => L.id === DEMO.level) : Math.min(meta.unlocked, LEVELS.length - 1);
+  sel = Math.max(0, opts().findIndex(o => o.dataset.act === 'field' && o.dataset.level === LEVELS[start].id)); highlight(); fitPanel();
 }
 const OPT_DEFS = {
   speed: { label: 'Game speed', vals: SPEEDS, fmt: v => v + 'x' },
@@ -3592,6 +3729,10 @@ const OPT_DEFS = {
   sfx: { label: 'Sound volume', vals: [0, 0.2, 0.4, 0.6, 0.8, 1], fmt: v => Math.round(v * 100) + '%' },
   nums: { label: 'Damage numbers', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
   quickChest: { label: 'Chest animation', vals: [false, true], fmt: v => v ? 'Quick' : 'Full' },
+  ui: { label: 'Interface size', vals: [0.8, 1, 1.25], fmt: v => v < 1 ? 'Small' : v > 1 ? 'Large' : 'Normal' },
+  minimap: { label: 'Minimap', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
+  fx: { label: 'Effects', vals: ['full', 'reduced'], fmt: v => v === 'full' ? 'Full' : 'Reduced (no glows or light beams)' },
+  colours: { label: 'Colours', vals: ['std', 'cb'], fmt: v => v === 'cb' ? 'Colour-blind friendly (blue health, orange foes)' : 'Standard' },
 };
 function changeOpt(k) {
   const d = OPT_DEFS[k], i = d.vals.indexOf(cfg.opts[k]);
@@ -3643,7 +3784,7 @@ function showBook(tab = 'weapons') {
   else if (tab === 'evos') body = `<p class="help booknote">A weapon at level ${MAX_LVL} plus its partner passive (any level) evolves when you open a boss's treasure chest. Found ${meta.evos.filter(known).length} of ${Object.keys(EVOS).filter(known).length}.</p>` + Object.entries(EVOS).filter(([id]) => known(id)).map(([id, E]) => {
       const found = meta.evos.includes(id), maxed = meta.maxed.includes(id), W_ = WEAPONS[id].name, P = PASSIVES[E.p].name;
       if (found) return card(bookIcon('e:' + id), E.name, `${W_} + ${P}`, [E.desc, evoStats(id)]);
-      return card(bookIcon('w:' + id, true), '???', maxed ? `${W_} + ${P}` : `${W_} + ???`, [maxed ? `You've maxed ${W_}. Carry ${P} and open a boss chest to see what it becomes.` : `Max ${W_} to learn which passive it needs.`]);
+      return card(bookIcon('w:' + id, true), '???', maxed ? `${W_} + ${P}` : `${W_} + ???`, [maxed ? `You've maxed ${W_}. Carry ${P} and open a boss chest to see what it becomes.` : `Clue: its partner passive ${passiveClue(EVOS[id].p)}. Max ${W_} to learn its name.`]);
     }).join('');
   else if (tab === 'foes') body = foesBook(card);
   else body = Object.keys(HEROES).filter(heroShown).map(id => { const H_ = HEROES[id], U = HERO_UNLOCKS[id];
@@ -3662,6 +3803,20 @@ function resetProgress() {
   runs = []; store.set('tos_runs', runs); store.del(RUN_KEY); store.del('tos_hero');
 }
 function toast(text) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; document.body.appendChild(t); setTimeout(() => t.remove(), 3500); }
+// What the game is, how to play, who made it, and which version this is.
+function showAbout() {
+  const built = BUILD === 'dev' ? 'development copy' : `build ${BUILD}`;
+  showMenu(`<h2>About</h2><div class="about">
+    <p><b>Tides of Survival</b> is a survivors-like set in the world of Warcraft II: Tides of Darkness. Pick a hero of the Alliance or the Horde, survive twenty minutes against an ever-growing army and its named heroes, and slay the final boss. Your weapons attack by themselves; you choose where to go and what to take when you level up.</p>
+    <h3>How to play</h3>
+    <p>Move with WASD, the arrow keys, the mouse (click to walk, hold to follow), a gamepad, or by dragging on a touch screen. Esc, P or Start pauses; F, Tab or Y changes the game speed. Gold from each run buys upgrades in the Armoury, reaching goals unlocks heroes and battlefields, and a weapon at level 5 with its partner passive evolves from a boss's treasure.</p>
+    <h3>Credits</h3>
+    <p>Made by CaptMurdock. Warcraft II and everything in it belong to Blizzard Entertainment: this is an unofficial fan project, not affiliated with or endorsed by Blizzard. The graphics, music and sounds are read from your own copy of the game and never leave your device; nothing of Blizzard's is distributed with this page.</p>
+    <p>Play and follow updates at <a href="${ITCH_URL}" target="_blank" rel="noopener">captmurdock.itch.io/tides-of-survival</a>.</p>
+    <h3>Version</h3><p>Version ${VERSION} (${built}).</p></div>
+    <div class="opts"><button class="opt" data-act="title" data-back>Back</button></div>`);
+  overlay.querySelector('.panel').classList.add('scrolls'); fitPanel();
+}
 function showSettings(from, focus) {
   const keys = Object.keys(OPT_DEFS);
   const rows = keys.map(k => `<button class="opt" data-act="opt" data-k="${k}" data-from="${from}">${OPT_DEFS[k].label}: ${OPT_DEFS[k].fmt(cfg.opts[k])}</button>`).join('');
@@ -3886,9 +4041,31 @@ function itemIcon(kind, id) {
   if (!iconUrls[key]) iconUrls[key] = c.toDataURL();
   return `<img class="cicon${key.startsWith('e:') ? ' evo' : ''}" src="${iconUrls[key]}" alt="">`;
 }
+// A clue to a passive without naming it, for the Book of War: "improves damage", "adds maximum health".
+function passiveClue(p) {
+  const d = PASSIVES[p].desc.replace(/[+\d.%]+\s*/g, '').replace(/\.$/, '').trim().toLowerCase();
+  return /^(take|regenerate)/.test(d) ? `helps you ${d.replace(/^take/, 'take').replace(/^regenerate/, 'regenerate')}` : `improves ${d.replace(/^more /, '')}`;
+}
+// "1 arrow, 10 damage" and "2 arrows, 13 damage" become "1 to 2 arrows, 10 to 13 damage": the change at a glance.
+function statChange(was, now) {
+  const a = was.split(/(\d+(?:\.\d+)?)/), b = now.split(/(\d+(?:\.\d+)?)/);
+  if (a.length !== b.length) return now;
+  return b.map((t, i) => i % 2 && t !== a[i] ? `${a[i]} to ${t}` : t).join('');   // the Warcraft II font has no arrow
+}
+function passiveChange(id, lvl) {
+  const m = PASSIVES[id].desc.match(/^([+]?)(\d+(?:\.\d+)?)(%?)\s*(.*)$/); if (!m) return '';
+  const per = +m[2], f = n => `${m[1]}${+(per * n).toFixed(1)}${m[3]}`;
+  return `${f(lvl - 1)} to ${f(lvl)} ${m[4].replace(/\.$/, '')} in all.`;
+}
+// A marker on cards that lead towards an evolution you could make.
+function evoMark(c) {
+  if (c.kind === 'w' && EVOS[c.id] && G.passives[EVOS[c.id].p]) return `Evolution path: you carry its partner, ${PASSIVES[EVOS[c.id].p].name}.`;
+  if (c.kind === 'p') { const w = Object.keys(G.weapons).find(w => EVOS[w] && EVOS[w].p === c.id && !G.weapons[w].evo); if (w) return `Evolution path: the partner of your ${wName(w)}.`; }
+  return '';
+}
 function itemInfo(c) {
-  if (c.kind === 'w') { const W_ = WEAPONS[c.id]; return { nm: W_.name, ds: c.lvl === 1 ? `${W_.desc} ${weaponStats(c.id, 1)}` : `${W_.up[c.lvl - 2].replace(/^./, m => m.toUpperCase())}. Now ${weaponStats(c.id, c.lvl).replace(/^./, m => m.toLowerCase())}`, lv: c.lvl === 1 ? '<span class="lv new">New weapon</span>' : `<span class="lv">Level ${c.lvl}</span>`, hint: c.lvl >= MAX_LVL && EVOS[c.id] ? `Max level. With ${PASSIVES[EVOS[c.id].p].name}, a boss chest evolves it into ${EVOS[c.id].name}.` : '' }; }
-  if (c.kind === 'p') { const P = PASSIVES[c.id]; return { nm: P.name, ds: P.desc, lv: c.lvl === 1 ? '<span class="lv new">New</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
+  if (c.kind === 'w') { const W_ = WEAPONS[c.id]; return { nm: W_.name, ds: c.lvl === 1 ? `${W_.desc} ${weaponStats(c.id, 1)}` : `${W_.up[c.lvl - 2].replace(/^./, m => m.toUpperCase())}: ${statChange(weaponStats(c.id, c.lvl - 1), weaponStats(c.id, c.lvl)).replace(/^./, m => m.toLowerCase())}`, lv: c.lvl === 1 ? '<span class="lv new">New weapon</span>' : `<span class="lv">Level ${c.lvl}</span>`, hint: c.lvl >= MAX_LVL && EVOS[c.id] ? `Max level. With ${PASSIVES[EVOS[c.id].p].name}, a boss chest evolves it into ${EVOS[c.id].name}.` : '' }; }
+  if (c.kind === 'p') { const P = PASSIVES[c.id]; return { nm: P.name, ds: c.lvl > 1 ? `${P.desc} ${passiveChange(c.id, c.lvl)}` : P.desc, lv: c.lvl === 1 ? '<span class="lv new">New</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
   if (c.kind === 'food') return { nm: 'Field rations', ds: 'Restore 40% of your health.', lv: '<span class="lv">Everything is maxed</span>' };
   return { nm: 'Sack of gold', ds: 'Gain 50 gold.', lv: '<span class="lv">Everything is maxed</span>' };
 }
@@ -3900,7 +4077,7 @@ function openLevelUp(reroll) {
   const offer = choices(); G.offer = offer.map(c => c.id);
   const cards = offer.map((c, i) => {
     const { nm, ds, lv, hint } = itemInfo(c);
-    return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="chead">${itemIcon(c.kind, c.id)}<span class="ctitle"><span class="nm">${i + 1}. ${nm}</span>${lv}</span></span><span class="ds">${ds}</span>${hint ? `<span class="ds evohint">${hint}</span>` : ''}</button>`;
+    return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="chead">${itemIcon(c.kind, c.id)}<span class="ctitle"><span class="nm">${i + 1}. ${nm}</span>${lv}</span></span><span class="ds">${ds}</span>${hint ? `<span class="ds evohint">${hint}</span>` : evoMark(c) ? `<span class="ds evohint">${evoMark(c)}</span>` : ''}</button>`;
   }).join('');
   showMenu(`<h2>Level ${G.hero.level}</h2><div class="cards">${cards}</div>
     <div class="lvlrow"><button class="opt" data-act="reroll" ${G.rerolls > 0 ? '' : 'disabled'}>Reroll (${G.rerolls})</button><button class="opt" data-act="skip">Skip (+10% health)</button></div>`);
@@ -3954,11 +4131,23 @@ function endRun(won) {
   playMusic(won ? 'victory' : 'defeat');
   showMenu(G.endHtml = `<h2>${won ? 'Victory!' : 'You have fallen'}</h2><p class="sub">${won ? `You held the line for twenty minutes and slew ${G.finalName || 'the final boss'}.` : G.final ? `${G.finalName || 'The final boss'} was too much this time.` : 'The horde was too much this time.'}</p>
     <div class="stats"><b>Hero</b><span>${G.HD.name}</span><b>Battlefield</b><span>${G.LV.name}</span><b>Survived</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>+${G.gold}${G.bonus ? ` (+${G.bonus} for surviving)` : ''}</span></div>
+    ${runBreakdown()}
     ${unlocked || G.newHeroes.length ? `<h3 class="chestgold">Unlocked</h3>${[unlocked && `New battlefield: ${unlocked}`, ...G.newHeroes.filter(id => !HEROES[id].secret).map(id => `New hero: ${HEROES[id].name}`),
       G.newHeroes.includes('peasant') && 'Someone has been watching from the woodpile. Secret heroes: the Peasant and the Peon!',
       G.newHeroes.includes('deathwing') && 'Deathwing has fallen, and now he answers to you. Secret hero: Deathwing!'].filter(Boolean).map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}` : ''}
     ${nextUp().map(t => `<p class="help nextup">${t}</p>`).join('')}
     <div class="opts"><button class="opt" data-act="retry">Retry</button><button class="opt" data-act="choose">Change hero</button><button class="opt" data-act="runlog">Run log</button><button class="opt" data-act="quit" data-back>Title screen</button></div>`);
+  overlay.querySelector('.panel')?.classList.add('wide', 'scrolls'); fitPanel();
+}
+// The fuller end of a run: damage by weapon, healing and damage taken, and health over time.
+function runBreakdown() {
+  const wd = Object.entries(G.wdmg || {}).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]), tot = wd.reduce((a, [, v]) => a + v, 0) || 1;
+  const nm = k => k === 'other' ? 'Other' : k === 'whirl' ? 'Whirlwinds' : WEAPONS[k] ? wName(k) : k;
+  const rows = wd.slice(0, 8).map(([k, v]) => `<div class="wrow"><span>${nm(k)}</span><span class="wbar"><i style="width:${Math.round(v / wd[0][1] * 100)}%"></i></span><span>${Math.round(v).toLocaleString('en-GB')} (${Math.round(v / tot * 100)}%)</span></div>`).join('');
+  const hist = G.hpHist || [], gw = 300, gh = 50, pts = hist.map((f, i) => `${(i / Math.max(1, hist.length - 1) * gw).toFixed(1)},${(gh - f * gh).toFixed(1)}`).join(' ');
+  const graph = hist.length > 1 ? `<svg class="hpgraph" viewBox="-2 -2 ${gw + 4} ${gh + 4}" preserveAspectRatio="none" aria-label="Health over the run"><polyline points="0,${gh} ${pts} ${gw},${gh}" fill="rgba(63,165,63,.25)" stroke="${cfg.opts.colours === 'cb' ? '#2f7fd8' : '#5fd05f'}" stroke-width="1.5"/></svg><div class="hpaxis"><span>0:00</span><span>Health over the run</span><span>${fmtTime(G.t)}</span></div>` : '';
+  return `<div class="breakdown"><h3>Damage by weapon</h3>${rows || '<p class="help">None.</p>'}
+    <div class="stats"><b>Damage taken</b><span>${Math.round(G.taken || 0).toLocaleString('en-GB')}</span><b>Healing</b><span>${Math.round(G.healed || 0).toLocaleString('en-GB')}</span></div>${graph}</div>`;
 }
 // Bank the run's gold and unlock the next level. Returns the name of a newly unlocked level, if any.
 function bankRun() {
