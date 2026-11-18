@@ -245,7 +245,7 @@
 <body>
 <canvas id="c"></canvas>
 <button id="pauseBtn" aria-label="Pause">II</button>
-<button id="speedBtn" aria-label="Game speed">1x</button>
+<button id="speedBtn" aria-label="Game speed">Normal</button>
 <div id="overlay"></div>
 
 <div id="lab">
@@ -781,7 +781,7 @@ const ICON_ENTRY = 356, HERO_ICONS = { lothar: 32, uther: 34, alleria: 187, khad
 // Each level uses one of the game's tilesets: palette, megatiles, minitiles and tile table entries in MAINDAT.WAR.
 const LEVELS = [
   { id: 'forest', name: 'Elwynn Forest', blurb: 'Rolling forest and lakes. A good place to start.', ts: [2, 3, 4, 5], ground: '#34501f',
-    bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.35, forestLakes: 4, trees: 0.5, rocks: 0.9, dark: 0.3, camps: 0.75 }, hp: 1, mix: {} },
+    bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.35, forestLakes: 4, trees: 0.53, fine: 0.55, rocks: 0.9, dark: 0.3, camps: 0.75 }, hp: 1, mix: {} },
   { id: 'winter', name: 'Alterac Mountains', blurb: 'Frozen lakes and snowbound pines. Tougher foes march here.', ts: [18, 19, 20, 21], ground: '#b9c4cc',
     bld: { pal: 18, human: [134, 146, 169, 142, 144, 138, 150], orc: [135, 147, 170, 143, 145, 139, 151] }, sea: { human: [150, 152, 154], orc: [151, 153, 155] }, gen: { clearings: 20, rmin: 10, rmax: 17, lane: 1.2, loops: 0.4, lakes: 0.3, forestLakes: 3, trees: 0.53, rocks: 0.86, dark: 0.3, camps: 0.75 }, hp: 1.3, mix: { tank: 1.5 } },
   { id: 'waste', name: 'Khaz Modan Wastes', blurb: 'Scorched badlands and rocky ridges. Swarms come thick and fast.', ts: [10, 11, 12, 13], ground: '#6b5434',
@@ -899,7 +899,7 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
       const d = Math.hypot(rx - sg.dx * t, ry - sg.dy * t); if (d - sg.w < dl) dl = d - sg.w; if (sg.road && d < droad) droad = d;
     }
     // Away from the clearings and lanes, trees grow in clumps rather than one solid forest.
-    const clump = pnoise(hx, hy, 8, seed + 19) * 0.65 + pnoise(hx, hy, 4, seed + 20) * 0.35, near = Math.min(dc, dl);
+    const fine = g.fine ?? 0.42, clump = pnoise(hx, hy, 8, seed + 19) * (1 - fine) + pnoise(hx, hy, 4, seed + 20) * fine, near = Math.min(dc, dl);
     let t = near < edge ? TT.G : clump > g.trees + Math.max(0, 6 - near) * 0.025 ? TT.F : TT.G;
     if (t === TT.G) {
       if (droad < 0.55 + (pnoise(hx, hy, 8, seed + 14) - 0.5) * 0.5) t = TT.C;
@@ -1054,11 +1054,13 @@ const cv = $('#c'), screenCtx = cv.getContext('2d');
 const wcv = document.createElement('canvas'), worldCtx = wcv.getContext('2d');
 let ctx = screenCtx;
 const overlay = $('#overlay'), pauseBtn = $('#pauseBtn'), speedBtn = $('#speedBtn');
-const SPEEDS = [1, 1.5, 2];
-function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedBtn.textContent = cfg.opts.speed + 'x'; }
-function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedBtn.textContent = cfg.opts.speed + 'x'; if (G && G.state === 'play') banner(`Game speed ${cfg.opts.speed}x`); }
+// Game speeds named as in Warcraft II: Battle.net Edition (Normal is the game's own pace).
+const SPEEDS = [0.5, 0.75, 1, 1.5, 2], SPEED_NAMES = ['Slowest', 'Slow', 'Normal', 'Fast', 'Fastest'];
+const speedName = v => SPEED_NAMES[SPEEDS.indexOf(v)] || v + 'x';
+function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedBtn.textContent = speedName(cfg.opts.speed); }
+function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedBtn.textContent = speedName(cfg.opts.speed); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.8.0', BUILD = '57d7dae 2026-11-18';
+const VERSION = '0.9.0', BUILD = 'a42af43 2026-11-18';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1639,7 +1641,9 @@ const MUSIC = {
   ORC1: 'Music\\ORC1.WAV', ORC2: 'Music\\ORC2.WAV', ORC3: 'Music\\ORC3.WAV', ORC4: 'Music\\ORC4.WAV', ORC5: 'Music\\ORC5.WAV', ORC6: 'Music\\ORC6.WAV',
   HWARROOM: 'Music\\HWARROOM.WAV', OWARROOM: 'Music\\OWARROOM.WAV', HVICTORY: 'Music\\HVICTORY.WAV', OVICTORY: 'Music\\OVICTORY.WAV', HDEFEAT: 'Music\\HDEFEAT.WAV', ODEFEAT: 'Music\\ODEFEAT.WAV',
 };
-const mu = { names: new Set(), cache: new Map(), gain: null, cur: null, kind: null, list: [], idx: 0, want: null, duck: false, token: 0 };
+const mu = { names: new Set(), cache: new Map(), gain: null, cur: null, kind: null, list: [], idx: 0, want: null, duck: false, token: 0, done: null };
+// The menu music loops for ten minutes, then fades out slowly and stays quiet until you next come back from a run.
+const MENU_MUSIC = { loopFor: 600, fade: 40 };
 // Each battlefield's own music, from your side's six campaign tracks: later battlefields bring new ones.
 const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6] };
 function playlistFor(kind) {
@@ -1695,13 +1699,13 @@ function loadTrack(id) {
 function playMusic(kind) {
   mu.want = kind;
   if (!A.actx || !mu.names.size) return;
-  if (mu.kind === kind && mu.cur) return;
-  mu.kind = kind; mu.list = playlistFor(kind).filter(id => mu.names.has(id)); mu.idx = 0;
+  if (mu.kind === kind && (mu.cur || mu.done === kind)) return;
+  mu.kind = kind; mu.done = null; mu.list = playlistFor(kind).filter(id => mu.names.has(id)); mu.idx = 0;
   stopMusic(); if (mu.list.length) nextTrack();
 }
 function stopMusic() {
   const c = mu.cur; mu.cur = null; mu.token++;
-  if (c) { try { c.g.gain.setTargetAtTime(0, A.actx.currentTime, 0.25); c.src.stop(A.actx.currentTime + 1.2); } catch (e) {} }
+  if (c) { try { c.g.gain.cancelScheduledValues(A.actx.currentTime); c.g.gain.setTargetAtTime(0, A.actx.currentTime, 0.25); c.src.stop(A.actx.currentTime + 1.2); } catch (e) {} }
 }
 async function nextTrack() {
   const tok = ++mu.token, id = mu.list[mu.idx % mu.list.length]; mu.idx++;
@@ -1710,9 +1714,13 @@ async function nextTrack() {
   if (!mu.gain) { mu.gain = A.actx.createGain(); mu.gain.connect(A.actx.destination); musicVolume(); }
   const src = A.actx.createBufferSource(), g = A.actx.createGain();
   src.buffer = buf; g.gain.value = 0; g.gain.setTargetAtTime(1, A.actx.currentTime, 0.3); src.connect(g).connect(mu.gain);
-  const loop = mu.kind === 'battle' && mu.list.length === 1; src.loop = loop;   // the menu music plays once, not on repeat
-  src.onended = () => { if (mu.cur && mu.cur.src === src && !loop && (mu.kind === 'battle')) { mu.cur = null; nextTrack(); } };
+  const menu = mu.kind === 'menu', loop = menu || mu.kind === 'battle' && mu.list.length === 1; src.loop = loop;
+  src.onended = () => {
+    if (!mu.cur || mu.cur.src !== src) return;
+    if (menu) { mu.cur = null; mu.done = 'menu'; } else if (!loop && mu.kind === 'battle') { mu.cur = null; nextTrack(); }
+  };
   src.start(); mu.cur = { src, g, id };
+  if (menu) { const t = A.actx.currentTime + MENU_MUSIC.loopFor; g.gain.setValueAtTime(1, t); g.gain.linearRampToValueAtTime(0, t + MENU_MUSIC.fade); src.stop(t + MENU_MUSIC.fade + 0.1); }
   if (mu.kind === 'battle') { const nx = mu.list[mu.idx % mu.list.length]; setTimeout(() => loadTrack(nx), 4000); } // prepare the next one in the background
 }
 // Read only the music out of a large MPQ File, using slices so the whole archive never sits in memory.
@@ -2932,8 +2940,46 @@ function special(e, d, dx, dy, dt) {
     for (let i = 0; i < 4; i++) { const a = rnd(0, TAU), r = rnd(55, 110); addMark(h.x + Math.cos(a) * r, h.y + Math.sin(a) * r, 28, 1.25 + i * 0.12, e.dmg * BOSS_HIT.mark, 'barrage', null, e.drop); }
   }
 }
+// Enemies find their way round trees and water: a map of steps to the hero over the nearby ground, rebuilt as
+// the hero moves. An enemy that walks into an obstacle follows it for a while instead of pressing on.
+const FLOW = { r: 48, refresh: 0.4, detour: 2, pace: 0.75 };   // pace: enemies pick their way round more slowly than they charge
+function updateFlow() {
+  const T = G.terrain; if (!T) { G.flow = null; return; }
+  const h = G.hero, hx = Math.floor(h.x / 16), hy = Math.floor((h.y + 4) / 16), R = FLOW.r, n = R * 2 + 1;
+  let f = G.flow; if (f && f.hx === hx && f.hy === hy && G.t - f.t < FLOW.refresh) return;
+  if (!f) f = G.flow = { d: new Int16Array(n * n), q: new Int32Array(n * n) };
+  f.hx = hx; f.hy = hy; f.t = G.t; const d = f.d, q = f.q, x0 = hx - R, y0 = hy - R, blk = T.blk; d.fill(-1);
+  let head = 0, tail = 0; d[R * n + R] = 0; q[tail++] = R * n + R;
+  while (head < tail) {
+    const i = q[head++], lx = i % n, ly = (i - lx) / n, v = d[i] + 1;
+    for (let k = 0; k < 4; k++) {
+      const ax = lx + (k === 0 ? 1 : k === 1 ? -1 : 0), ay = ly + (k === 2 ? 1 : k === 3 ? -1 : 0);
+      if (ax < 0 || ay < 0 || ax >= n || ay >= n) continue;
+      const j = ay * n + ax; if (d[j] >= 0 || blk[tmod(y0 + ay, TM) * TM + tmod(x0 + ax, TM)] !== 0) continue;
+      d[j] = v; q[tail++] = j;
+    }
+  }
+}
+// Which way to walk from (x, y) round the obstacles to the hero: null when the straight way is (nearly) as short
+// (unless `force`, when the way straight ahead is blocked), or when there's no route known.
+function flowDir(x, y, force) {
+  const f = G.flow; if (!f) return null;
+  const R = FLOW.r, n = R * 2 + 1, cx = Math.floor(x / 16), cy = Math.floor((y + 4) / 16), lx = cx - f.hx + R, ly = cy - f.hy + R;
+  if (lx < 1 || ly < 1 || lx >= n - 1 || ly >= n - 1) return null;
+  const d = f.d, here = d[ly * n + lx]; if (here <= 0 || !force && here <= Math.abs(lx - R) + Math.abs(ly - R) + FLOW.detour) return null;
+  let best = here, bx = 0, by = 0;
+  for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+    if (!ox && !oy) continue; const v = d[(ly + oy) * n + lx + ox]; if (v < 0) continue;
+    if (ox && oy && (d[ly * n + lx + ox] < 0 || d[(ly + oy) * n + lx] < 0)) continue;   // no cutting corners
+    if (v < best || v === best && ox && oy && !(bx && by)) { best = v; bx = ox; by = oy; }
+  }
+  if (!bx && !by) return null;
+  const tx = (cx + bx) * 16 + 8 - x, ty = (cy + by) * 16 + 4 - y, l = Math.hypot(tx, ty) || 1;
+  return [tx / l, ty / l];
+}
 function updateEnemies(dt) {
   const h = G.hero, far = Math.hypot(W, H) * 0.75;
+  updateFlow();
   for (const e of G.enemies) {
     if (e.dead) continue;
     if (e.static) { e.flash -= dt; continue; }
@@ -2952,7 +2998,10 @@ function updateEnemies(dt) {
     let vx = dx * sp, vy = dy * sp;
     if (G.terrain && !e.free && sp && !footBlocked(e.x, e.y, e.r * 0.5)) {
       const look = Math.sign(sp) * 7, r = e.r * 0.5;
-      if (footBlocked(e.x + dx * look, e.y + dy * look, r)) {
+      const path = sp > 0 && !e.charge;   // charges go straight
+      const fd = path && flowDir(e.x, e.y, footBlocked(e.x + dx * look, e.y + dy * look, r));   // the way round, when going straight would mean a detour or a wall
+      if (fd) { vx = fd[0] * sp * FLOW.pace; vy = fd[1] * sp * FLOW.pace; }
+      else if (footBlocked(e.x + dx * look, e.y + dy * look, r)) {
         e.side ||= Math.random() < 0.5 ? 1 : -1; let ok = false;
         for (const k of [1, 2, 3, 4, -1, -2, -3, -4]) {
           const a = Math.atan2(dy, dx) + k * e.side * 0.55, cx = Math.cos(a), cy = Math.sin(a);
@@ -3410,7 +3459,7 @@ function drawFrame(ui) {
   txt(String(G.gold), gx, 4, 7, '#ffd24a', 'right');
   txt(`${G.kills} kills`, gx - 64, 4, 7, '#f1e6c8', 'right');
   // Speed, when it isn't normal, sits by the clock where it can't be missed.
-  if (cfg.opts.speed !== 1) txt(`${cfg.opts.speed}x speed`, W / 2 + 34, 4, 7, '#7fd0ff');
+  if (cfg.opts.speed !== 1) txt(`${speedName(cfg.opts.speed)} speed`, W / 2 + 34, 4, 7, '#7fd0ff');
   drawBar(ui, lite, dark);
   drawMinimap();
 }
@@ -3845,7 +3894,7 @@ function showLevels(heroId) {
   sel = Math.max(0, opts().findIndex(o => o.dataset.act === 'field' && o.dataset.level === LEVELS[start].id)); highlight(); fitPanel();
 }
 const OPT_DEFS = {
-  speed: { label: 'Game speed', vals: SPEEDS, fmt: v => v + 'x' },
+  speed: { label: 'Game speed', vals: SPEEDS, fmt: speedName },
   music: { label: 'Music volume', vals: [0, 0.2, 0.4, 0.6, 0.8, 1], fmt: v => Math.round(v * 100) + '%' },
   sfx: { label: 'Sound volume', vals: [0, 0.2, 0.4, 0.6, 0.8, 1], fmt: v => Math.round(v * 100) + '%' },
   nums: { label: 'Damage numbers', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
@@ -4739,7 +4788,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, fitStage, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
