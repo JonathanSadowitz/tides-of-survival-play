@@ -1093,7 +1093,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.11.1', BUILD = '5eaaedd 2026-11-19';
+const VERSION = '0.11.2', BUILD = '908ee4e 2026-11-19';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -3431,17 +3431,20 @@ function drawLowHealth() {
   g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, cb ? `rgba(255,140,0,${a})` : `rgba(200,0,0,${a})`);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 }
+// Every named boss alive, oldest first (the final boss once the army falls back); a stand-in boss only if there are none.
+function livingBosses() { const b = G.enemies.filter(e => e.boss && e.hp > 0); return b.length ? b : G.enemies.filter(e => e.type === 'boss' && e.hp > 0).slice(0, 1); }
 function drawLootArrows() {
   const h = G.hero, m = 14, cx = W / 2, cy = H / 2, now = performance.now();
   const fortPt = G.fort && G.fort.state === 'held' ? [{ x: G.fort.x, y: G.fort.y, fort: true }] : [];
   if (!G.aboard && G.boats && G.boats.length) { let nb = null, nd = 1e9; for (const b of G.boats) { const d = Math.hypot(b.x - h.x, b.y - h.y); if (!b.sunk && d < nd) { nd = d; nb = b; } } if (nb) fortPt.push({ x: nb.x, y: nb.y, fort: true, boat: true }); }
+  for (const b of livingBosses()) fortPt.push({ x: b.x, y: b.y, fort: true, boss: true });   // bosses out of sight are pointed out too
   for (const g of [...G.gems, ...fortPt]) {
     if (!g.pow && !g.chest && !g.fort) continue;
     const dx = g.x - camX - cx, dy = g.y - camY - cy;
     if (Math.abs(dx) < cx - 4 && Math.abs(dy) < cy - 4) continue;
     if (!g.fort && Math.hypot(g.x - h.x, g.y - h.y) > 900) continue;   // the fortress is always pointed out
     const k = Math.min((cx - m) / Math.abs(dx || 1e-6), (cy - m) / Math.abs(dy || 1e-6)), x = cx + dx * k, y = cy + dy * k, a = Math.atan2(dy, dx);
-    const col = g.boat ? '#7fc4ff' : g.fort ? '#ff7a5c' : g.pow ? POWERUPS[g.pow].col : '#ffd24a';
+    const col = g.boss ? '#d070ff' : g.boat ? '#7fc4ff' : g.fort ? '#ff7a5c' : g.pow ? POWERUPS[g.pow].col : '#ffd24a';
     ctx.globalAlpha = 0.75 + 0.25 * Math.sin(now / 200);
     ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 9, y + Math.sin(a) * 9); ctx.lineTo(x + Math.cos(a + 2.4) * 8, y + Math.sin(a + 2.4) * 8); ctx.lineTo(x + Math.cos(a - 2.4) * 8, y + Math.sin(a - 2.4) * 8); ctx.fill();
     ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7); ctx.lineTo(x + Math.cos(a + 2.4) * 6, y + Math.sin(a + 2.4) * 6); ctx.lineTo(x + Math.cos(a - 2.4) * 6, y + Math.sin(a - 2.4) * 6); ctx.fill();
@@ -3748,9 +3751,16 @@ function drawHud() {
   for (const id in G.buffs) { const im = A.pick && A.pick.pow && A.pick.pow[id], left = Math.ceil(G.buffs[id] - G.t);
     ctx.fillStyle = '#000'; ctx.fillRect(bx, by, 20, 18); if (im) ctx.drawImage(im, bx + 1, by + 1, 18, 16); ctx.strokeStyle = POWERUPS[id].col; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, 19, 17);
     txt(String(left), bx + 22, by + 5, 7, '#ffffff'); bx += 34; }
-  if (boss) {
-    const bw = Math.min(200, W - 120);
-    uiBar((W - bw) / 2, 32, bw, 7, boss.hp / boss.maxHp, '#b8261a', '#ff7a5c', '#5e100a', boss.name || (A.demo ? DEMO.bossNames[G.HD.side] : G.HD.side === 'Horde' ? 'Gryphon Rider' : 'Dragon'));
+  if (boss) {   // one strip, shared side by side when two or three bosses are alive at once
+    const list = livingBosses(), n = list.length, gap = 8, btn = speedBtn.style.display === 'block' ? speedBtn.getBoundingClientRect() : null;
+    const clear = btn && btn.top < 48 ? 2 * (btn.left - 6 - W / 2) : W;   // keep clear of the speed and pause buttons on phones
+    const bw = Math.max(60, Math.min(200 + 60 * (n - 1), W - 120, clear)), sw = (bw - gap * (n - 1)) / n;
+    list.forEach((b, i) => {
+      const full = b.name || (A.demo ? DEMO.bossNames[G.HD.side] : G.HD.side === 'Horde' ? 'Gryphon Rider' : 'Dragon');
+      const lw = s => fonts.small ? fontWidth(fonts.small, s) : s.length * 5;
+      let name = full; if (lw(name) > sw - 6) name = full.split(' ')[0]; if (lw(name) > sw - 6) name = '';
+      uiBar((W - bw) / 2 + i * (sw + gap), 32, sw, 7, b.hp / b.maxHp, '#b8261a', '#ff7a5c', '#5e100a', name);
+    });
   }
   if (G.banner) {
     const b = G.banner, y = 24; ctx.globalAlpha = Math.min(1, b.t / 0.4);
@@ -5045,7 +5055,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, livingBosses, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
