@@ -789,6 +789,12 @@ const LEVELS = [
     bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1.1, loops: 0.45, lakes: 0.2, forestLakes: 2, trees: 0.55, rocks: 0.7, dark: 0.35, camps: 0.75 }, hp: 1.6, mix: { fast: 1.8 } },
   { id: 'swamp', name: 'Swamp of Sorrows', blurb: 'Murky water and twisted trees. Only the hardiest survive.', ts: [438, 439, 440, 441], ground: '#3f4a2a',
     bld: { pal: 438, human: [479, 491, 80, 487, 489, 483, 495], orc: [480, 492, 81, 488, 490, 484, 496] }, sea: { human: [495, 497, 499], orc: [496, 498, 500] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.55, forestLakes: 6, trees: 0.5, rocks: 0.9, dark: 0.35, camps: 0.75 }, hp: 2, mix: { ranged: 1.6, tank: 1.3 } },
+  { id: 'portal', name: 'The Dark Portal', blurb: 'The blasted lands round the Dark Portal. Stay near it and troops pour through, faster the longer you linger.', ts: [10, 11, 12, 13], ground: '#5e3e2c',
+    bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, portal: { entry: 185 },
+    gen: { clearings: 20, rmin: 9, rmax: 14, lane: 1.1, loops: 0.45, lakes: 0.15, forestLakes: 1, trees: 0.54, rocks: 0.72, dark: 0.4, camps: 0.7, portal: { x: 26, y: 18, r: 15 } }, hp: 2.4, mix: { tank: 1.3, ranged: 1.2 } },
+  { id: 'quel', name: "Quel'Thalas", blurb: 'The elves\' ancient forest: dense woods and narrow paths, with archers and trolls hiding among the trees.', ts: [2, 3, 4, 5], ground: '#2c4a1c',
+    bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, ambush: { from: 45, every: 7, max: 7 },
+    gen: { clearings: 18, rmin: 7, rmax: 10, lane: 0.5, loops: 0.55, lakes: 0.25, forestLakes: 3, trees: 0.4, fine: 0.3, rocks: 0.93, dark: 0.35, camps: 0.75, pockets: true }, hp: 3.0, mix: { ranged: 1.4, fast: 1.2 } },
 ];
 const UNLOCK_T = 600; // surviving 10 minutes, after a few runs there (FIELD_RUNS), unlocks the next level
 const UPGRADES = {
@@ -869,6 +875,7 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
   const I = (x, y) => tmod(y, TM) * TM + tmod(x, TM);
   let rs = (seed >>> 0) || 1; const R = () => { rs ^= rs << 13; rs ^= rs >>> 17; rs ^= rs << 5; return (rs >>> 0) / 4294967296; };
   const tdx = (a, b) => tmod(a - b + TN / 2, TN) - TN / 2;
+  const PORT_CLEAR = 6;   // tiles of shore kept clear of enemy ports beyond a friendly camp's clearing
   // 0. Islands (Tol Barad): land only on a few islands, the first under the start, with open sea between.
   const isles = g.islands ? [{ x: 0, y: 0, r: g.irmax }] : null;
   if (isles) for (let k = 0; isles.length < g.islands && k < 4000; k++) {
@@ -879,6 +886,7 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
   const onIsle = p => !isles || isles.some(o => Math.hypot(tdx(p.x, o.x), tdx(p.y, o.y)) < o.r - p.r - 2);
   // 1. Clearings, the first one at the start position.
   const pts = [{ x: 0, y: 0, r: 11, start: true }];
+  if (g.portal) pts.push({ x: g.portal.x, y: g.portal.y, r: g.portal.r, portal: true });   // the Dark Portal's own clearing
   for (let k = 0; pts.length < g.clearings && k < 4000; k++) {
     const p = { x: R() * TN, y: R() * TN, r: g.rmin + R() * (g.rmax - g.rmin) };
     if (onIsle(p) && pts.every(o => Math.hypot(tdx(p.x, o.x), tdx(p.y, o.y)) > o.r + p.r + 5)) pts.push(p);
@@ -895,7 +903,7 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
   const segs = (isles ? edges.filter(([a, b]) => isleOf(pts[a].x, pts[a].y) === isleOf(pts[b].x, pts[b].y)) : edges).map(([a, b]) => ({ a, b, ax: pts[a].x, ay: pts[a].y, dx: tdx(pts[b].x, pts[a].x), dy: tdx(pts[b].y, pts[a].y), w: g.lane * (3.6 + R() * 2.6), road: R() < 0.65 }));
   // 3. Lakes: in some clearings, and a few on their own in the forest.
   const lakes = [];
-  pts.forEach((p, i) => { if (i && R() < g.lakes) { const a = R() * TAU, d = R() * p.r * 0.35; lakes.push({ x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, r: 2.2 + R() * Math.min(3.2, p.r * 0.35), host: i }); } });
+  pts.forEach((p, i) => { if (i && !p.portal && R() < g.lakes) { const a = R() * TAU, d = R() * p.r * 0.35; lakes.push({ x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, r: 2.2 + R() * Math.min(3.2, p.r * 0.35), host: i }); } });
   for (let k = 0; k < g.forestLakes; k++) lakes.push({ x: R() * TN, y: R() * TN, r: 2.5 + R() * 3.5, host: -1 });
   for (const L of lakes) if (L.host >= 0) pts[L.host].lake = L;
   // 4. Classify every half-tile.
@@ -929,6 +937,11 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
   }
   // Keep the start clear.
   for (let y = -16; y <= 16; y++) for (let x = -16; x <= 16; x++) if (x * x + y * y <= 196) { const i = I(x, y); if (T_BLOCK[q[i]]) q[i] = TT.G; }
+  if (g.portal) { const px = Math.round(g.portal.x * 2), py = Math.round(g.portal.y * 2); for (let y = -16; y <= 16; y++) for (let x = -16; x <= 16; x++) if (x * x + y * y <= 196) { const i = I(px + x, py + y); q[i] = x * x + y * y <= 100 ? TT.DG : T_BLOCK[q[i]] ? TT.G : q[i]; } }   // scorched ground round the Portal
+  // Dense forest (Quel'Thalas) can wall in small patches of open ground: fill any that can't be reached from the start.
+  if (g.pockets) { const seen = new Uint8Array(TM * TM), st = [0]; seen[0] = 1;
+    while (st.length) { const i = st.pop(), x = i % TM, y = (i / TM) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const j = I(x + dx, y + dy); if (!seen[j] && !T_BLOCK[q[j]]) { seen[j] = 1; st.push(j); } } }
+    for (let i = 0; i < q.length; i++) if (!seen[i] && !T_BLOCK[q[i]]) q[i] = TT.F; }
   // 5. Warcraft II keeps terrain on tile corners: each tile is drawn from the types at its four corners, and
   // neighbouring tiles share them, so shores and forest edges carry on across tile boundaries. Take every other
   // half-tile as a corner, settle clashes so neighbouring corners are equal or one step apart (each tile then
@@ -955,11 +968,16 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
   const fits = (tx, ty, w, h, gap) => { for (let y = ty - gap; y < ty + h + gap; y++) for (let x = tx - gap; x < tx + w + gap; x++) if (!tileFree(x, y)) return false; return true; };
   const forestNear = (tx, ty, w, h) => { let c = 0; for (let y = ty - 3; y < ty + h + 3; y++) for (let x = tx - 3; x < tx + w + 3; x++) if (q[I(x * 2, y * 2)] === TT.F) c++; return c; };
   const camps = [];
+  // The Dark Portal: four tiles square in the middle of its clearing, never destroyed.
+  let portal = null;
+  if (g.portal) { const tx = Math.round(g.portal.x) - 2, ty = Math.round(g.portal.y) - 2; portal = { tx, ty, w: 4, h: 4, entry: LV.portal && LV.portal.entry };
+    for (let y = -1; y <= 4; y++) for (let x = -1; x <= 4; x++) occ[tmod(ty + y, TN) * TN + tmod(tx + x, TN)] = 1;
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) blk[I(tx * 2 + x, ty * 2 + y)] = 2; }
   pts.forEach((p, i) => {
-    if (p.start || p.r < 8) return;
+    if (p.start || p.portal || p.r < 8) return;
     if (R() > g.camps) return;
     const enemy = R() < 0.65, side = enemy ? enemySide : (enemySide === 'orc' ? 'human' : 'orc');
-    const c = { id: camps.length, cx: Math.round(p.x), cy: Math.round(p.y), enemy, side, blds: [] };
+    const c = { id: camps.length, cx: Math.round(p.x), cy: Math.round(p.y), r: p.r, enemy, side, blds: [] };
     const sz = bldSize;
     const put = (kind, tx, ty) => { const entry = LV.bld[side][kind], s2 = sz(entry); if (!s2) return null; const b = { entry, kind, tx, ty, w: s2[0], h: s2[1] }; c.blds.push(b); for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) occ[tmod(ty + y, TN) * TN + tmod(tx + x, TN)] = 1; return b; };
     const spiral = (cx, cy, maxR, test) => { for (let r = 0; r <= maxR; r++) for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (Math.max(Math.abs(x), Math.abs(y)) === r && test(cx + x, cy + y)) return [cx + x, cy + y]; return null; };
@@ -1002,6 +1020,9 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
       while (stack.length) { const i = stack.pop(); cells.push(i); const x = i % TM, y = (i / TM) | 0; for (const [dx, dy] of D4) { const j = I(x + dx, y + dy); if (!seen[j] && isW(q[j])) { seen[j] = 1; stack.push(j); } } }
       if (cells.length < 100 || R() > (g.ports ?? 0.6)) continue;
       const shore = cells.filter(i => { const x = i % TM, y = (i / TM) | 0; return D4.some(([dx, dy]) => !isW(q[I(x + dx, y + dy)])); });
+      // A lake beside one of your own side's settlements stays friendly: no enemy shipyard, so no enemy ships (Jon).
+      const friendly = camps.filter(f => !f.enemy && !f.sea);
+      if (friendly.some(f => shore.some(i => Math.hypot(tdx((i % TM) / 2, f.cx), tdx(((i / TM) | 0) / 2, f.cy)) < (f.r || 10) + PORT_CLEAR))) continue;
       const side = enemySide, c = { id: camps.length, cx: 0, cy: 0, enemy: true, sea: true, side, blds: [] };
       for (const k of [0, R() < 0.5 ? 1 : 2]) {
         const entry = LV.sea[side][k], s2 = bldSize(entry); if (!s2) continue;
@@ -1058,7 +1079,7 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
       if (hit) { docks.push({ hx: hit[0], hy: hit[1], isle: i }); break; }
     }
   });
-  return { LV, seed, q, blk, tiles, camps, isles, docks, chunks: new Map() };
+  return { LV, seed, q, blk, tiles, camps, isles, docks, portal, chunks: new Map() };
 }
 
   return { TT, T_SOLID, T_PRI, T_BLOCK, T_PAIR, T_MASK2P, T_NEXT, TN, TM, ihash, pnoise, tmod, buildTerrain };
@@ -1093,7 +1114,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.11.3', BUILD = 'ba7fe73 2026-11-19';
+const VERSION = '0.12.0', BUILD = '2733844 2026-11-19';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1119,7 +1140,7 @@ const store = {
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(() => {}); } catch (e) {}
 let cfg = store.get('tos_cfg', null) || { roles: {}, sounds: {}, palette: null };
 cfg.roles ||= {}; cfg.sounds ||= {};
-cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, voice: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fx: 'full', colours: 'std' }, cfg.opts || {});
+cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, voice: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fx: 'full', colours: 'std', tips: true }, cfg.opts || {});
 if (!cfg.optsV) { if (cfg.opts.music === 0.6) cfg.opts.music = 0.4; cfg.optsV = 2; }   // 60% was the old default: too loud
 const saveCfg = () => store.set('tos_cfg', cfg);
 let best = store.get('tos_best', { time: 0, kills: 0, level: 0 });
@@ -1680,11 +1701,12 @@ const mu = { names: new Set(), cache: new Map(), gain: null, cur: null, kind: nu
 // The menu music loops for ten minutes, then fades out slowly and stays quiet until you next come back from a run.
 const MENU_MUSIC = { loopFor: 600, fade: 40 };
 // Each battlefield's own music, from your side's six campaign tracks: later battlefields bring new ones.
-const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6] };
+// Past your own side's six, a battlefield plays the other side's tracks ('x' and the number).
+const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6], portal: ['x1', 'x3'], quel: ['x2', 'x4'] };
 function playlistFor(kind) {
   const horde = G && G.HD.side === 'Horde', pre = horde ? 'ORC' : 'HUMAN', p1 = horde ? 'O' : 'H';
   if (kind === 'menu') return ['OWARROOM'];
-  if (kind === 'battle') return (FIELD_MUSIC[G && G.LV.id] || [1, 2, 3, 4, 5, 6]).map(i => pre + i);   // each battlefield has its own tracks
+  if (kind === 'battle') return (FIELD_MUSIC[G && G.LV.id] || [1, 2, 3, 4, 5, 6]).map(i => typeof i === 'string' ? (horde ? 'HUMAN' : 'ORC') + i.slice(1) : pre + i);   // each battlefield has its own tracks
   if (kind === 'victory') return [p1 + 'VICTORY'];
   if (kind === 'defeat') return [p1 + 'DEFEAT'];
   return [];
@@ -2164,6 +2186,7 @@ const BOSS_POOL = {
 const FINALS = {
   forest: { Horde: 'orgrim', Alliance: 'lothar' }, winter: { Horde: 'guldan', Alliance: 'turalyon' },
   waste: { Horde: 'deathwing', Alliance: 'kurdran' }, swamp: { Horde: 'chogall', Alliance: 'khadgar' },
+  portal: { Horde: 'teron', Alliance: 'danath' }, quel: { Horde: 'zuljin', Alliance: 'alleria' },
 };
 function planBosses() {   // [5:00, 10:00, 15:00, final]
   const side = foeSide(), fin = FINALS[G.LV.id][side], rest = Object.keys(BOSS_POOL[side]).filter(k => k !== fin);
@@ -2295,6 +2318,8 @@ function loadTileset(LV) {
     const w = Core.u16(d, 2), h = Core.u16(d, 4), bc = document.createElement('canvas'); bc.width = w; bc.height = h;
     bc.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(d, 0, w, h), w, h, tp), 0, 0); A.bldSpr[e] = bc;
   }
+  if (LV.portal) { const d = Core.safeEntry(war, LV.portal.entry); if (d && Core.isGfu(d)) { const w = Core.u16(d, 2), h = Core.u16(d, 4), bc = document.createElement('canvas'); bc.width = w; bc.height = h;
+    bc.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(d, 0, w, h), w, h, bp), 0, 0); A.bldSpr[LV.portal.entry] = bc; } }   // the Dark Portal, in the tileset's own colours
   return (A.tilesets[LV.id] = { atlas: c, cols, recs, bldSpr: A.bldSpr });
 }
 const CHUNK = 8;
@@ -2359,12 +2384,74 @@ function drawMinimap() {
   if (!drawMiniMap(T, h.x, h.y, bx, by, sz)) return;
   const half = MINI.span * 8, cb = cfg.opts.colours === 'cb';
   ctx.fillStyle = cb ? '#ff9a1a' : '#e0281c';
-  for (const e of G.enemies) { const dx = e.x - h.x, dy = e.y - h.y; if (Math.abs(dx) < half && Math.abs(dy) < half) ctx.fillRect(Math.round(bx + sz / 2 + dx / 16 * k) - (e.boss ? 1 : 0), Math.round(by + sz / 2 + dy / 16 * k) - (e.boss ? 1 : 0), e.boss ? 3 : 1, e.boss ? 3 : 1); }
+  for (const e of G.enemies) { if (e.hidden) continue; const dx = e.x - h.x, dy = e.y - h.y; if (Math.abs(dx) < half && Math.abs(dy) < half) ctx.fillRect(Math.round(bx + sz / 2 + dx / 16 * k) - (e.boss ? 1 : 0), Math.round(by + sz / 2 + dy / 16 * k) - (e.boss ? 1 : 0), e.boss ? 3 : 1, e.boss ? 3 : 1); }
+  const pp = G.portal && portalPos(); if (pp) { const dx = pp.x - h.x, dy = pp.y - h.y, mx = Math.max(-sz / 2 + 2, Math.min(sz / 2 - 3, dx / 16 * k)), my = Math.max(-sz / 2 + 2, Math.min(sz / 2 - 3, dy / 16 * k)); ctx.fillStyle = '#7dff6e'; ctx.fillRect(Math.round(bx + sz / 2 + mx) - 2, Math.round(by + sz / 2 + my) - 2, 5, 5); }
   if (G.fort && G.fort.state === 'held') { const dx = G.fort.x - h.x, dy = G.fort.y - h.y, mx = Math.max(-sz / 2 + 2, Math.min(sz / 2 - 3, dx / 16 * k)), my = Math.max(-sz / 2 + 2, Math.min(sz / 2 - 3, dy / 16 * k)); ctx.fillStyle = '#ffd24a'; ctx.fillRect(Math.round(bx + sz / 2 + mx) - 2, Math.round(by + sz / 2 + my) - 2, 4, 4); }
   ctx.fillStyle = '#fff'; ctx.fillRect(bx + sz / 2 - 1, by + sz / 2 - 1, 3, 3);
   // The screen's own view, outlined as in Warcraft II.
   ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; const vw = W / 16 * k, vh = H / 16 * k;
   ctx.strokeRect(Math.round(bx + sz / 2 - vw / 2) + 0.5, Math.round(by + sz / 2 - vh / 2) + 0.5, Math.round(vw), Math.round(vh));
+}
+
+/* ---------- the Dark Portal ---------- */
+// The Portal stands in its own clearing. Near it, troops pour through, faster and in bigger groups the longer
+// you stay (heat); walk away and it cools. Troops from the Portal are worth half as much experience again.
+const PORTAL = { near: 520, active: 950, every: 4.5, ramp: 40, cool: 2, max: 5, xp: 1.5, surge: 60 };
+function portalPos() {
+  const p = G.terrain && G.terrain.portal; if (!p) return null;
+  const P = TN * 32, bx = p.tx * 32 + 64, by = p.ty * 32 + 64, h = G.hero;
+  return { x: bx + Math.round((h.x - bx) / P) * P, y: by + Math.round((h.y - by) / P) * P };
+}
+function setupPortal() { G.portal = G.terrain && G.terrain.portal ? { heat: 0, spawnT: 3, warned: false, prop: null, d: 1e9 } : null; }
+function updatePortal(dt) {
+  const P = G.portal; if (!P) return;
+  const at = portalPos(), h = G.hero, d = Math.hypot(at.x - h.x, at.y - h.y);
+  if (!P.prop) { P.prop = { x: at.x, y: at.y, spr: A.bldSpr[G.terrain.portal.entry], portal: true }; G.props.push(P.prop); }
+  P.prop.x = at.x; P.prop.y = at.y; P.d = d;
+  if (d < PORTAL.near) { P.heat += dt; if (!P.warned) { P.warned = true; tip('portal', 'The Dark Portal! The longer you stay near it, the more troops pour through.'); } }
+  else P.heat = Math.max(0, P.heat - dt * PORTAL.cool);
+  if (P.heat >= PORTAL.surge && !P.surge) { P.surge = true; banner('The Dark Portal surges!'); } else if (P.heat < PORTAL.surge / 2) P.surge = false;
+  if (d > PORTAL.active || G.final) return;
+  if ((P.spawnT -= dt) > 0) return;
+  P.spawnT = PORTAL.every / (1 + P.heat / PORTAL.ramp);
+  const n = Math.min(PORTAL.max, 1 + Math.floor(P.heat / 45)), t = Math.min(G.t, RUN_LEN);
+  for (let i = 0; i < n && G.enemies.length < 330; i++) {
+    const e = spawnEnemy(pickType(t), at.x + rnd(-56, 56), at.y + 84 + rnd(0, 26));   // out of the Portal's mouth
+    if (e) { e.xp *= PORTAL.xp; e.portal = true; }
+  }
+  if (cfg.opts.fx !== 'reduced') G.fx.push({ k: 'ring', x: at.x, y: at.y + 60, r: 56, t: 0, life: 0.5, col: '130,150,255' });
+}
+function drawPortalGlow() {
+  const P = G.portal; if (!P || !P.prop || cfg.opts.fx === 'reduced') return;
+  const x = P.prop.x - camX, y = P.prop.y - camY; if (x < -200 || y < -200 || x > W + 200 || y > H + 200) return;
+  const k = Math.min(1, P.heat / 90), a = (0.2 + 0.45 * k) * (0.75 + 0.25 * Math.sin(performance.now() / (320 - 160 * k)));
+  const g = ctx.createRadialGradient(x, y, 6, x, y, 96 + 70 * k); g.addColorStop(0, `rgba(120,150,255,${a})`); g.addColorStop(1, 'rgba(70,60,200,0)');
+  ctx.fillStyle = g; ctx.fillRect(x - 170, y - 170, 340, 340);
+}
+/* ---------- Quel'Thalas: archers and trolls hiding in the trees ---------- */
+// Ranged troops wait on the forest's edge, hidden until you come close or they loose their first shot. They never move.
+const AMBUSH = { reveal: 170, near: 230, far: 420 };
+function updateAmbush(dt) {
+  const L = G.LV.ambush; if (!L || G.t < L.from || G.final || !G.terrain) return;
+  if ((G.ambushT = (G.ambushT ?? 2) - dt) > 0) return;
+  G.ambushT = L.every;
+  if (G.enemies.filter(e => e.ambush && !e.dead).length >= L.max) return;
+  const T = G.terrain, h = G.hero;
+  for (let k = 0; k < 40; k++) {
+    const a = rnd(0, TAU), r = rnd(AMBUSH.near, AMBUSH.far), cx = Math.floor((h.x + Math.cos(a) * r) / 16), cy = Math.floor((h.y + Math.sin(a) * r) / 16);
+    if (T.q[tmod(cy, TM) * TM + tmod(cx, TM)] !== TT.F) continue;
+    if (![[2, 0], [-2, 0], [0, 2], [0, -2]].some(([dx, dy]) => !T.blk[tmod(cy + dy, TM) * TM + tmod(cx + dx, TM)])) continue;   // on the edge, with open ground within a tile
+    const e = spawnEnemy(upgrade('ranged', G.t)); if (!e) return;
+    e.x = cx * 16 + 8; e.y = cy * 16 + 8; e.ambush = true; e.hidden = true; e.free = true; e.shootT = rnd(1, 2);
+    tip('ambush', foeSide() === 'Horde' ? 'Trolls in the trees! Hidden axethrowers strike from the forest\'s edge.' : 'Elves in the trees! Hidden archers shoot from the forest\'s edge.');
+    return;
+  }
+}
+function updateAmbusher(e, d, dx, dy) {
+  if (d > 900) { e.dead = true; return; }   // left behind: new ones wait further on
+  if (e.hidden && (d < AMBUSH.reveal || e.flash > 0)) e.hidden = false;
+  e.dir = dirOf(dx, dy);
+  if (e.shootT <= 0 && d < e.range * 1.3) { e.shootT = e.type === 'ranged_up' ? 2.0 : 2.6; e.swing = SWING; e.hidden = false; G.eshots.push({ x: e.x, y: e.y, vx: dx * 95, vy: dy * 95, dmg: e.dmg, life: 3, dir: dirOf(dx, dy) }); }
 }
 
 /* ---------- camps ---------- */
@@ -2374,6 +2461,7 @@ function startLevel() {
   try { G.terrain = buildTerrain(G.LV, G.seed ?? SEED_PARAM ?? ((Math.random() * 1e9) | 0), G.HD.side === 'Horde' ? 'human' : 'orc'); } catch (e) { console.error(e); G.terrain = null; }
   setupFortress();
   setupBoats();
+  setupPortal();
 }
 /* ---------- Tol Barad: transports between the islands ---------- */
 // A transport waits at each island's dock. Walk into it to board; while aboard you steer it, your weapons fire from
@@ -2438,7 +2526,7 @@ function updateBoats(dt) {
     const a = rnd(0, TAU), x = h.x + Math.cos(a) * BOAT.ships.near, y = h.y + Math.sin(a) * BOAT.ships.near;
     if (!shipAt(x, y)) continue;
     const e = spawnEnemy(G.t >= 600 && hasFoe('ship2') && Math.random() < 0.5 ? 'ship2' : 'ship', x, y); if (!e) return;
-    e.ship = true; if (!G.shipTip) { G.shipTip = true; banner('Warships! Sink them from the deck, or outrun them.'); }
+    e.ship = true; if (!G.shipTip) { G.shipTip = true; tip('ships', 'Warships! Sink them from the deck, or outrun them.'); }
     return;
   }
 }
@@ -2489,7 +2577,7 @@ function updateCamps(dt) {
       if (!st.live) activateCamp(st);
       const alive = c.enemy && st.ents.some(e => !e.dead);
       if (alive && d < 560) {
-        if (!st.warned) { st.warned = true; if (st.fort) banner(`The fortress! Destroy every building to free ${HEROES[G.fort.id].name}.`); else banner(c.sea ? `An enemy port! Its ships shell the shore: sink them with ranged weapons.` : `An enemy ${c.side === 'orc' ? 'orc' : 'human'} camp! Destroy it for gold.`); }
+        if (!st.warned) { st.warned = true; if (st.fort) banner(`The fortress! Destroy every building to free ${HEROES[G.fort.id].name}.`); else if (c.sea) tip('port', `An enemy port! Its ships shell the shore: sink them with ranged weapons.`); else tip('camp', `An enemy ${c.side === 'orc' ? 'orc' : 'human'} camp! Destroy it for gold.`); }
         if (c.sea) { portShips(st, dt); continue; }
         st.spawnT -= dt;
         if (st.spawnT <= 0) {
@@ -2528,7 +2616,7 @@ function portShips(st, dt) {
     if (!ok[tmod(Math.floor(y / 16), TM) * TM + tmod(Math.floor(x / 16), TM)] || Math.hypot(x - h.x, y - h.y) < 140) continue;
     const e = spawnEnemy(G.t >= 600 && hasFoe('ship2') && Math.random() < 0.5 ? 'ship2' : 'ship', x, y); if (!e) return;
     e.ship = true; e.port = st; st.ships.push(e);
-    if (!G.shipTip) { G.shipTip = true; banner('Warships! Only ranged weapons can sink them. Or keep out of range.'); }
+    if (!G.shipTip) { G.shipTip = true; tip('ships', 'Warships! Only ranged weapons can sink them. Or keep out of range.'); }
     return;
   }
 }
@@ -2580,7 +2668,7 @@ function buildingDestroyed(e) {
   G.fx.push({ k: 'boom', x: e.x, y: e.y, r: e.r * 1.5, t: 0, life: 0.6 }); sfx('s_boom', 0.05);
   for (let i = 0; i < 3 + (e.kind === 3) * 4; i++) G.gems.push({ x: e.x + rnd(-e.r, e.r), y: e.y + rnd(-e.r, e.r), coin: Math.round(rnd(3, 7) * goldMul()) });
   G.gems.push({ x: e.x, y: e.y, v: e.xp });
-  if (e.camp.ents.every(b => b.dead)) { G.gems.push({ x: e.x, y: e.y + 6, chest: 'camp' }); if (e.camp.fort) freePrisoner(); else banner('Camp destroyed! It left a supply cache.'); }
+  if (e.camp.ents.every(b => b.dead)) { G.gems.push({ x: e.x, y: e.y + 6, chest: 'camp' }); if (e.camp.fort) freePrisoner(); else tip('cache', 'Camp destroyed! It left a supply cache.'); }
 }
 
 /* ---------- spatial grid ---------- */
@@ -2693,6 +2781,15 @@ function spawn(dt) {
 }
 // A small, quick note near the top of the screen (with the power-up's icon when there is one).
 function banner(text, icon) { G.banner = { text, icon, t: 1.5 }; }
+// Teaching tips (what a camp is, what warships do) show in a player's first few runs of each, then stop (Jon).
+// News (a boss approaches, a prisoner escapes) always shows. Counts live in the save, so Reset progress brings tips back.
+const TIPS = { runs: 3 };
+function tip(key, text) {
+  if (!cfg.opts.tips) return;
+  const seen = (meta.tips ||= {}), run = (G.tipRun ||= {});
+  if (!run[key]) { if ((seen[key] || 0) >= TIPS.runs) return; run[key] = true; seen[key] = (seen[key] || 0) + 1; saveMeta(); }
+  banner(text);
+}
 
 /* ---------- combat ---------- */
 // Ships can only be sunk from the shore with something that flies or reaches across the water.
@@ -3204,6 +3301,7 @@ function updateEnemies(dt) {
     if (e.stun > 0) { e.stun -= dt; e.atkT = Math.max(e.atkT, 0.2); continue; }   // Shield Bash
     let dx = h.x - e.x, dy = h.y - e.y; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
     if (e.ship) { updateShip(e, d, dx, dy, dt); continue; }
+    if (e.ambush) { updateAmbusher(e, d, dx, dy); continue; }
     let sp = e.spd * (e.lust > 0 ? 1.4 : 1);
     if (e.range) {   // ranged units keep their distance
       if (d < e.range * (e.type === 'siege' ? 0.55 : 0.75)) sp = -sp * 0.6; else if (d < e.range) sp = 0;
@@ -3283,7 +3381,7 @@ function update(dt) {
   if (h.frenzy && (h.frenzyT -= dt) <= 0) h.frenzy = Math.max(0, h.frenzy - dt * 0.15);   // Blade Frenzy fades
   if (G.HD.holyLight && h.hp > 0 && h.hp < h.maxHp * 0.3 && G.t >= (G.holyT || 0)) { G.holyT = G.t + 60; h.hp = Math.min(h.maxHp, h.hp + h.maxHp * 0.4); banner('Holy Light!'); G.fx.push({ k: 'pillar', x: h.x, y: h.y, t: 0, life: 0.6 }); }
   h.coilBank = Math.min(COIL_HEAL_PER_S, (h.coilBank || 0) + COIL_HEAL_PER_S * dt);
-  spawn(dt); updateCamps(dt); updateFort(dt); updateBoats(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
+  spawn(dt); updateCamps(dt); updateFort(dt); updateBoats(dt); updatePortal(dt); updateAmbush(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
   for (const f of G.fx) f.t += dt; G.fx = G.fx.filter(f => f.t < f.life); G.numCount = 0; for (const f of G.fx) if (f.k === 'num') G.numCount++;
   for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
   if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
@@ -3437,14 +3535,15 @@ function drawLootArrows() {
   const h = G.hero, m = 14, cx = W / 2, cy = H / 2, now = performance.now();
   const fortPt = G.fort && G.fort.state === 'held' ? [{ x: G.fort.x, y: G.fort.y, fort: true }] : [];
   if (!G.aboard && G.boats && G.boats.length) { let nb = null, nd = 1e9; for (const b of G.boats) { const d = Math.hypot(b.x - h.x, b.y - h.y); if (!b.sunk && d < nd) { nd = d; nb = b; } } if (nb) fortPt.push({ x: nb.x, y: nb.y, fort: true, boat: true }); }
-  for (const b of livingBosses()) fortPt.push({ x: b.x, y: b.y, fort: true, boss: true });   // bosses out of sight are pointed out too
+  for (const b of livingBosses()) fortPt.push({ x: b.x, y: b.y, fort: true, boss: true });
+  if (G.portal && !G.portal.warned) { const pp = portalPos(); fortPt.push({ x: pp.x, y: pp.y, fort: true, portal: true }); }   // the way to the Portal, until you reach it   // bosses out of sight are pointed out too
   for (const g of [...G.gems, ...fortPt]) {
     if (!g.pow && !g.chest && !g.fort) continue;
     const dx = g.x - camX - cx, dy = g.y - camY - cy;
     if (Math.abs(dx) < cx - 4 && Math.abs(dy) < cy - 4) continue;
     if (!g.fort && Math.hypot(g.x - h.x, g.y - h.y) > 900) continue;   // the fortress is always pointed out
     const k = Math.min((cx - m) / Math.abs(dx || 1e-6), (cy - m) / Math.abs(dy || 1e-6)), x = cx + dx * k, y = cy + dy * k, a = Math.atan2(dy, dx);
-    const col = g.boss ? '#d070ff' : g.boat ? '#7fc4ff' : g.fort ? '#ff7a5c' : g.pow ? POWERUPS[g.pow].col : '#ffd24a';
+    const col = g.portal ? '#7dff6e' : g.boss ? '#d070ff' : g.boat ? '#7fc4ff' : g.fort ? '#ff7a5c' : g.pow ? POWERUPS[g.pow].col : '#ffd24a';
     ctx.globalAlpha = 0.75 + 0.25 * Math.sin(now / 200);
     ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 9, y + Math.sin(a) * 9); ctx.lineTo(x + Math.cos(a + 2.4) * 8, y + Math.sin(a + 2.4) * 8); ctx.lineTo(x + Math.cos(a - 2.4) * 8, y + Math.sin(a - 2.4) * 8); ctx.fill();
     ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7); ctx.lineTo(x + Math.cos(a + 2.4) * 6, y + Math.sin(a + 2.4) * 6); ctx.lineTo(x + Math.cos(a - 2.4) * 6, y + Math.sin(a - 2.4) * 6); ctx.fill();
@@ -3868,13 +3967,14 @@ function renderWorld() {
   list.push(null);
   const sy = e => e ? e.y + (e.spr ? e.spr.height / 2 - 10 : 0) : h.y;
   list.sort((a, b) => sy(a) - sy(b));
+  drawPortalGlow();
   for (const m of G.marks) drawMark(m);
   for (const w of G.whirls || []) drawWhirl(w);
   // Every unit's shadow in one path and one fill, rather than one fill per unit.
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath();
-  for (const e of list) if (e && e.type && !e.static) { const x = e.x - camX, y = e.y - camY + e.r * 0.8, rx = e.r * (e.fly ? 0.8 : 1); ctx.moveTo(x + rx, y); ctx.ellipse(x, y, rx, e.r * 0.4, 0, 0, TAU); }
+  for (const e of list) if (e && e.type && !e.static && !e.hidden) { const x = e.x - camX, y = e.y - camY + e.r * 0.8, rx = e.r * (e.fly ? 0.8 : 1); ctx.moveTo(x + rx, y); ctx.ellipse(x, y, rx, e.r * 0.4, 0, 0, TAU); }
   ctx.fill(); G.shadowsDrawn = true;
-  for (const e of list) !e ? (G.HD.fly ? 0 : drawHero()) : e.prisoner ? drawPrisoner(e) : e.boat ? drawBoat(e.boat) : e.fly ? 0 : e.spr && !e.type ? drawBuilding(e) : drawEnemy(e);
+  for (const e of list) !e ? (G.HD.fly ? 0 : drawHero()) : e.prisoner ? drawPrisoner(e) : e.boat ? drawBoat(e.boat) : e.fly ? 0 : e.spr && !e.type ? drawBuilding(e) : e.hidden ? (ctx.globalAlpha = 0.22, drawEnemy(e), ctx.globalAlpha = 1) : drawEnemy(e);
   for (const e of list) if (e && e.fly) drawEnemy(e);   // fliers over trees and buildings
   if (G.HD.fly) drawHero();   // Kurdran and Deathwing too
   G.shadowsDrawn = false;
@@ -4054,6 +4154,7 @@ overlay.addEventListener('click', e => {
   else if (act === 'shop') showShop();
   else if (act === 'book') showBook(b.dataset.tab);
   else if (act === 'bookentry') { const i = opts().indexOf(b); if (i >= 0) { sel = i; highlight(); } }
+  else if (act === 'resettips') { meta.tips = {}; saveMeta(); cfg.opts.tips = true; saveCfg(); showSettings(b.dataset.from || 'title'); toast('Tips will show again.'); }
   else if (act === 'reset') {
     // Twice to be sure: the first press arms it for a few seconds.
     if (!resetArmed) { resetArmed = true; b.textContent = 'Press again to erase all progress'; b.classList.add('armed'); setTimeout(() => { resetArmed = false; if (b.isConnected) { b.textContent = 'Reset progress'; b.classList.remove('armed'); } }, 4000); return; }
@@ -4162,6 +4263,7 @@ const OPT_DEFS = {
   ui: { label: 'Interface size', vals: [0.8, 1, 1.25], fmt: v => v < 1 ? 'Small' : v > 1 ? 'Large' : 'Normal' },
   minimap: { label: 'Minimap', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
   fx: { label: 'Effects', vals: ['full', 'reduced'], fmt: v => v === 'full' ? 'Full' : 'Reduced (no glows or light beams)' },
+  tips: { label: 'Tips', vals: [true, false], fmt: v => v ? `On for your first ${TIPS.runs} runs of each` : 'Off' },
   colours: { label: 'Colours', vals: ['std', 'cb'], fmt: v => v === 'cb' ? 'Colour-blind friendly (blue health, orange foes)' : 'Standard' },
 };
 function changeOpt(k) {
@@ -4297,7 +4399,7 @@ function showAbout() {
 function showSettings(from, focus) {
   const keys = Object.keys(OPT_DEFS);
   const rows = keys.map(k => `<button class="opt" data-act="opt" data-k="${k}" data-from="${from}">${OPT_DEFS[k].label}: ${OPT_DEFS[k].fmt(cfg.opts[k])}</button>`).join('');
-  const xfer = from === 'pause' ? '' : `<button class="opt" data-act="history">Run history</button><button class="opt" data-act="exportsave">Copy save code</button><button class="opt" data-act="importsave">Load save code</button><button class="opt" data-act="lab">Asset Lab (advanced)</button><button class="opt danger" data-act="reset">Reset progress</button>`;
+  const xfer = from === 'pause' ? '' : `<button class="opt" data-act="history">Run history</button><button class="opt" data-act="exportsave">Copy save code</button><button class="opt" data-act="importsave">Load save code</button><button class="opt" data-act="lab">Asset Lab (advanced)</button><button class="opt" data-act="resettips">Show tips again</button><button class="opt danger" data-act="reset">Reset progress</button>`;
   showMenu(`<h2>Settings</h2><div class="opts set">${rows}${xfer}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
   if (focus) { sel = keys.indexOf(focus); highlight(); }
 }
@@ -5055,7 +5157,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, livingBosses, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
