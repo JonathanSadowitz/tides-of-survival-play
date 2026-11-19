@@ -189,7 +189,7 @@
   @media (max-width:760px){ .endbody{grid-template-columns:minmax(0,1fr)} }
   .breakdown h3{margin:0 0 4px;color:var(--gold);font-size:15px} .wrow{display:grid;grid-template-columns:9em 1fr 9em;gap:6px;align-items:center;font-size:13px;margin:2px 0}
   .wbar{height:8px;background:#16100a;border:1px solid #000} .wbar i{display:block;height:100%;background:linear-gradient(#ffd27a,#b8862a)}
-  .hpgraph{width:100%;height:60px;background:#16100a;border:1px solid #000;margin-top:8px} .hpaxis{display:flex;justify-content:space-between;font-size:11px;color:#c9b88f}
+  .hpgraph{width:100%;height:60px;background:#16100a;border:1px solid #000;margin-top:8px} .hpaxis{display:flex;justify-content:space-between;font-size:13px;color:#c9b88f}
   .savedago{font-size:12px;color:#e8d9b0;text-align:center;margin:-4px 0 4px;text-shadow:0 1px 2px #000}
   .hinfo{margin-top:8px;border:1px solid var(--gold2);border-radius:6px;padding:8px 12px;background:rgba(0,0,0,.25);min-height:104px;text-align:left}
   .hinfo-in{display:flex;gap:12px;align-items:flex-start} .hinfo .nm{color:var(--gold);font-size:18px} .hinfo .ds{display:block;font-size:15px;margin-top:4px}
@@ -1069,7 +1069,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.10.2', BUILD = '58bd52b 2026-11-19';
+const VERSION = '0.10.3', BUILD = '71d2103 2026-11-19';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -2012,7 +2012,8 @@ function nextUp() {
   else if (i + 1 < LEVELS.length) out.push(`Next battlefield: ${LEVELS[i + 1].name}. Play ${FIELD_RUNS} runs in ${LEVELS[i].name} (${Math.min(FIELD_RUNS, fieldRuns(LEVELS[i].id))} so far) and survive ${fmtTime(UNLOCK_T)} there (best ${fmtTime(P_().lv[LEVELS[i].id] || 0)}).`);
   const h = Object.keys(HERO_UNLOCKS).find(id => !heroOpen(id) && !demoLocked(id));
   if (h && !isPrisoner(h)) out.push(`Next hero: ${HEROES[h].name}. ${HERO_UNLOCKS[h].goal} (${HERO_UNLOCKS[h].best()}), or buy for ${HERO_UNLOCKS[h].cost} gold in hero select.`);
-  for (const id of meta.prisoners) if (!heroOpen(id)) out.push(`${HEROES[id].name} is held prisoner. Play as ${anSide(HEROES[id].side)} hero and destroy the ${enemyOf(HEROES[id].side)} fortress that holds him.`);
+  const held = meta.prisoners.filter(id => !heroOpen(id) && !(G && G.revealed || []).includes(id));   // ones found this run are announced above
+  if (held.length) out.push(`Held prisoner: ${held.map(id => HEROES[id].name).join(', ')}. Each is freed from an enemy fortress in a run as one of his own side's heroes.`);
   const nextP = PRISON.heroes.find(id => !heroOpen(id) && !meta.prisoners.includes(id) && !demoLocked(id));
   if (nextP && (!h || isPrisoner(h))) out.push(`Next prisoner: ${HEROES[nextP].name}. ${HERO_UNLOCKS[nextP].goal} (${HERO_UNLOCKS[nextP].best()}) to find where he is held.`);
   return out;
@@ -4493,10 +4494,10 @@ function endRun(won) {
   showMenu(G.endHtml = `<h2>${won ? 'Victory!' : 'You have fallen'}</h2><p class="sub">${won ? `You held the line for twenty minutes and slew ${G.finalName || 'the final boss'}.` : G.final ? `${G.finalName || 'The final boss'} was too much this time.` : 'The horde was too much this time.'}</p>
     <div class="endbody scrollbox"><div class="endl">
     <div class="stats"><b>Hero</b><span>${G.HD.name}</span><b>Battlefield</b><span>${G.LV.name}</span><b>Survived</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>+${G.gold}${G.bonus ? ` (+${G.bonus} for surviving)` : ''}</span></div>
+    ${deathRecap()}
     ${unlocked || G.newHeroes.length ? `<h3 class="chestgold">Unlocked</h3>${[unlocked && `New battlefield: ${unlocked}`, ...G.newHeroes.filter(id => !HEROES[id].secret).map(id => `New hero: ${HEROES[id].name}`),
       G.newHeroes.includes('peasant') && 'Someone has been watching from the woodpile. Secret heroes: the Peasant and the Peon!',
       G.newHeroes.includes('deathwing') && 'Deathwing has fallen, and now he answers to you. Secret hero: Deathwing!'].filter(Boolean).map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}` : ''}
-    ${deathRecap()}
     ${fortNews().map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}
     ${nextUp().map(t => `<p class="help nextup">${t}</p>`).join('')}</div><div class="endr">${runBreakdown()}</div></div>
     <div class="opts endopts"><button class="opt" data-act="retry">Retry</button><button class="opt" data-act="choose">Change hero</button><button class="opt" data-act="runlog">Run log</button><button class="opt" data-act="quit" data-back>Title screen</button></div>`);
