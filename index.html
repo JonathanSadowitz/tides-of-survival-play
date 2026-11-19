@@ -1093,7 +1093,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.11.2', BUILD = '908ee4e 2026-11-19';
+const VERSION = '0.11.3', BUILD = 'ba7fe73 2026-11-19';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -2183,7 +2183,7 @@ function snapRun() {
   const h = G.hero;
   return { v: 1, hero: G.heroId, level: G.LV.id, seed: G.terrain.seed, t: G.t, kills: G.kills, gold: G.gold,
     lab: G.labour || 0, bp: G.bossPlan || null, bossN: G.bossN || 0, eliteNext: G.eliteNext, eliteN: G.eliteN, swarmNext: G.swarmNext,
-    bs: (b => b ? { n: b.boss, f: b.hp / b.maxHp } : null)(G.enemies.find(e => e.boss)), revives: G.revives, rerolls: G.rerolls,
+    bs: G.enemies.filter(e => e.boss && e.hp > 0).map(b => ({ n: b.boss, f: b.hp / b.maxHp })),   // every boss still alive, as wounded as he is revives: G.revives, rerolls: G.rerolls,
     pending: G.pending + (G.state === 'levelup' ? 1 : 0), chests: G.chestQueue,
     h: { x: h.x, y: h.y, hp: h.hp, xp: h.xp, level: h.level, next: h.next },
     w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), e: Object.keys(G.weapons).filter(k => G.weapons[k].evo), p: G.passives, sh: G.hero.shield || 0,
@@ -2207,7 +2207,7 @@ function continueRun() {
   Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(PACE.elite, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives, rerolls: s.rerolls, pending: s.pending || 0, chestQueue: s.chests || [] });
   Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next }); G.labour = s.lab || 0; G.bossPlan = s.bp && s.bp.length === BOSSES.length ? s.bp : null;   // runs saved before 20-minute runs plan again
   recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
-  if (s.bs && BOSSES[s.bs.n - 1]) spawnBoss(s.bs.n, s.bs.f);
+  for (const b of [].concat(s.bs || [])) if (BOSSES[b.n - 1]) spawnBoss(b.n, b.f);   // older saves kept one boss, not a list
   if (s.ab >= 0 && G.boats && G.boats[s.ab]) { const b = G.boats[s.ab]; b.x = G.hero.x; b.y = G.hero.y; G.aboard = b; }
   if (G.fort && s.fort) { G.fort.state = s.fort.s; G.fort.freedAt = s.fort.at; G.fort.told = true; }   // the boss you were fighting comes back, wounded as he was
   for (const c of s.camps || []) {
