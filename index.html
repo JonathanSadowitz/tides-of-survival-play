@@ -789,6 +789,8 @@ const LEVELS = [
     bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1.1, loops: 0.45, lakes: 0.2, forestLakes: 2, trees: 0.55, rocks: 0.7, dark: 0.35, camps: 0.75 }, hp: 1.6, mix: { fast: 1.8 } },
   { id: 'swamp', name: 'Swamp of Sorrows', blurb: 'Murky water and twisted trees. Only the hardiest survive.', ts: [438, 439, 440, 441], ground: '#3f4a2a',
     bld: { pal: 438, human: [479, 491, 80, 487, 489, 483, 495], orc: [480, 492, 81, 488, 490, 484, 496] }, sea: { human: [495, 497, 499], orc: [496, 498, 500] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.55, forestLakes: 6, trees: 0.5, rocks: 0.9, dark: 0.35, camps: 0.75 }, hp: 2, mix: { ranged: 1.6, tank: 1.3 } },
+  { id: 'isles', name: 'Tol Barad', blurb: 'An island fortress off the coast of Lordaeron. Board a transport at the docks to sail between the isles; warships hunt you at sea.', ts: [2, 3, 4, 5], ground: '#2f5a8a', test: true,
+    bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { islands: 6, irmin: 15, irmax: 21, strait: 9, clearings: 18, rmin: 8, rmax: 11, lane: 1, loops: 0.3, lakes: 0, forestLakes: 0, trees: 0.55, fine: 0.55, rocks: 0.95, dark: 0.3, camps: 0.85, ports: 0.5 }, hp: 2.2, mix: { ranged: 1.3 } },
 ];
 const UNLOCK_T = 600; // surviving 10 minutes, after a few runs there (FIELD_RUNS), unlocks the next level
 const UPGRADES = {
@@ -869,12 +871,21 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
   const I = (x, y) => tmod(y, TM) * TM + tmod(x, TM);
   let rs = (seed >>> 0) || 1; const R = () => { rs ^= rs << 13; rs ^= rs >>> 17; rs ^= rs << 5; return (rs >>> 0) / 4294967296; };
   const tdx = (a, b) => tmod(a - b + TN / 2, TN) - TN / 2;
+  // 0. Islands (Tol Barad): land only on a few islands, the first under the start, with open sea between.
+  const isles = g.islands ? [{ x: 0, y: 0, r: g.irmax }] : null;
+  if (isles) for (let k = 0; isles.length < g.islands && k < 4000; k++) {
+    const p = { x: R() * TN, y: R() * TN, r: g.irmin + R() * (g.irmax - g.irmin) };
+    if (isles.every(o => Math.hypot(tdx(p.x, o.x), tdx(p.y, o.y)) > o.r + p.r + g.strait)) isles.push(p);
+  }
+  const isleOf = (x, y) => { if (!isles) return 0; let b = 0, bd = 1e9; isles.forEach((o, i) => { const d = Math.hypot(tdx(x, o.x), tdx(y, o.y)) - o.r; if (d < bd) { bd = d; b = i; } }); return b; };
+  const onIsle = p => !isles || isles.some(o => Math.hypot(tdx(p.x, o.x), tdx(p.y, o.y)) < o.r - p.r - 2);
   // 1. Clearings, the first one at the start position.
   const pts = [{ x: 0, y: 0, r: 11, start: true }];
   for (let k = 0; pts.length < g.clearings && k < 4000; k++) {
     const p = { x: R() * TN, y: R() * TN, r: g.rmin + R() * (g.rmax - g.rmin) };
-    if (pts.every(o => Math.hypot(tdx(p.x, o.x), tdx(p.y, o.y)) > o.r + p.r + 5)) pts.push(p);
+    if (onIsle(p) && pts.every(o => Math.hypot(tdx(p.x, o.x), tdx(p.y, o.y)) > o.r + p.r + 5)) pts.push(p);
   }
+  if (isles) isles.forEach((o, i) => { if (i && !pts.some(p => isleOf(p.x, p.y) === i)) pts.push({ x: o.x, y: o.y, r: Math.min(g.rmax, o.r - 6) }); });   // every island has a clearing
   const n = pts.length, D = (a, b) => Math.hypot(tdx(pts[a].x, pts[b].x), tdx(pts[a].y, pts[b].y));
   // 2. Lanes: a spanning tree so everything connects, plus a few loops so you can circle round.
   const edges = [], used = new Set([0]);
@@ -883,7 +894,7 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
     const near = [...Array(n).keys()].filter(b => b !== a).sort((x, y) => D(a, x) - D(a, y)).slice(0, 3);
     for (const b of near) if (R() < g.loops && D(a, b) < 48 && !edges.some(e => (e[0] === a && e[1] === b) || (e[0] === b && e[1] === a))) edges.push([a, b, D(a, b)]);
   }
-  const segs = edges.map(([a, b]) => ({ a, b, ax: pts[a].x, ay: pts[a].y, dx: tdx(pts[b].x, pts[a].x), dy: tdx(pts[b].y, pts[a].y), w: g.lane * (3.6 + R() * 2.6), road: R() < 0.65 }));
+  const segs = (isles ? edges.filter(([a, b]) => isleOf(pts[a].x, pts[a].y) === isleOf(pts[b].x, pts[b].y)) : edges).map(([a, b]) => ({ a, b, ax: pts[a].x, ay: pts[a].y, dx: tdx(pts[b].x, pts[a].x), dy: tdx(pts[b].y, pts[a].y), w: g.lane * (3.6 + R() * 2.6), road: R() < 0.65 }));
   // 3. Lakes: in some clearings, and a few on their own in the forest.
   const lakes = [];
   pts.forEach((p, i) => { if (i && R() < g.lakes) { const a = R() * TAU, d = R() * p.r * 0.35; lakes.push({ x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, r: 2.2 + R() * Math.min(3.2, p.r * 0.35), host: i }); } });
@@ -911,6 +922,10 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
     for (const L of lakes) {
       const d = Math.hypot(tdx(hx / 2 + 0.25 + wx * 0.9, L.x), tdx(hy / 2 + 0.25 + wy * 0.9, L.y)) - L.r;
       if (d < -1.6) { t = TT.DW; break; } if (d < 0) { t = TT.W; break; } if (d < 1.1 && t !== TT.W) t = TT.C;
+    }
+    if (isles) {   // the sea: deep water, then shallows, then a beach
+      let di = 1e9; for (const o of isles) { const d = Math.hypot(tdx(px, o.x), tdx(py, o.y)) - o.r * (0.85 + 0.3 * pnoise(hx, hy, 16, seed + 21)); if (d < di) di = d; }
+      if (di > 2.5) t = TT.DW; else if (di > 0.5) t = TT.W; else if (di > -1.2 && t !== TT.DW && t !== TT.W) t = TT.C;
     }
     q[hy * TM + hx] = t;
   }
@@ -1015,7 +1030,7 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
     const reach = () => { const seen = new Uint8Array(TM * TM), st = [0]; seen[0] = 1;
       while (st.length) { const i = st.pop(), x = i % TM, y = (i / TM) | 0; for (const [dx, dy] of D4) { const j = I(x + dx, y + dy); if (!seen[j] && !blk[j]) { seen[j] = 1; st.push(j); } } }
       return camps.every(c => c.sea || seen[I(c.cx * 2, c.cy * 2)]); };
-    while (camps.some(c => c.sea) && !reach()) { const k = camps.map(c => !!c.sea).lastIndexOf(true), c = camps[k]; for (const [j, v] of c.under) blk[j] = v; camps.splice(k, 1); }
+    while (!isles && camps.some(c => c.sea) && !reach()) { const k = camps.map(c => !!c.sea).lastIndexOf(true), c = camps[k]; for (const [j, v] of c.under) blk[j] = v; camps.splice(k, 1); }
     camps.forEach((c, i) => { c.id = i; delete c.under; });
   }
   // Pick the megatile for each tile from its four quadrants.
@@ -1034,7 +1049,18 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
     if (!m) m = pick(ts.recs[T_SOLID[Math.max(...a.map(t => T_PRI[t] * 8 + t)) & 7]] || ts.recs[5] || [], hh);
     tiles[ty * TN + tx] = m;
   }
-  return { LV, seed, q, blk, tiles, camps, chunks: new Map() };
+  // Docks: on each island, the shallows nearest its neighbour, where a transport waits.
+  const docks = [];
+  if (isles) isles.forEach((o, i) => {
+    let nb = null, nd = 1e9; isles.forEach((o2, j) => { if (j === i) return; const d = Math.hypot(tdx(o2.x, o.x), tdx(o2.y, o.y)); if (d < nd) { nd = d; nb = o2; } });
+    const a0 = nb ? Math.atan2(tdx(nb.y, o.y), tdx(nb.x, o.x)) : 0;
+    for (const da of [0, 0.3, -0.3, 0.6, -0.6, 1, -1, 1.5, -1.5, 2.2, -2.2, 3]) {
+      const a = a0 + da; let hit = null;
+      for (let r = o.r * 0.4; r < o.r * 1.6 && !hit; r += 0.5) { const hx = Math.round((o.x + Math.cos(a) * r) * 2), hy = Math.round((o.y + Math.sin(a) * r) * 2), j = I(hx, hy); if (q[j] === TT.W && blk[j] !== 2) hit = [hx, hy]; }
+      if (hit) { docks.push({ hx: hit[0], hy: hit[1], isle: i }); break; }
+    }
+  });
+  return { LV, seed, q, blk, tiles, camps, isles, docks, chunks: new Map() };
 }
 
   return { TT, T_SOLID, T_PRI, T_BLOCK, T_PAIR, T_MASK2P, T_NEXT, TN, TM, ihash, pnoise, tmod, buildTerrain };
@@ -1069,7 +1095,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.10.3', BUILD = '71d2103 2026-11-19';
+const VERSION = '0.11.0', BUILD = '0bc7776 2026-11-19';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1163,7 +1189,9 @@ const AUTO_ROLES = {
   fire: { e: 327, mode: 'dir5', r0: 0, r1: 0 }, coil: { e: 334, mode: 'dir5', r0: 0, r1: 5 }, eshot: { e: 340, mode: 'dir5', r0: 0, r1: 2 },
   ally_eshot: { e: 339, mode: 'dir5', r0: 0, r1: 0 },
   flyer: unitR(36, 3), ally_flyer: unitR(35, 3), scout: unitR(63, 1), ally_scout: unitR(38, 1), siege: unitR(50, 1), ally_siege: unitR(49, 1),
-  ship: unitR(42, 0), ally_ship: unitR(41, 0), ship2: unitR(62, 0), ally_ship2: unitR(59, 0),
+  // Ships, from Wargus's table (19 November 2026: destroyers had the battleships' pictures, and battleships a destroyer's
+  // and an empty oil tanker's): destroyers 61 and 62, battleship and juggernaught 41 and 42, transports 39 and 40.
+  ship: unitR(62, 0), ally_ship: unitR(61, 0), ship2: unitR(42, 0), ally_ship2: unitR(41, 0), transport: unitR(39, 0), transport_orc: unitR(40, 0),
   stone: { e: 348, mode: 'dir5', r0: 0, r1: 0 }, ally_stone: { e: 338, mode: 'dir5', r0: 0, r1: 0 }, hammer: { e: 325, mode: 'dir5', r0: 0, r1: 2 },
   elite1: unitR(52), ally_elite1: unitR(51), elite2: unitR(54), ally_elite2: unitR(53), elite3: unitR(58), ally_elite3: unitR(55),
   boss1: unitR(58), ally_boss1: unitR(45), boss2: unitR(46), ally_boss2: unitR(51), boss3: unitR(36, 3), ally_boss3: unitR(35, 3),
@@ -1171,7 +1199,7 @@ const AUTO_ROLES = {
   boom: { e: 347, mode: 'cycle', r0: 0, r1: 19 }, rune: { e: 335, mode: 'cycle', r0: 0, r1: 3 },
 };
 const SWING = 0.45, HSWING = 0.35;
-const ROLE_SCALE = { ship: 0.75, ally_ship: 0.8, ship2: 0.8, ally_ship2: 0.85, daemon: 0.9, hero_kurdran: 0.8, hero_deathwing: 0.85, flyer: 0.8, scout: 0.8, ally_scout: 0.7, siege: 0.8, ally_siege: 0.8, boss1: 1.5, ally_boss1: 1.6, boss2: 1.6, ally_boss2: 1.4, boss3: 1.3, ally_boss3: 1.35 };
+const ROLE_SCALE = { ship: 0.8, ally_ship: 0.8, ship2: 0.85, ally_ship2: 0.85, transport: 0.8, transport_orc: 0.8, daemon: 0.9, hero_kurdran: 0.8, hero_deathwing: 0.85, flyer: 0.8, scout: 0.8, ally_scout: 0.7, siege: 0.8, ally_siege: 0.8, boss1: 1.5, ally_boss1: 1.6, boss2: 1.6, ally_boss2: 1.4, boss3: 1.3, ally_boss3: 1.35 };
 // Sound files inside War2Dat.mpq (paths from the Wargus project).
 const MPQ_SOUNDS = [['s_hit', 'Gamesfx\\misc\\bowhit.wav'], ['s_hurt', 'Gamesfx\\misc\\punch.wav'], ['s_die', 'Gamesfx\\orc\\odead.wav'], ['s_die_ally', 'Gamesfx\\human\\hdead.wav'],
   ['s_level', 'Gamesfx\\misc\\hcapture.wav'], ['s_boom', 'Gamesfx\\misc\\explode.wav'], ['s_sword', 'Gamesfx\\misc\\sword1.wav'], ['s_bow', 'Gamesfx\\misc\\bowfire.wav'],
@@ -1187,7 +1215,7 @@ function autoAssign(force) {
     const demo = isDemoMain(war);
     for (const [role, r0] of Object.entries(AUTO_ROLES)) {
       const r = demo && DEMO.roles[role] ? unitR(DEMO.roles[role]) : r0, cur = cfg.roles[role];
-      if (!force && cur && A.wars[cur.file]) continue;
+      if (!force && cur && A.wars[cur.file] && !(cur.auto && cur.file === main && cur.entry !== r.e)) continue;   // automatic picks follow the table when it's corrected
       if (Core.kindOf(war, r.e) !== 'gfx') continue;
       cfg.roles[role] = { file: main, entry: r.e, mode: r.mode, r0: r.r0, r1: r.r1, auto: true }; n++;
     }
@@ -1347,7 +1375,7 @@ const ROLE_TEAM = {
 };
 const BOSS_TEAM = { Horde: 'violet', Alliance: 'green' };
 const roleTeam = role => ROLE_TEAM[role] ? TEAM[ROLE_TEAM[role]] : HUMAN_ROLE.test(role) ? TEAM.blue : TEAM.red;
-const HUMAN_ROLE = /^(hero|hero_lothar|hero_uther|hero_alleria|hero_khadgar|hero_peasant|hero_danath|hero_turalyon|hero_kurdran|ally_(basic|fast|tank|ranged|boss|flyer|scout|siege|elite[123]|boss[123]|caster))$/;
+const HUMAN_ROLE = /^(hero|hero_lothar|hero_uther|hero_alleria|hero_khadgar|hero_peasant|hero_danath|hero_turalyon|hero_kurdran|ally_(basic|fast|tank|ranged|boss|flyer|scout|siege|elite[123]|boss[123]|caster|ship|ship2)|transport)$/;
 function buildAtlas(g, pal, cols) {
   cols = Math.max(1, Math.min(cols, g.count));
   const rows = Math.ceil(g.count / cols);
@@ -1654,7 +1682,7 @@ const mu = { names: new Set(), cache: new Map(), gain: null, cur: null, kind: nu
 // The menu music loops for ten minutes, then fades out slowly and stays quiet until you next come back from a run.
 const MENU_MUSIC = { loopFor: 600, fade: 40 };
 // Each battlefield's own music, from your side's six campaign tracks: later battlefields bring new ones.
-const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6] };
+const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6], isles: [2, 4] };
 function playlistFor(kind) {
   const horde = G && G.HD.side === 'Horde', pre = horde ? 'ORC' : 'HUMAN', p1 = horde ? 'O' : 'H';
   if (kind === 'menu') return ['OWARROOM'];
@@ -1955,7 +1983,7 @@ const heroOpen = id => !demoLocked(id) && (HEROES[id] && HEROES[id].secret ? (HE
 const heroShown = id => !HEROES[id].secret || heroOpen(id);   // the secret heroes don't exist until they're unlocked
 // The first time the whole roster is unlocked, the workers put down their tools. Returns true just that once.
 function revealSecret() { if (meta.secret || A.demo || !rosterDone()) return false; meta.secret = true; saveMeta(); setTimeout(() => heroVoice('done', 1, 'peasant') || heroVoice('ready', 1, 'peasant'), 900); return true; }
-const levelOpen = i => A.demo ? LEVELS[i].id === DEMO.level : i <= meta.unlocked;
+const levelOpen = i => A.demo ? LEVELS[i].id === DEMO.level : i <= meta.unlocked || !!LEVELS[i].test;   // test battlefields are open to try while they're built
 const fullGameLink = () => `<a href="${DEMO.shop}" target="_blank" rel="noopener">Warcraft II: Battle.net Edition</a>`;
 // Record what this run achieved, then unlock any hero whose goal is now met. Returns the newly unlocked heroes.
 function recordProgress() {
@@ -2138,6 +2166,7 @@ const BOSS_POOL = {
 const FINALS = {
   forest: { Horde: 'orgrim', Alliance: 'lothar' }, winter: { Horde: 'guldan', Alliance: 'turalyon' },
   waste: { Horde: 'deathwing', Alliance: 'kurdran' }, swamp: { Horde: 'chogall', Alliance: 'khadgar' },
+  isles: { Horde: 'zuljin', Alliance: 'daelin' },   // until the flagship final boss is built
 };
 function planBosses() {   // [5:00, 10:00, 15:00, final]
   const side = foeSide(), fin = FINALS[G.LV.id][side], rest = Object.keys(BOSS_POOL[side]).filter(k => k !== fin);
@@ -2161,7 +2190,7 @@ function snapRun() {
     pending: G.pending + (G.state === 'levelup' ? 1 : 0), chests: G.chestQueue,
     h: { x: h.x, y: h.y, hp: h.hp, xp: h.xp, level: h.level, next: h.next },
     w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), e: Object.keys(G.weapons).filter(k => G.weapons[k].evo), p: G.passives, sh: G.hero.shield || 0,
-    fort: G.fort ? { s: G.fort.state, at: G.fort.freedAt ?? null } : null,
+    fort: G.fort ? { s: G.fort.state, at: G.fort.freedAt ?? null } : null, ab: G.aboard ? G.boats.indexOf(G.aboard) : -1,
     camps: [...G.camps.values()].filter(c => c.dead.size || c.chest).map(c => ({ key: c.key, ox: c.ox, oy: c.oy, dead: [...c.dead], chest: c.chest })) };
 }
 function saveRun() { const s = snapRun(); if (s) { s.at = Date.now(); store.set(RUN_KEY, s); } }
@@ -2182,6 +2211,7 @@ function continueRun() {
   Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next }); G.labour = s.lab || 0; G.bossPlan = s.bp && s.bp.length === BOSSES.length ? s.bp : null;   // runs saved before 20-minute runs plan again
   recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
   if (s.bs && BOSSES[s.bs.n - 1]) spawnBoss(s.bs.n, s.bs.f);
+  if (s.ab >= 0 && G.boats && G.boats[s.ab]) { const b = G.boats[s.ab]; b.x = G.hero.x; b.y = G.hero.y; G.aboard = b; }
   if (G.fort && s.fort) { G.fort.state = s.fort.s; G.fort.freedAt = s.fort.at; G.fort.told = true; }   // the boss you were fighting comes back, wounded as he was
   for (const c of s.camps || []) {
     const camp = G.terrain.camps.find(x => x.id === +c.key.split(':')[0]); if (!camp) continue;
@@ -2346,6 +2376,82 @@ function startLevel() {
   if (!loadTileset(G.LV)) return;
   try { G.terrain = buildTerrain(G.LV, G.seed ?? SEED_PARAM ?? ((Math.random() * 1e9) | 0), G.HD.side === 'Horde' ? 'human' : 'orc'); } catch (e) { console.error(e); G.terrain = null; }
   setupFortress();
+  setupBoats();
+}
+/* ---------- Tol Barad: transports between the islands ---------- */
+// A transport waits at each island's dock. Walk into it to board; while aboard you steer it, your weapons fire from
+// the deck, and touching a shore puts you ashore there. Warships hunt it at sea; if it sinks you lose some health
+// and wash up on the nearest island, and it comes back to its dock a little later.
+const BOAT = { speed: 92, hp: 180, board: 26, respawn: 8, sinkHit: 0.2, ships: { from: 45, every: 16, max: 2, near: 260 } };
+function setupBoats() {
+  G.boats = []; G.aboard = null; const T = G.terrain; if (!T || !T.docks) return;
+  G.boats = T.docks.map(d => { const x = d.hx * 16 + 8, y = d.hy * 16 + 8; return { x, y, hx: x, hy: y, dir: 4, hp: BOAT.hp, maxHp: BOAT.hp, isle: d.isle, flash: 0 }; });
+}
+const seaAt = (x, y) => { const T = G.terrain; if (!T) return false; const i = tmod(Math.floor(y / 16), TM) * TM + tmod(Math.floor(x / 16), TM); return (T.q[i] === TT.DW || T.q[i] === TT.W) && T.blk[i] !== 2; };
+const boatFits = (x, y) => seaAt(x - 6, y) && seaAt(x + 6, y) && seaAt(x, y - 5) && seaAt(x, y + 5);
+function landNear(x, y, maxR = 480) {
+  for (let r = 8; r <= maxR; r += 8) { let best = null, bd = 1e9;
+    for (let k = 0, n = Math.max(8, Math.round(r / 3)); k < n; k++) { const a = k / n * TAU, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r; if (!footBlocked(px, py, 6) && !seaAt(px, py)) { const d = Math.hypot(px - x, py - y); if (d < bd) { bd = d; best = [px, py]; } } }
+    if (best) return best; }
+  return null;
+}
+// On land: walking into a transport boards it. Returns true if the hero is now aboard.
+function tryBoard(mx, my) {
+  const h = G.hero; if (G.HD.fly || !G.boats || !G.boats.length || Math.hypot(mx, my) < 0.15) return false;
+  for (const b of G.boats) {
+    if (b.sunk) continue;
+    const dx = b.x - h.x, dy = b.y - h.y, d = Math.hypot(dx, dy);
+    if (d < BOAT.board && (dx * mx + dy * my) > 0) {
+      G.aboard = b; h.x = b.x; h.y = b.y; sfx('s_start', 0.5);
+      if (!G.boatTip) { G.boatTip = true; banner('Aboard! Sail to another island and touch its shore to land.'); G.banner.t = 3.5; }
+      logEvent('boarded'); return true;
+    }
+  }
+  return false;
+}
+// Aboard: the stick steers the transport; pushing into a shore you can stand on puts you ashore.
+function moveBoat(mx, my, dt) {
+  const b = G.aboard, h = G.hero, ml = Math.hypot(mx, my), sp = BOAT.speed;
+  const nx = b.x + mx * sp * dt, ny = b.y + my * sp * dt; let moved = false;
+  if (boatFits(nx, b.y)) { b.x = nx; moved = true; } if (boatFits(b.x, ny)) { b.y = ny; moved = true; }
+  if (ml > 0.15) { b.dir = dirOf(mx, my); b.moveT = (b.moveT || 0) + dt; }
+  h.x = b.x; h.y = b.y;
+  if (ml > 0.15 && (!boatFits(b.x + mx * 14, b.y + my * 14))) {   // at the shore: step off if there's ground ahead
+    const ux = mx / ml, uy = my / ml;
+    for (const r of [18, 26, 34]) { const px = b.x + ux * r, py = b.y + uy * r; if (!footBlocked(px, py, 5) && !seaAt(px, py)) { G.aboard = null; h.x = px; h.y = py; sfx('s_start', 0.5); logEvent('landed'); return; } }
+  }
+}
+function hurtBoat(d) {
+  const b = G.aboard; if (!b) return; b.hp -= d; b.flash = 0.12;
+  if (b.hp > 0) return;
+  const h = G.hero; G.fx.push({ k: 'boom', x: b.x, y: b.y, r: 28, t: 0, life: 0.7 }); sfx('s_boom', 0);
+  b.sunk = G.t + BOAT.respawn; G.aboard = null;
+  const p = landNear(h.x, h.y) || [b.hx, b.hy]; h.x = p[0]; h.y = p[1];
+  hurtHero(h.maxHp * BOAT.sinkHit, 'sinking'); banner('Your transport sank! You washed ashore.'); G.banner.t = 3; logEvent('transport sank');
+}
+function updateBoats(dt) {
+  if (!G.boats || !G.boats.length) return;
+  for (const b of G.boats) { b.flash -= dt; if (b.sunk && G.t >= b.sunk) { b.sunk = 0; b.x = b.hx; b.y = b.hy; b.hp = b.maxHp; } }
+  // Warships hunt the transport while you're at sea.
+  if (!G.aboard || G.t < BOAT.ships.from || G.final || !hasFoe('ship')) return;
+  G.huntT = (G.huntT ?? 3) - dt; if (G.huntT > 0) return; G.huntT = BOAT.ships.every;
+  if (G.enemies.filter(e => e.ship && !e.dead && !e.port).length >= BOAT.ships.max) return;
+  const h = G.hero;
+  for (let k = 0; k < 30; k++) {
+    const a = rnd(0, TAU), x = h.x + Math.cos(a) * BOAT.ships.near, y = h.y + Math.sin(a) * BOAT.ships.near;
+    if (!shipAt(x, y)) continue;
+    const e = spawnEnemy(G.t >= 600 && hasFoe('ship2') && Math.random() < 0.5 ? 'ship2' : 'ship', x, y); if (!e) return;
+    e.ship = true; if (!G.shipTip) { G.shipTip = true; banner('Warships! Sink them from the deck, or outrun them.'); }
+    return;
+  }
+}
+function drawBoat(b) {
+  if (b.sunk) return;
+  const role = G.HD.side === 'Horde' ? 'transport_orc' : 'transport', x = b.x - camX, y = b.y - camY;
+  if (b.flash > 0) ctx.globalAlpha = 0.6;
+  if (!drawSprite(role, b.x, b.y, b.dir, G.aboard === b ? b.moveT || 0 : 0, false)) { ctx.fillStyle = '#7a5530'; ctx.fillRect(x - 12, y - 7, 24, 14); ctx.strokeStyle = '#000'; ctx.strokeRect(x - 12, y - 7, 24, 14); }
+  ctx.globalAlpha = 1;
+  if (b.hp < b.maxHp) { const bw = 22; ctx.fillStyle = '#000'; ctx.fillRect(Math.round(x - bw / 2) - 1, Math.round(y + 14), bw + 2, 4); ctx.fillStyle = '#5aa8ff'; ctx.fillRect(Math.round(x - bw / 2), Math.round(y + 15), Math.max(0, Math.round(bw * b.hp / b.maxHp)), 2); }
 }
 // The fortress: the enemy camp with a hall nearest a good walk from the start, holding the first prisoner of your side.
 function setupFortress() {
@@ -2432,6 +2538,7 @@ function portShips(st, dt) {
 // The water a ship may sail: lake within a few half-tiles of the shore, so every ranged weapon can reach it from land.
 function shipCells(T) {
   if (T.ship) return T.ship;
+  if (T.isles) { const n = TM * TM, ok = new Uint8Array(n); for (let i = 0; i < n; i++) ok[i] = (T.q[i] === TT.DW || T.q[i] === TT.W) && T.blk[i] !== 2 ? 1 : 0; return (T.ship = ok); }   // Tol Barad: the open sea
   const n = TM * TM, dist = new Uint8Array(n).fill(255), qu = [], isW = t => t === TT.DW || t === TT.W;
   for (let i = 0; i < n; i++) if (!isW(T.q[i])) { dist[i] = 0; qu.push(i); }
   for (let k = 0; k < qu.length; k++) { const i = qu[k]; if (dist[i] >= SHIP.shore) continue; const x = i % TM, y = (i / TM) | 0;
@@ -2527,7 +2634,8 @@ function spawnEnemy(type, x, y, boss) {
   const t = Math.min(G.t, RUN_LEN), T = ET[type], h = G.hero, free = type === 'boss' || T.fly || T.ship;
   if (x === undefined) {
     const d = Math.hypot(W, H) / 2 + 24;
-    for (let k = 0; k < 10; k++) { const a = rnd(0, TAU); x = h.x + Math.cos(a) * d; y = h.y + Math.sin(a) * d; if (free || !footBlocked(x, y, 6)) break; }
+    let ok = false; for (let k = 0; k < (G.terrain && G.terrain.isles ? 24 : 10); k++) { const a = rnd(0, TAU); x = h.x + Math.cos(a) * d; y = h.y + Math.sin(a) * d; if (free || !footBlocked(x, y, 6)) { ok = true; break; } }
+    if (!ok && G.terrain && G.terrain.isles) return;   // out at sea, with no land in sight: nobody comes
   } else if (!free && footBlocked(x, y, 4)) return;
   // Each boss is tougher than the last: the first is a fair fight, the second close to full strength, the last a real test.
   const bossK = boss ? [BOSS_K[0], BOSS_K[1], BOSS_K[2], FINAL.hp][boss.n - 1] : 1;
@@ -2659,6 +2767,7 @@ function tipDrops(g) {
   G.banner = { text: g.pow ? 'A power-up dropped! Walk over it to use it' : 'Foes drop gold, meat and power-ups. Walk over them!', icon: g.pow ? A.pick && A.pick.pow && A.pick.pow[g.pow] : A.pick && A.pick.gold, t: 4 };
 }
 function hurtHero(d, src) {
+  if (G.aboard && (src === 'ship' || src === 'siege')) return hurtBoat(d);   // shells aimed at the transport hit the transport
   const h = G.hero; G.stats.lastHit = src || null; let dm = Math.max(1, d - h.armour);
   if (h.shield > 0) { const a = Math.min(h.shield, dm); h.shield -= a; dm -= a; if (dm <= 0) return; }
   if (G.lg) { const k = src || '?'; G.lg.hurt[k] = (G.lg.hurt[k] || 0) + Math.min(dm, Math.max(0, h.hp)); G.lg.hits++; }
@@ -2671,7 +2780,7 @@ const RECAP = { secs: 5, low: 0.3 };
 function srcName(k) {
   if (k === 'boss') { const b = G.enemies.find(e => e.boss) ; return b && b.name || G.finalName || 'the boss'; }
   if (FOES[k]) return FOES[k][foeSide()] || FOES[k].Horde;
-  return { shot: 'missiles', tower: 'the fortress towers', barrage: "the boss's barrage", '?': 'something unseen' }[k] || k;
+  return { shot: 'missiles', sinking: 'your transport sinking', tower: 'the fortress towers', barrage: "the boss's barrage", '?': 'something unseen' }[k] || k;
 }
 function deathRecap() {
   if (G.won || !G.stats.lastHit) return '';
@@ -3168,7 +3277,8 @@ function update(dt) {
   let [mx, my] = readMove(); const ml = Math.hypot(mx, my);
   if (ml > 1) { mx /= ml; my /= ml; }
   const hs = h.speed, hnx = h.x + mx * hs * dt, hny = h.y + my * hs * dt, stuck = G.HD.fly || footBlocked(h.x, h.y, 5);   // fliers cross anything
-  if (stuck || !footBlocked(hnx, h.y, 5)) h.x = hnx; if (stuck || !footBlocked(h.x, hny, 5)) h.y = hny;
+  if (G.aboard) moveBoat(mx, my, dt);   // Tol Barad: at sea, the transport sails instead
+  else if (!tryBoard(mx, my)) { if (stuck || !footBlocked(hnx, h.y, 5)) h.x = hnx; if (stuck || !footBlocked(h.x, hny, 5)) h.y = hny; }
   if (ml > 0.15) { h.face = Math.atan2(my, mx); h.dir = dirOf(mx, my); h.moveT += dt; }
   G.hv = [mx * hs, my * hs];
   logTick(dt, ml > 0.15);
@@ -3176,7 +3286,7 @@ function update(dt) {
   if (h.frenzy && (h.frenzyT -= dt) <= 0) h.frenzy = Math.max(0, h.frenzy - dt * 0.15);   // Blade Frenzy fades
   if (G.HD.holyLight && h.hp > 0 && h.hp < h.maxHp * 0.3 && G.t >= (G.holyT || 0)) { G.holyT = G.t + 60; h.hp = Math.min(h.maxHp, h.hp + h.maxHp * 0.4); banner('Holy Light!'); G.fx.push({ k: 'pillar', x: h.x, y: h.y, t: 0, life: 0.6 }); }
   h.coilBank = Math.min(COIL_HEAL_PER_S, (h.coilBank || 0) + COIL_HEAL_PER_S * dt);
-  spawn(dt); updateCamps(dt); updateFort(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
+  spawn(dt); updateCamps(dt); updateFort(dt); updateBoats(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
   for (const f of G.fx) f.t += dt; G.fx = G.fx.filter(f => f.t < f.life); G.numCount = 0; for (const f of G.fx) if (f.k === 'num') G.numCount++;
   for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
   if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
@@ -3327,13 +3437,14 @@ function drawLowHealth() {
 function drawLootArrows() {
   const h = G.hero, m = 14, cx = W / 2, cy = H / 2, now = performance.now();
   const fortPt = G.fort && G.fort.state === 'held' ? [{ x: G.fort.x, y: G.fort.y, fort: true }] : [];
+  if (!G.aboard && G.boats && G.boats.length) { let nb = null, nd = 1e9; for (const b of G.boats) { const d = Math.hypot(b.x - h.x, b.y - h.y); if (!b.sunk && d < nd) { nd = d; nb = b; } } if (nb) fortPt.push({ x: nb.x, y: nb.y, fort: true, boat: true }); }
   for (const g of [...G.gems, ...fortPt]) {
     if (!g.pow && !g.chest && !g.fort) continue;
     const dx = g.x - camX - cx, dy = g.y - camY - cy;
     if (Math.abs(dx) < cx - 4 && Math.abs(dy) < cy - 4) continue;
     if (!g.fort && Math.hypot(g.x - h.x, g.y - h.y) > 900) continue;   // the fortress is always pointed out
     const k = Math.min((cx - m) / Math.abs(dx || 1e-6), (cy - m) / Math.abs(dy || 1e-6)), x = cx + dx * k, y = cy + dy * k, a = Math.atan2(dy, dx);
-    const col = g.fort ? '#ff7a5c' : g.pow ? POWERUPS[g.pow].col : '#ffd24a';
+    const col = g.boat ? '#7fc4ff' : g.fort ? '#ff7a5c' : g.pow ? POWERUPS[g.pow].col : '#ffd24a';
     ctx.globalAlpha = 0.75 + 0.25 * Math.sin(now / 200);
     ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 9, y + Math.sin(a) * 9); ctx.lineTo(x + Math.cos(a + 2.4) * 8, y + Math.sin(a + 2.4) * 8); ctx.lineTo(x + Math.cos(a - 2.4) * 8, y + Math.sin(a - 2.4) * 8); ctx.fill();
     ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7); ctx.lineTo(x + Math.cos(a + 2.4) * 6, y + Math.sin(a + 2.4) * 6); ctx.lineTo(x + Math.cos(a - 2.4) * 6, y + Math.sin(a - 2.4) * 6); ctx.fill();
@@ -3745,6 +3856,7 @@ function renderWorld() {
   }
   const list = G.enemies.filter(e => Math.abs(e.x - h.x) < W / 2 + 90 && Math.abs(e.y - h.y) < H / 2 + 90);
   for (const p of G.props) if (Math.abs(p.x - h.x) < W / 2 + 90 && Math.abs(p.y - h.y) < H / 2 + 90) list.push(p);
+  for (const b of G.boats || []) if (!b.sunk && Math.abs(b.x - h.x) < W / 2 + 90 && Math.abs(b.y - h.y) < H / 2 + 90) list.push({ boat: b, x: b.x, y: b.y - 3 });
   const pr = prisonerSpot(); if (pr && Math.abs(pr.x - h.x) < W / 2 + 90 && Math.abs(pr.y - h.y) < H / 2 + 90) list.push(pr);
   list.push(null);
   const sy = e => e ? e.y + (e.spr ? e.spr.height / 2 - 10 : 0) : h.y;
@@ -3755,7 +3867,7 @@ function renderWorld() {
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath();
   for (const e of list) if (e && e.type && !e.static) { const x = e.x - camX, y = e.y - camY + e.r * 0.8, rx = e.r * (e.fly ? 0.8 : 1); ctx.moveTo(x + rx, y); ctx.ellipse(x, y, rx, e.r * 0.4, 0, 0, TAU); }
   ctx.fill(); G.shadowsDrawn = true;
-  for (const e of list) !e ? (G.HD.fly ? 0 : drawHero()) : e.prisoner ? drawPrisoner(e) : e.fly ? 0 : e.spr && !e.type ? drawBuilding(e) : drawEnemy(e);
+  for (const e of list) !e ? (G.HD.fly ? 0 : drawHero()) : e.prisoner ? drawPrisoner(e) : e.boat ? drawBoat(e.boat) : e.fly ? 0 : e.spr && !e.type ? drawBuilding(e) : drawEnemy(e);
   for (const e of list) if (e && e.fly) drawEnemy(e);   // fliers over trees and buildings
   if (G.HD.fly) drawHero();   // Kurdran and Deathwing too
   G.shadowsDrawn = false;
@@ -4004,13 +4116,13 @@ function fieldTile(L, i, heroId) {
   const open = levelOpen(i);
   return `<button class="opt tile field${open ? '' : ' locked'}" data-act="field" data-id="${heroId}" data-level="${L.id}"${open ? '' : ' aria-disabled="true"'}>
     <canvas class="fpic" width="128" height="96" data-level="${L.id}"></canvas>
-    <span class="tt"><span class="nm">${L.name}</span><span class="lv">${open ? ['Easy', 'Normal', 'Hard', 'Very hard'][Math.min(i, 3)] : 'Locked'}</span></span></button>`;
+    <span class="tt"><span class="nm">${L.name}</span><span class="lv">${L.test ? 'Prototype' : open ? ['Easy', 'Normal', 'Hard', 'Very hard'][Math.min(i, 3)] : 'Locked'}</span></span></button>`;
 }
 function fieldDetails(L, i, heroId) {
   const open = levelOpen(i), best = P_().lv[L.id] || 0;
   const why = open ? L.blurb : A.demo ? 'Requires the full game.' : `Play ${FIELD_RUNS} runs in ${LEVELS[i - 1].name} (${Math.min(FIELD_RUNS, fieldRuns(LEVELS[i - 1].id))} so far) and survive ${fmtTime(UNLOCK_T)} there to unlock (best ${fmtTime(P_().lv[LEVELS[i - 1].id] || 0)}).`;
   return `<div class="hinfo-in"><div><span class="nm">${L.name}</span>
-    <span class="ds">${why}</span>${open ? `<span class="ds">Difficulty: ${['easy', 'normal', 'hard', 'very hard'][Math.min(i, 3)]}. Your best here: ${best ? fmtTime(best) : 'not played yet'}.</span>` : ''}
+    <span class="ds">${why}</span>${L.test ? '<span class="ds">A prototype, open to try while it is being built. It may change a lot.</span>' : ''}${open ? `<span class="ds">Difficulty: ${['easy', 'normal', 'hard', 'very hard'][Math.min(i, 3)]}. Your best here: ${best ? fmtTime(best) : 'not played yet'}.</span>` : ''}
     ${open ? `<div class="opts"><button class="opt primary" data-act="start" data-id="${heroId}" data-level="${L.id}">Fight here</button></div>` : ''}</div></div>`;
 }
 function showFieldInfo(b) {
@@ -4936,7 +5048,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
