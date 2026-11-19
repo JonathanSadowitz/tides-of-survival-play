@@ -1060,7 +1060,7 @@ const speedName = v => SPEED_NAMES[SPEEDS.indexOf(v)] || v + 'x';
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedBtn.textContent = speedName(cfg.opts.speed); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedBtn.textContent = speedName(cfg.opts.speed); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.9.0', BUILD = 'a42af43 2026-11-18';
+const VERSION = '0.10.0', BUILD = 'a0b4e88 2026-11-19';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1912,10 +1912,15 @@ let meta = store.get('tos_meta', null) || { gold: 0, spent: 0, ups: {}, unlocked
 meta.ups ||= {};
 // Heroes: Lothar and Grom from the start; the rest unlock by reaching a goal or by buying them with Armoury gold.
 const START_HEROES = ['lothar', 'grom'];
-const freshMeta = () => ({ gold: 0, spent: 0, ups: {}, unlocked: 0, last: null, heroes: [...START_HEROES], prog: freshProg(), evos: [], maxed: [], seen: [] });
+const freshMeta = () => ({ gold: 0, spent: 0, ups: {}, unlocked: 0, last: null, heroes: [...START_HEROES], prog: freshProg(), evos: [], maxed: [], seen: [], prisoners: [] });
 const freshProg = () => ({ kills: { Alliance: 0, Horde: 0 }, time: {}, won: { Alliance: false, Horde: false }, lv: {}, boss: { Alliance: 0, Horde: 0 } });
 meta.heroes ||= [...START_HEROES]; meta.prog ||= freshProg(); meta.prog.boss ||= { Alliance: 0, Horde: 0 }; meta.evos ||= []; meta.maxed ||= []; meta.seen ||= [];   // evolutions found and weapons maxed, for the Book of War
 const P_ = () => meta.prog;
+meta.prisoners ||= [];   // prisoners revealed and not yet freed
+// Phase I2: the later heroes are prisoners. Meeting a hero's goal reveals where he is held; in a later run as one of
+// his side's heroes, a guarded fortress holds him. Destroy it, then stay alive while he escapes, to free him for good.
+const PRISON = { heroes: ['turalyon', 'dentarg', 'kurdran', 'guldan', 'khadgar', 'teron'], escape: 120, near: 650, far: 1600, hp: 2.5, towerRange: 190, towerEvery: 1.8, garrison: 3.5 };
+const isPrisoner = id => PRISON.heroes.includes(id);
 // An easy ladder: the first heroes come within a few runs, the later ones take real mastery.
 const HERO_GAP = 2;   // runs between heroes earned by goals
 const FIELD_RUNS = 5;   // runs on a battlefield before the next one can open
@@ -1954,22 +1959,39 @@ function recordProgress() {
   (p.runsOn ||= {})[G.LV.id] = (p.runsOn[G.LV.id] || 0) + 1;
   p.sinceHero = (p.sinceHero ?? HERO_GAP - 1) + 1;   // a new save can earn its first hero on its first run
   const got = [];
+  const freed = G.fort && G.fort.state === 'escaped' && G.fort.id;   // freed from a fortress this run: he counts as this run's hero
+  if (freed && !meta.heroes.includes(freed)) { meta.heroes.push(freed); got.push(freed); p.sinceHero = 0; }
+  meta.prisoners = meta.prisoners.filter(id => !meta.heroes.includes(id));
   // Heroes are drip-fed: at most one earned per run, and never in two runs running (19 November 2026: four in a row
   // after a couple of runs was too quick). Buying with gold is always open.
-  if (p.sinceHero >= HERO_GAP) for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!meta.heroes.includes(id) && !demoLocked(id) && U.done()) { meta.heroes.push(id); got.push(id); p.sinceHero = 0; break; }
+  if (p.sinceHero >= HERO_GAP) for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!isPrisoner(id) && !meta.heroes.includes(id) && !demoLocked(id) && U.done()) { meta.heroes.push(id); got.push(id); p.sinceHero = 0; break; }
+  G.revealed = revealPrisoners();
   if (G.slewDeathwing && !meta.deathwing && !A.demo) { meta.deathwing = true; got.push('deathwing'); }
   if (revealSecret()) got.push(...SECRET);
   return got;
 }
+// A prisoner's goal met: from now on a fortress holds him in runs as one of his side's heroes.
+function revealPrisoners() {
+  const out = [];
+  for (const id of PRISON.heroes) if (!meta.heroes.includes(id) && !meta.prisoners.includes(id) && !demoLocked(id) && HERO_UNLOCKS[id].done()) { meta.prisoners.push(id); out.push(id); }
+  return out;
+}
+function fortNews() {
+  const out = (G.revealed || []).map(id => `Prisoner found: ${HEROES[id].name} is held in ${anSide(enemyOf(HEROES[id].side))} fortress. Play as ${anSide(HEROES[id].side)} hero to free him.`);
+  if (G.fort && G.fort.state === 'escaping') out.push(`${HEROES[G.fort.id].name} was recaptured before he could escape. His fortress waits for your next run.`);
+  return out;
+}
+const enemyOf = side => side === 'Horde' ? 'Alliance' : 'Horde', anSide = side => (side === 'Alliance' ? 'an ' : 'a ') + side;
 function buyHero(id) {
-  const U = HERO_UNLOCKS[id]; if (!U || heroOpen(id) || demoLocked(id) || meta.gold < U.cost) return false;
+  const U = HERO_UNLOCKS[id]; if (!U || isPrisoner(id) || heroOpen(id) || demoLocked(id) || meta.gold < U.cost) return false;
   meta.gold -= U.cost; meta.heroes.push(id); saveMeta(); sfx('s_buy', 0); return true;
 }
 // Goals were made easier (November 2026): a save that already meets them gets the heroes and battlefields at once.
 let caughtUp = false;
 function catchUpUnlocks() {
   const got = [];
-  for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!meta.heroes.includes(id) && !demoLocked(id) && U.done()) { meta.heroes.push(id); got.push(HEROES[id].name); }
+  for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!isPrisoner(id) && !meta.heroes.includes(id) && !demoLocked(id) && U.done()) { meta.heroes.push(id); got.push(HEROES[id].name); }
+  for (const id of revealPrisoners()) got.push(`${HEROES[id].name}, held prisoner: free him from ${anSide(enemyOf(HEROES[id].side))} fortress`);
   while (!A.demo && meta.unlocked + 1 < LEVELS.length && (P_().lv[LEVELS[meta.unlocked].id] || 0) >= UNLOCK_T) { meta.unlocked++; got.push(LEVELS[meta.unlocked].name); }
   if (got.length) saveMeta();
   return got;
@@ -1980,7 +2002,10 @@ function nextUp() {
   if (A.demo) out.push(`Three more battlefields and two more heroes are waiting in the full game: get ${fullGameLink()} and import it under Game files on the title screen. Your progress carries over.`);
   else if (i + 1 < LEVELS.length) out.push(`Next battlefield: ${LEVELS[i + 1].name}. Play ${FIELD_RUNS} runs in ${LEVELS[i].name} (${Math.min(FIELD_RUNS, fieldRuns(LEVELS[i].id))} so far) and survive ${fmtTime(UNLOCK_T)} there (best ${fmtTime(P_().lv[LEVELS[i].id] || 0)}).`);
   const h = Object.keys(HERO_UNLOCKS).find(id => !heroOpen(id) && !demoLocked(id));
-  if (h) out.push(`Next hero: ${HEROES[h].name}. ${HERO_UNLOCKS[h].goal} (${HERO_UNLOCKS[h].best()}), or buy for ${HERO_UNLOCKS[h].cost} gold in hero select.`);
+  if (h && !isPrisoner(h)) out.push(`Next hero: ${HEROES[h].name}. ${HERO_UNLOCKS[h].goal} (${HERO_UNLOCKS[h].best()}), or buy for ${HERO_UNLOCKS[h].cost} gold in hero select.`);
+  for (const id of meta.prisoners) if (!heroOpen(id)) out.push(`${HEROES[id].name} is held prisoner. Play as ${anSide(HEROES[id].side)} hero and destroy the ${enemyOf(HEROES[id].side)} fortress that holds him.`);
+  const nextP = PRISON.heroes.find(id => !heroOpen(id) && !meta.prisoners.includes(id) && !demoLocked(id));
+  if (nextP && (!h || isPrisoner(h))) out.push(`Next prisoner: ${HEROES[nextP].name}. ${HERO_UNLOCKS[nextP].goal} (${HERO_UNLOCKS[nextP].best()}) to find where he is held.`);
   return out;
 }
 const saveMeta = () => store.set('tos_meta', meta);
@@ -2126,6 +2151,7 @@ function snapRun() {
     pending: G.pending + (G.state === 'levelup' ? 1 : 0), chests: G.chestQueue,
     h: { x: h.x, y: h.y, hp: h.hp, xp: h.xp, level: h.level, next: h.next },
     w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), e: Object.keys(G.weapons).filter(k => G.weapons[k].evo), p: G.passives, sh: G.hero.shield || 0,
+    fort: G.fort ? { s: G.fort.state, at: G.fort.freedAt ?? null } : null,
     camps: [...G.camps.values()].filter(c => c.dead.size || c.chest).map(c => ({ key: c.key, ox: c.ox, oy: c.oy, dead: [...c.dead], chest: c.chest })) };
 }
 function saveRun() { const s = snapRun(); if (s) { s.at = Date.now(); store.set(RUN_KEY, s); } }
@@ -2145,7 +2171,8 @@ function continueRun() {
   Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(PACE.elite, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives, rerolls: s.rerolls, pending: s.pending || 0, chestQueue: s.chests || [] });
   Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next }); G.labour = s.lab || 0; G.bossPlan = s.bp && s.bp.length === BOSSES.length ? s.bp : null;   // runs saved before 20-minute runs plan again
   recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
-  if (s.bs && BOSSES[s.bs.n - 1]) spawnBoss(s.bs.n, s.bs.f);   // the boss you were fighting comes back, wounded as he was
+  if (s.bs && BOSSES[s.bs.n - 1]) spawnBoss(s.bs.n, s.bs.f);
+  if (G.fort && s.fort) { G.fort.state = s.fort.s; G.fort.freedAt = s.fort.at; G.fort.told = true; }   // the boss you were fighting comes back, wounded as he was
   for (const c of s.camps || []) {
     const camp = G.terrain.camps.find(x => x.id === +c.key.split(':')[0]); if (!camp) continue;
     G.camps.set(c.key, { key: c.key, c: camp, ox: c.ox, oy: c.oy, dead: new Set(c.dead), chest: c.chest, ents: [], spawnT: 2, live: false, warned: true });
@@ -2296,6 +2323,7 @@ function drawMinimap() {
   const half = MINI.span * 8, cb = cfg.opts.colours === 'cb';
   ctx.fillStyle = cb ? '#ff9a1a' : '#e0281c';
   for (const e of G.enemies) { const dx = e.x - h.x, dy = e.y - h.y; if (Math.abs(dx) < half && Math.abs(dy) < half) ctx.fillRect(Math.round(bx + sz / 2 + dx / 16 * k) - (e.boss ? 1 : 0), Math.round(by + sz / 2 + dy / 16 * k) - (e.boss ? 1 : 0), e.boss ? 3 : 1, e.boss ? 3 : 1); }
+  if (G.fort && G.fort.state === 'held') { const dx = G.fort.x - h.x, dy = G.fort.y - h.y, mx = Math.max(-sz / 2 + 2, Math.min(sz / 2 - 3, dx / 16 * k)), my = Math.max(-sz / 2 + 2, Math.min(sz / 2 - 3, dy / 16 * k)); ctx.fillStyle = '#ffd24a'; ctx.fillRect(Math.round(bx + sz / 2 + mx) - 2, Math.round(by + sz / 2 + my) - 2, 4, 4); }
   ctx.fillStyle = '#fff'; ctx.fillRect(bx + sz / 2 - 1, by + sz / 2 - 1, 3, 3);
   // The screen's own view, outlined as in Warcraft II.
   ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; const vw = W / 16 * k, vh = H / 16 * k;
@@ -2307,6 +2335,34 @@ function startLevel() {
   G.terrain = null; G.camps = new Map(); G.props = [];
   if (!loadTileset(G.LV)) return;
   try { G.terrain = buildTerrain(G.LV, G.seed ?? SEED_PARAM ?? ((Math.random() * 1e9) | 0), G.HD.side === 'Horde' ? 'human' : 'orc'); } catch (e) { console.error(e); G.terrain = null; }
+  setupFortress();
+}
+// The fortress: the enemy camp with a hall nearest a good walk from the start, holding the first prisoner of your side.
+function setupFortress() {
+  G.fort = null; const T = G.terrain; if (!T || A.demo) return;
+  const id = meta.prisoners.find(x => HEROES[x] && HEROES[x].side === G.HD.side && !meta.heroes.includes(x)); if (!id) return;
+  const P = TN * 32, h = G.hero; let best = null, bs = 1e9;
+  for (const c of T.camps) {
+    if (!c.enemy || c.sea || !c.blds.some(b => b.kind === 3)) continue;
+    const wx = c.cx * 32 + 16, wy = c.cy * 32 + 16, kx = Math.round((h.x - wx) / P), ky = Math.round((h.y - wy) / P), x = wx + kx * P, y = wy + ky * P, d = Math.hypot(x - h.x, y - h.y);
+    const sc = (d < PRISON.near ? 3000 : d > PRISON.far ? 1500 : 0) + Math.abs(d - 1000) - c.blds.length * 30;
+    if (sc < bs) { bs = sc; best = { camp: c.id, kx, ky, x, y }; }
+  }
+  if (best) G.fort = { id, ...best, state: 'held', told: false };
+}
+const isFortCamp = st => !!G.fort && st.c.id === G.fort.camp && st.ox === G.fort.kx * TN * 32 && st.oy === G.fort.ky * TN * 32;
+function updateFort(dt) {
+  const F = G.fort; if (!F) return;
+  const nm = HEROES[F.id].name;
+  if (!F.told && G.t > 2.5) { F.told = true; banner(`${nm} is held prisoner in a fortress nearby. Destroy it to free him!`); G.banner.t = 4; }
+  if (F.state === 'escaping' && G.t - F.freedAt >= PRISON.escape) {
+    F.state = 'escaped'; banner(`${nm} has escaped! He joins your heroes after this run.`); G.banner.t = 4; heroVoice('yes', 1, F.id); logEvent('prisoner escaped');
+  }
+}
+function freePrisoner() {
+  const F = G.fort; if (!F || F.state !== 'held') return;
+  F.state = 'escaping'; F.freedAt = G.t;
+  banner(`${HEROES[F.id].name} is free! Stay alive for ${fmtTime(PRISON.escape)} while he escapes.`); G.banner.t = 4; heroVoice('ready', 1, F.id); logEvent('prisoner freed');
 }
 function updateCamps(dt) {
   const T = G.terrain; if (!T) return;
@@ -2320,13 +2376,13 @@ function updateCamps(dt) {
       if (!st.live) activateCamp(st);
       const alive = c.enemy && st.ents.some(e => !e.dead);
       if (alive && d < 560) {
-        if (!st.warned) { st.warned = true; banner(c.sea ? `An enemy port! Its ships shell the shore: sink them with ranged weapons.` : `An enemy ${c.side === 'orc' ? 'orc' : 'human'} camp! Destroy it for gold.`); }
+        if (!st.warned) { st.warned = true; if (st.fort) banner(`The fortress! Destroy every building to free ${HEROES[G.fort.id].name}.`); else banner(c.sea ? `An enemy port! Its ships shell the shore: sink them with ranged weapons.` : `An enemy ${c.side === 'orc' ? 'orc' : 'human'} camp! Destroy it for gold.`); }
         if (c.sea) { portShips(st, dt); continue; }
         st.spawnT -= dt;
         if (st.spawnT <= 0) {
-          st.spawnT = 5.5;
+          st.spawnT = st.fort ? PRISON.garrison : 5.5;
           const live = st.ents.filter(e => !e.dead);
-          for (let i = 0; i < 2 + (G.t > 300); i++) { const b = live[Math.floor(Math.random() * live.length)], a = rnd(0, TAU), x = b.x + Math.cos(a) * (b.r + 14), y = b.y + Math.sin(a) * (b.r + 14); if (!footBlocked(x, y, 4)) spawnEnemy(Math.random() < 0.7 ? 'basic' : 'fast', x, y); }
+          for (let i = 0; i < 2 + (G.t > 300) + !!st.fort; i++) { const b = live[Math.floor(Math.random() * live.length)], a = rnd(0, TAU), x = b.x + Math.cos(a) * (b.r + 14), y = b.y + Math.sin(a) * (b.r + 14); if (!footBlocked(x, y, 4)) spawnEnemy(Math.random() < 0.7 ? 'basic' : 'fast', x, y); }
         }
       }
     } else if (st && st.live && d > 1300) deactivateCamp(st);
@@ -2338,11 +2394,12 @@ function activateCamp(st) {
     if (st.dead.has(i)) return;
     const spr = A.bldSpr[b.entry], x = st.ox + b.tx * 32 + b.w * 16, y = st.oy + b.ty * 32 + b.h * 16;
     if (st.c.enemy) {
-      const hp = (150 + 150 * (b.kind === 3)) * (1 + G.t / 300) * G.LV.hp;
-      const e = { type: 'bld', static: true, x, y, hp, maxHp: hp, r: Math.min(b.w, b.h) * 13, spr, camp: st, idx: i, kind: b.kind, flash: 0, kx: 0, ky: 0, dir: 4, t: 0, atkT: 0, swing: 0, xp: 5, dmg: 0, spd: 0, sea: !!b.sea };
+      const fort = isFortCamp(st), hp = (150 + 150 * (b.kind === 3)) * (1 + G.t / 300) * G.LV.hp * (fort ? PRISON.hp : 1);
+      const e = { type: 'bld', static: true, x, y, hp, maxHp: hp, r: Math.min(b.w, b.h) * 13, spr, camp: st, idx: i, kind: b.kind, flash: 0, kx: 0, ky: 0, dir: 4, t: 0, atkT: 0, swing: 0, xp: 5, dmg: 0, spd: 0, sea: !!b.sea, fort, tower: fort && b.kind === 2, shootT: rnd(0.5, PRISON.towerEvery) };
       G.enemies.push(e); st.ents.push(e);
     } else { const pr = { x, y, spr, camp: st }; G.props.push(pr); st.ents.push(pr); }
   });
+  if (isFortCamp(st)) { st.fort = true; if (!st.guard && G.fort.state === 'held') { st.guard = true; const hall = st.ents.find(e => e.kind === 3) || st.ents[0]; if (hall) spawnEnemy('elite' + (G.eliteN++ % 3 + 1), hall.x + rnd(-30, 30), hall.y + hall.r + 20); } }
   if (!st.c.enemy && !st.chest) { const gm = { x: st.ox + st.c.cx * 32 + 16, y: st.oy + st.c.cy * 32 + 16, chest: 'camp', camp: st }; G.gems.push(gm); st.ents.push(gm); }
 }
 // A port launches warships onto its lake, two at a time at most, from 4:00 (battleships join from 10:00).
@@ -2384,9 +2441,18 @@ function updateShip(e, d, dx, dy, dt) {
   let want = d > e.range * 0.8 ? 1 : d < e.range * 0.5 ? -0.6 : 0, a = Math.atan2(dy, dx);
   if (!want) { e.wa = (e.wa ?? a + Math.PI / 2) + rnd(-0.4, 0.4) * dt; a = e.wa; want = 0.4; }   // drift along the shore
   const sp = e.spd * want * (e.lust > 0 ? 1.4 : 1);
-  for (const k of [0, 0.5, -0.5, 1, -1, 1.6, -1.6, 2.4, -2.4]) {
+  // Against the shore while closing in, it holds its place and heading rather than flicking between ways round
+  // (Jon, 19 November 2026: the sprite jumped between frames). Its facing only changes after a moment's steady course.
+  e.dirT = (e.dirT || 0) - dt;
+  const ks = want > 0 && d > e.range * 0.8 ? [0, 0.35, -0.35] : [0, 0.5, -0.5, 1, -1, 1.6, -1.6, 2.4, -2.4];
+  for (const k of ks) {
     const b = a + k, nx = e.x + Math.cos(b) * sp * dt, ny = e.y + Math.sin(b) * sp * dt;
-    if (shipAt(nx, ny)) { e.x = nx; e.y = ny; if (sp) e.dir = dirOf(Math.cos(b) * Math.sign(sp), Math.sin(b) * Math.sign(sp)); break; }
+    if (shipAt(nx, ny)) {
+      e.x = nx; e.y = ny;
+      const nd = sp ? dirOf(Math.cos(b) * Math.sign(sp), Math.sin(b) * Math.sign(sp)) : e.dir;
+      if (nd !== e.dir && e.dirT <= 0) { e.dir = nd; e.dirT = 0.5; }
+      break;
+    }
   }
   if (!shipAt(e.x, e.y)) { e.dead = true; }   // a building's water was cleared under it, or the map changed: never leave it on land
 }
@@ -2400,7 +2466,7 @@ function buildingDestroyed(e) {
   G.fx.push({ k: 'boom', x: e.x, y: e.y, r: e.r * 1.5, t: 0, life: 0.6 }); sfx('s_boom', 0.05);
   for (let i = 0; i < 3 + (e.kind === 3) * 4; i++) G.gems.push({ x: e.x + rnd(-e.r, e.r), y: e.y + rnd(-e.r, e.r), coin: Math.round(rnd(3, 7) * goldMul()) });
   G.gems.push({ x: e.x, y: e.y, v: e.xp });
-  if (e.camp.ents.every(b => b.dead)) { G.gems.push({ x: e.x, y: e.y + 6, chest: 'camp' }); banner('Camp destroyed! It left a supply cache.'); }
+  if (e.camp.ents.every(b => b.dead)) { G.gems.push({ x: e.x, y: e.y + 6, chest: 'camp' }); if (e.camp.fort) freePrisoner(); else banner('Camp destroyed! It left a supply cache.'); }
 }
 
 /* ---------- spatial grid ---------- */
@@ -2528,8 +2594,22 @@ function hitEnemy(e, dmg, kx = 0, ky = 0) {
   if (e.type !== 'boss' && !e.static) { e.kx += kx; e.ky += ky; }
   sfx('s_hit');
   if (e.hp <= 0 && e.static) { e.dead = true; buildingDestroyed(e); return; }
+  const n0 = G.gems.length;
   if (e.hp <= 0 && e.ship) { for (let i = 0; i < 4 + 3 * (e.type === 'ship2'); i++) G.gems.push({ x: e.x + rnd(-10, 10), y: e.y + rnd(-10, 10), coin: Math.round(rnd(3, 6) * goldMul()) }); }
-  if (e.hp <= 0) { e.dead = true; G.kills++; if (G.HD.frenzy) { h.frenzy = Math.min(0.2, (h.frenzy || 0) + 0.015); h.frenzyT = 4; } drop(e); addCorpse(e); if (e.type === 'boss') sfx(G.HD.side === 'Horde' && A.sbuf.s_die_ally ? 's_die_ally' : 's_die', 0); if (G.HD.killHeal) h.hp = Math.min(h.maxHp, h.hp + G.HD.killHeal); }
+  if (e.hp <= 0) { e.dead = true; G.kills++; if (G.HD.frenzy) { h.frenzy = Math.min(0.2, (h.frenzy || 0) + 0.015); h.frenzyT = 4; } drop(e); if (e.ship) washAshore(e, n0); addCorpse(e); if (e.type === 'boss') sfx(G.HD.side === 'Horde' && A.sbuf.s_die_ally ? 's_die_ally' : 's_die', 0); if (G.HD.killHeal) h.hp = Math.min(h.maxHp, h.hp + G.HD.killHeal); }
+}
+// A sunk ship's drops wash up on the nearest shore, so they can always be picked up on foot (Jon, 19 November 2026).
+function nearestLand(x, y) {
+  for (let r = 1; r <= 12; r++) { let best = null, bd = 1e9;
+    for (let k = 0; k < 16 * r; k++) { const a = k / (16 * r) * TAU, px = x + Math.cos(a) * r * 12, py = y + Math.sin(a) * r * 12, d = Math.hypot(px - G.hero.x, py - G.hero.y);
+      if (!footBlocked(px, py, 5) && d < bd) { bd = d; best = [px, py]; } }
+    if (best) return best; }
+  return null;
+}
+function washAshore(e, from) {
+  const p = nearestLand(e.x, e.y); if (!p) return;
+  for (let i = from; i < G.gems.length; i++) { const g = G.gems[i]; g.x = p[0] + rnd(-8, 8); g.y = p[1] + rnd(-8, 8); }
+  G.fx.push({ k: 'boom', x: p[0], y: p[1], r: 8, t: 0, life: 0.3 });
 }
 function addCorpse(e) {
   const role = foeSprite(e.role || e.type), sp = A.sprites[role];
@@ -2880,12 +2960,19 @@ function updateShots(dt) {
       s.vx = Math.cos(na) * sp; s.vy = Math.sin(na) * sp; s.dir = dirOf(s.vx, s.vy);
     }
     s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
-    if (Math.hypot(h.x - s.x, h.y - s.y) < 7) { hurtHero(s.dmg, 'shot'); s.dead = true; }
+    if (Math.hypot(h.x - s.x, h.y - s.y) < 7) { hurtHero(s.dmg, s.by || 'shot'); s.dead = true; }
     if (s.life <= 0) s.dead = true;
   }
   G.eshots = G.eshots.filter(s => !s.dead);
 }
 // A mark on the ground where something will land: a siege stone, or a boss's barrage. Hurts the hero if still inside when it lands.
+// The fortress's guard towers loose arrows at you, at Warcraft II's guard tower range.
+function towerShoot(e, dt) {
+  const h = G.hero, dx = h.x - e.x, dy = h.y - e.y, d = Math.hypot(dx, dy);
+  if ((e.shootT -= dt) > 0 || d > PRISON.towerRange) return;
+  e.shootT = PRISON.towerEvery; const ux = dx / d, uy = dy / d;
+  G.eshots.push({ x: e.x, y: e.y - 10, vx: ux * 150, vy: uy * 150, dmg: 9 * (1 + G.t / 400), life: 2, dir: dirOf(ux, uy), by: 'tower' });
+}
 function addMark(x, y, r, T, dmg, by, src, drop) { G.marks.push({ x, y, r, t: 0, T, dmg, by, src, role: by === 'siege' || by === 'ship' ? 'stone' : null, drop }); }
 function updateMarks(dt) {
   const h = G.hero;
@@ -2982,7 +3069,7 @@ function updateEnemies(dt) {
   updateFlow();
   for (const e of G.enemies) {
     if (e.dead) continue;
-    if (e.static) { e.flash -= dt; continue; }
+    if (e.static) { e.flash -= dt; if (e.tower) towerShoot(e, dt); continue; }
     e.t += dt; e.flash -= dt; e.atkT -= dt; e.swing -= dt; e.shootT -= dt; if (e.lust > 0) e.lust -= dt;
     if (e.stun > 0) { e.stun -= dt; e.atkT = Math.max(e.atkT, 0.2); continue; }   // Shield Bash
     let dx = h.x - e.x, dy = h.y - e.y; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
@@ -3065,7 +3152,7 @@ function update(dt) {
   if (h.frenzy && (h.frenzyT -= dt) <= 0) h.frenzy = Math.max(0, h.frenzy - dt * 0.15);   // Blade Frenzy fades
   if (G.HD.holyLight && h.hp > 0 && h.hp < h.maxHp * 0.3 && G.t >= (G.holyT || 0)) { G.holyT = G.t + 60; h.hp = Math.min(h.maxHp, h.hp + h.maxHp * 0.4); banner('Holy Light!'); G.fx.push({ k: 'pillar', x: h.x, y: h.y, t: 0, life: 0.6 }); }
   h.coilBank = Math.min(COIL_HEAL_PER_S, (h.coilBank || 0) + COIL_HEAL_PER_S * dt);
-  spawn(dt); updateCamps(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
+  spawn(dt); updateCamps(dt); updateFort(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
   for (const f of G.fx) f.t += dt; G.fx = G.fx.filter(f => f.t < f.life); G.numCount = 0; for (const f of G.fx) if (f.k === 'num') G.numCount++;
   for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
   if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
@@ -3207,13 +3294,14 @@ function sparkle(x, y, p) {
 // Arrows at the screen's edge pointing at power-ups and treasure that have dropped out of sight.
 function drawLootArrows() {
   const h = G.hero, m = 14, cx = W / 2, cy = H / 2, now = performance.now();
-  for (const g of G.gems) {
-    if (!g.pow && !g.chest) continue;
+  const fortPt = G.fort && G.fort.state === 'held' ? [{ x: G.fort.x, y: G.fort.y, fort: true }] : [];
+  for (const g of [...G.gems, ...fortPt]) {
+    if (!g.pow && !g.chest && !g.fort) continue;
     const dx = g.x - camX - cx, dy = g.y - camY - cy;
     if (Math.abs(dx) < cx - 4 && Math.abs(dy) < cy - 4) continue;
-    if (Math.hypot(g.x - h.x, g.y - h.y) > 900) continue;
+    if (!g.fort && Math.hypot(g.x - h.x, g.y - h.y) > 900) continue;   // the fortress is always pointed out
     const k = Math.min((cx - m) / Math.abs(dx || 1e-6), (cy - m) / Math.abs(dy || 1e-6)), x = cx + dx * k, y = cy + dy * k, a = Math.atan2(dy, dx);
-    const col = g.pow ? POWERUPS[g.pow].col : '#ffd24a';
+    const col = g.fort ? '#ff7a5c' : g.pow ? POWERUPS[g.pow].col : '#ffd24a';
     ctx.globalAlpha = 0.75 + 0.25 * Math.sin(now / 200);
     ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 9, y + Math.sin(a) * 9); ctx.lineTo(x + Math.cos(a + 2.4) * 8, y + Math.sin(a + 2.4) * 8); ctx.lineTo(x + Math.cos(a - 2.4) * 8, y + Math.sin(a - 2.4) * 8); ctx.fill();
     ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7); ctx.lineTo(x + Math.cos(a + 2.4) * 6, y + Math.sin(a + 2.4) * 6); ctx.lineTo(x + Math.cos(a - 2.4) * 6, y + Math.sin(a - 2.4) * 6); ctx.fill();
@@ -3271,6 +3359,22 @@ function drawMarkShot(m) {
   else { if (p < 0.55) return; x = m.x; y = m.y - (1 - p) * 220; }
   const role = m.role ? foeSprite(m.role) : m.drop && A.sprites[m.drop] ? m.drop : foeSide() === 'Horde' ? 'fire' : 'hammer';
   if (!drawSprite(role, x, y, dir, attract, false)) circle(x - camX, y - camY, 4, '#3a3a3a', '#000');
+}
+// The prisoner stands by the fortress's hall, ringed in gold; once freed he slips away over a few seconds.
+function prisonerSpot() {
+  const F = G.fort; if (!F || F.state === 'escaped') return null;
+  const away = F.state === 'escaping' ? Math.min(1, (G.t - F.freedAt) / 4) : 0; if (away >= 1) return null;
+  const st = [...G.camps.values()].find(isFortCamp), hall = st && st.ents.find(e => e.kind === 3);
+  if (hall && F.px == null) { F.px = hall.x; F.py = hall.y + hall.r + 14; }
+  return { prisoner: true, id: F.id, x: (F.px ?? F.x) + away * 40, y: (F.py ?? F.y) + away * 20, a: 1 - away };
+}
+function drawPrisoner(p) {
+  const x = p.x - camX, y = p.y - camY, k = 'hero_' + p.id;
+  ctx.globalAlpha = p.a;
+  if (G.fort.state === 'held') { ctx.strokeStyle = `rgba(255,210,74,${0.5 + 0.3 * Math.sin(performance.now() / 250)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x, y + 7, 12, 5, 0, 0, TAU); ctx.stroke(); }
+  if (!drawSprite(A.sprites[k] ? k : 'hero', p.x, p.y, 4, G.fort.state === 'escaping' ? G.t : 0, false)) circle(x, y, 7, '#ffd24a', '#000');
+  ctx.globalAlpha = 1;
+  if (G.fort.state === 'held') txt(HEROES[p.id].name, x, y - 24, 7, '#ffd24a', 'center');
 }
 function drawHero() {
   const h = G.hero, x = h.x - camX, y = h.y - camY;
@@ -3554,6 +3658,7 @@ function render() {
   if (!G) return;
   for (const f of G.fx) drawFx(f);
   if (G.state === 'play') drawLootArrows();
+  if (G.fort && G.fort.state === 'escaping') txt(`${HEROES[G.fort.id].name} escapes in ${fmtTime(Math.max(0, PRISON.escape - (G.t - G.fort.freedAt)))}`, W / 2, 30, 7, '#ffd24a', 'center');
   drawHudSafe();
 }
 function renderWorld() {
@@ -3607,6 +3712,7 @@ function renderWorld() {
   }
   const list = G.enemies.filter(e => Math.abs(e.x - h.x) < W / 2 + 90 && Math.abs(e.y - h.y) < H / 2 + 90);
   for (const p of G.props) if (Math.abs(p.x - h.x) < W / 2 + 90 && Math.abs(p.y - h.y) < H / 2 + 90) list.push(p);
+  const pr = prisonerSpot(); if (pr && Math.abs(pr.x - h.x) < W / 2 + 90 && Math.abs(pr.y - h.y) < H / 2 + 90) list.push(pr);
   list.push(null);
   const sy = e => e ? e.y + (e.spr ? e.spr.height / 2 - 10 : 0) : h.y;
   list.sort((a, b) => sy(a) - sy(b));
@@ -3616,7 +3722,7 @@ function renderWorld() {
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath();
   for (const e of list) if (e && e.type && !e.static) { const x = e.x - camX, y = e.y - camY + e.r * 0.8, rx = e.r * (e.fly ? 0.8 : 1); ctx.moveTo(x + rx, y); ctx.ellipse(x, y, rx, e.r * 0.4, 0, 0, TAU); }
   ctx.fill(); G.shadowsDrawn = true;
-  for (const e of list) !e ? (G.HD.fly ? 0 : drawHero()) : e.fly ? 0 : e.spr && !e.type ? drawBuilding(e) : drawEnemy(e);
+  for (const e of list) !e ? (G.HD.fly ? 0 : drawHero()) : e.prisoner ? drawPrisoner(e) : e.fly ? 0 : e.spr && !e.type ? drawBuilding(e) : drawEnemy(e);
   for (const e of list) if (e && e.fly) drawEnemy(e);   // fliers over trees and buildings
   if (G.HD.fly) drawHero();   // Kurdran and Deathwing too
   G.shadowsDrawn = false;
@@ -3978,7 +4084,7 @@ function showBook(tab = 'weapons') {
     }).join('');
   else if (tab === 'foes') body = foesBook(card);
   else body = Object.keys(HEROES).filter(heroShown).map(id => { const H_ = HEROES[id], U = HERO_UNLOCKS[id];
-      const status = heroOpen(id) ? 'Unlocked' : demoLocked(id) ? 'Requires the full game' : `Locked. ${U.goal} (${U.best()}), or buy for ${U.cost} gold.`;
+      const status = heroOpen(id) ? 'Unlocked' : demoLocked(id) ? 'Requires the full game' : isPrisoner(id) ? (meta.prisoners.includes(id) ? `Held prisoner in ${anSide(enemyOf(HEROES[id].side))} fortress: play as ${anSide(HEROES[id].side)} hero to free him.` : `Held prisoner. ${U.goal} (${U.best()}) to find where.`) : `Locked. ${U.goal} (${U.best()}), or buy for ${U.cost} gold.`;
       return card(`<canvas class="hpic${heroOpen(id) ? '' : ' dim'}" width="48" height="48" data-hero="${id}"></canvas>`, H_.name, `${H_.unit}, ${H_.side}`, [BIOS[id] ? `<i class="bio">${BIOS[id]}</i>` : '', `Starts with <b>${WEAPONS[H_.start].name}</b>. ${H_.hp} health.`, `<b>${H_.sig}:</b> ${H_.sigDesc}`, status]); }).join('');
   showMenu(`<h2>Book of War</h2><div class="opts buyrow booktabs">${BOOK_TABS.map(([k, l]) => `<button class="opt${k === tab ? ' cur' : ''}" data-act="book" data-tab="${k}">${l}</button>`).join('')}</div>
     <div class="bookgrid scrollbox">${body}</div><div class="opts" style="margin-top:12px"><button class="opt" data-act="title" data-back>Back</button></div>`);
@@ -4134,6 +4240,10 @@ function heroDetails(id) {
     <span class="ds sig"><b>${H_.sig}:</b> ${H_.sigDesc}</span>`;
   let act;
   if (demoLocked(id)) act = `<span class="ds">Requires the full game: Warcraft II: Battle.net Edition, from the Battle.net Shop.</span>`;
+  else if (!heroOpen(id) && isPrisoner(id)) { const U = HERO_UNLOCKS[id];
+    act = meta.prisoners.includes(id)
+      ? `<span class="ds">Held prisoner in ${anSide(enemyOf(H_.side))} fortress. Play as ${anSide(H_.side)} hero: destroy the fortress, then stay alive for ${fmtTime(PRISON.escape)} while ${first} escapes.</span>`
+      : `<span class="ds">Held prisoner by the ${enemyOf(H_.side)}. To find where: ${U.goal} (${U.best()}). Then free him from their fortress.</span>`; }
   else if (!heroOpen(id)) { const U = HERO_UNLOCKS[id];
     act = `<span class="ds">To unlock: ${U.goal} (${U.best()}).</span><div class="opts"><button class="opt" data-act="buyhero" data-id="${id}" ${meta.gold < U.cost ? 'disabled' : ''}>Buy ${first} for ${U.cost} gold</button></div>`; }
   else act = `<div class="opts"><button class="opt" data-act="play" data-id="${id}">Play as ${first}</button></div>`;
@@ -4352,6 +4462,7 @@ function endRun(won) {
     ${unlocked || G.newHeroes.length ? `<h3 class="chestgold">Unlocked</h3>${[unlocked && `New battlefield: ${unlocked}`, ...G.newHeroes.filter(id => !HEROES[id].secret).map(id => `New hero: ${HEROES[id].name}`),
       G.newHeroes.includes('peasant') && 'Someone has been watching from the woodpile. Secret heroes: the Peasant and the Peon!',
       G.newHeroes.includes('deathwing') && 'Deathwing has fallen, and now he answers to you. Secret hero: Deathwing!'].filter(Boolean).map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}` : ''}
+    ${fortNews().map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}
     ${nextUp().map(t => `<p class="help nextup">${t}</p>`).join('')}</div><div class="endr">${runBreakdown()}</div></div>
     <div class="opts endopts"><button class="opt" data-act="retry">Retry</button><button class="opt" data-act="choose">Change hero</button><button class="opt" data-act="runlog">Run log</button><button class="opt" data-act="quit" data-back>Title screen</button></div>`);
   overlay.querySelector('.panel')?.classList.add('wide', 'scrolls'); fitPanel();
@@ -4788,7 +4899,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
