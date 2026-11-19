@@ -789,8 +789,6 @@ const LEVELS = [
     bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1.1, loops: 0.45, lakes: 0.2, forestLakes: 2, trees: 0.55, rocks: 0.7, dark: 0.35, camps: 0.75 }, hp: 1.6, mix: { fast: 1.8 } },
   { id: 'swamp', name: 'Swamp of Sorrows', blurb: 'Murky water and twisted trees. Only the hardiest survive.', ts: [438, 439, 440, 441], ground: '#3f4a2a',
     bld: { pal: 438, human: [479, 491, 80, 487, 489, 483, 495], orc: [480, 492, 81, 488, 490, 484, 496] }, sea: { human: [495, 497, 499], orc: [496, 498, 500] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.55, forestLakes: 6, trees: 0.5, rocks: 0.9, dark: 0.35, camps: 0.75 }, hp: 2, mix: { ranged: 1.6, tank: 1.3 } },
-  { id: 'isles', name: 'Tol Barad', blurb: 'An island fortress off the coast of Lordaeron. Board a transport at the docks to sail between the isles; warships hunt you at sea.', ts: [2, 3, 4, 5], ground: '#2f5a8a', test: true,
-    bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { islands: 6, irmin: 15, irmax: 21, strait: 9, clearings: 18, rmin: 8, rmax: 11, lane: 1, loops: 0.3, lakes: 0, forestLakes: 0, trees: 0.55, fine: 0.55, rocks: 0.95, dark: 0.3, camps: 0.85, ports: 0.5 }, hp: 2.2, mix: { ranged: 1.3 } },
 ];
 const UNLOCK_T = 600; // surviving 10 minutes, after a few runs there (FIELD_RUNS), unlocks the next level
 const UPGRADES = {
@@ -1095,7 +1093,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.11.0', BUILD = '0bc7776 2026-11-19';
+const VERSION = '0.11.1', BUILD = '5eaaedd 2026-11-19';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1682,7 +1680,7 @@ const mu = { names: new Set(), cache: new Map(), gain: null, cur: null, kind: nu
 // The menu music loops for ten minutes, then fades out slowly and stays quiet until you next come back from a run.
 const MENU_MUSIC = { loopFor: 600, fade: 40 };
 // Each battlefield's own music, from your side's six campaign tracks: later battlefields bring new ones.
-const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6], isles: [2, 4] };
+const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6] };
 function playlistFor(kind) {
   const horde = G && G.HD.side === 'Horde', pre = horde ? 'ORC' : 'HUMAN', p1 = horde ? 'O' : 'H';
   if (kind === 'menu') return ['OWARROOM'];
@@ -2166,7 +2164,6 @@ const BOSS_POOL = {
 const FINALS = {
   forest: { Horde: 'orgrim', Alliance: 'lothar' }, winter: { Horde: 'guldan', Alliance: 'turalyon' },
   waste: { Horde: 'deathwing', Alliance: 'kurdran' }, swamp: { Horde: 'chogall', Alliance: 'khadgar' },
-  isles: { Horde: 'zuljin', Alliance: 'daelin' },   // until the flagship final boss is built
 };
 function planBosses() {   // [5:00, 10:00, 15:00, final]
   const side = foeSide(), fin = FINALS[G.LV.id][side], rest = Object.keys(BOSS_POOL[side]).filter(k => k !== fin);
