@@ -1069,7 +1069,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.10.1', BUILD = '4d04db9 2026-11-19';
+const VERSION = '0.10.2', BUILD = '58bd52b 2026-11-19';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1095,7 +1095,7 @@ const store = {
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(() => {}); } catch (e) {}
 let cfg = store.get('tos_cfg', null) || { roles: {}, sounds: {}, palette: null };
 cfg.roles ||= {}; cfg.sounds ||= {};
-cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fx: 'full', colours: 'std' }, cfg.opts || {});
+cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, voice: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fx: 'full', colours: 'std' }, cfg.opts || {});
 if (!cfg.optsV) { if (cfg.opts.music === 0.6) cfg.opts.music = 0.4; cfg.optsV = 2; }   // 60% was the old default: too loud
 const saveCfg = () => store.set('tos_cfg', cfg);
 let best = store.get('tos_best', { time: 0, kills: 0, level: 0 });
@@ -1622,10 +1622,10 @@ function ensureAudio() {
     A.actx.decodeAudioData(d.slice().buffer).then(b => { A.sbuf[role] = b; }).catch(() => {});
   }
 }
-function playBuffer(b, vol = 0.45) {
+function playBuffer(b, vol = 0.45, voice = false) {
   if (!A.actx || !b || A.active > 6) return;
   const src = A.actx.createBufferSource(), g = A.actx.createGain();
-  g.gain.value = vol * cfg.opts.sfx; src.buffer = b; src.connect(g).connect(A.actx.destination);
+  g.gain.value = vol * (voice ? cfg.opts.voice ?? 1 : cfg.opts.sfx); src.buffer = b; src.connect(g).connect(A.actx.destination);
   A.active++; src.onended = () => A.active--; src.start();
 }
 // Sound mix. With many weapons and a high attack speed, playing every swing turns into a wall of noise, so:
@@ -1793,9 +1793,9 @@ function heroVoice(kind, chance = 1, heroId) {
   if (!idx.length) return false;
   vo.last = now;
   const i = drawFromBag(heroId + ':' + kind, idx);
-  if (vo.buf.has(i)) { playBuffer(vo.buf.get(i), 0.7); return true; }
+  if (vo.buf.has(i)) { playBuffer(vo.buf.get(i), 0.7, true); return true; }
   const d = Core.safeEntry(war, i); if (!d) return false;
-  A.actx.decodeAudioData(d.slice().buffer).then(b => { vo.buf.set(i, b); playBuffer(b, 0.7); }).catch(() => {});
+  A.actx.decodeAudioData(d.slice().buffer).then(b => { vo.buf.set(i, b); playBuffer(b, 0.7, true); }).catch(() => {});
   return true;
 }
 
@@ -1823,7 +1823,7 @@ const WEAPONS = {
 // Evolutions: a maxed weapon plus its partner passive (any level) turns into a stronger weapon
 // the next time you open a boss's treasure chest. The evolved weapon replaces the original.
 const EVOS = {
-  sword:    { p: 'might',    name: 'Doomhammer',          desc: 'A crushing sweep in front and behind that hurls enemies back.' },
+  sword:    { p: 'might',    name: "Knight's Crusade",     desc: 'A crushing sweep in front and behind that hurls enemies back.' },
   arrows:   { p: 'boots',    name: "Ranger's Volley",     desc: 'A fan of seven piercing arrows.' },
   axes:     { p: 'heal',     name: "Berserker's Fury",    desc: 'Five axes whirl out in every direction; each kill heals you.' },
   aura:     { p: 'armour',   name: 'Exorcism',            desc: 'A stronger holy aura that bursts outward every few seconds.' },
@@ -2663,6 +2663,20 @@ function hurtHero(d, src) {
   if (G.lg) { const k = src || '?'; G.lg.hurt[k] = (G.lg.hurt[k] || 0) + Math.min(dm, Math.max(0, h.hp)); G.lg.hits++; }
   G.taken = (G.taken || 0) + Math.min(dm, Math.max(0, h.hp)); G.takenNow = (G.takenNow || 0) + dm;
   h.hp -= dm; h.hurtT = 0.15; sfx('s_hurt', 0.25);
+  const R = (G.recent ||= []); R.push([G.t, src || '?', dm]); while (R.length && R[0][0] < G.t - RECAP.secs) R.shift();   // for the death recap
+}
+// What hurt you: the killing blow and the biggest dangers of your last few seconds, for the end of a lost run.
+const RECAP = { secs: 5, low: 0.3 };
+function srcName(k) {
+  if (k === 'boss') { const b = G.enemies.find(e => e.boss) ; return b && b.name || G.finalName || 'the boss'; }
+  if (FOES[k]) return FOES[k][foeSide()] || FOES[k].Horde;
+  return { shot: 'missiles', tower: 'the fortress towers', barrage: "the boss's barrage", '?': 'something unseen' }[k] || k;
+}
+function deathRecap() {
+  if (G.won || !G.stats.lastHit) return '';
+  const by = {}; let tot = 0; for (const [, k, d] of G.recent || []) { by[k] = (by[k] || 0) + d; tot += d; }
+  const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, d]) => `${srcName(k)} ${Math.round(d)}`).join(', ');
+  return `<p class="help recap">Killing blow: <b>${srcName(G.stats.lastHit)}</b>. In your last ${RECAP.secs} seconds you took ${Math.round(tot)} damage${top ? `: ${top}` : ''}.</p>`;
 }
 function explode(s) {
   G.fx.push({ k: 'boom', x: s.x, y: s.y, r: s.er, t: 0, life: 0.4 }); sfx(s.k === 'fire' && A.sbuf.s_fire ? 's_fire' : 's_boom', 0.08);
@@ -3301,6 +3315,14 @@ function sparkle(x, y, p) {
   ctx.globalAlpha = k; ctx.fillStyle = '#fffbe0'; ctx.fillRect(x - r, y, r * 2 + 1, 1); ctx.fillRect(x, y - r, 1, r * 2 + 1); ctx.globalAlpha = 1;
 }
 // Arrows at the screen's edge pointing at power-ups and treasure that have dropped out of sight.
+// Low health: the screen's edge pulses red (orange with colour-blind colours), faster as health falls.
+function drawLowHealth() {
+  const h = G.hero, f = h.hp / h.maxHp; if (G.state !== 'play' || f > RECAP.low || h.hp <= 0) return;
+  const k = 1 - f / RECAP.low, a = (0.25 + 0.35 * k) * (0.6 + 0.4 * Math.sin(performance.now() / (260 - 120 * k))), cb = cfg.opts.colours === 'cb';
+  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.65);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, cb ? `rgba(255,140,0,${a})` : `rgba(200,0,0,${a})`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
 function drawLootArrows() {
   const h = G.hero, m = 14, cx = W / 2, cy = H / 2, now = performance.now();
   const fortPt = G.fort && G.fort.state === 'held' ? [{ x: G.fort.x, y: G.fort.y, fort: true }] : [];
@@ -3667,6 +3689,7 @@ function render() {
   if (!G) return;
   for (const f of G.fx) drawFx(f);
   if (G.state === 'play') drawLootArrows();
+  drawLowHealth();
   if (G.fort && G.fort.state === 'escaping') txt(`${HEROES[G.fort.id].name} escapes in ${fmtTime(Math.max(0, PRISON.escape - (G.t - G.fort.freedAt)))}`, W / 2, 30, 7, '#ffd24a', 'center');
   drawHudSafe();
 }
@@ -4005,13 +4028,15 @@ function showLevels(heroId) {
   overlay.querySelectorAll('.tile.field').forEach(t => t.addEventListener('mouseenter', () => { const i = opts().indexOf(t); if (i >= 0) { sel = i; highlight(); } }));
   const box = overlay.querySelector('#fieldInfo');
   if (box && !isPhone()) { let hMax = 0; LEVELS.forEach((L, i) => { box.innerHTML = fieldDetails(L, i, heroId); wcify(box); hMax = Math.max(hMax, box.offsetHeight); }); box.innerHTML = ''; delete box.dataset.level; box.style.boxSizing = 'border-box'; box.style.minHeight = hMax + 'px'; }
-  const start = A.demo ? LEVELS.findIndex(L => L.id === DEMO.level) : Math.min(meta.unlocked, LEVELS.length - 1);
+  const lastI = meta.last ? LEVELS.findIndex(L => L.id === meta.last.level) : -1;   // the battlefield you played last, if it's open
+  const start = A.demo ? LEVELS.findIndex(L => L.id === DEMO.level) : lastI >= 0 && levelOpen(lastI) ? lastI : Math.min(meta.unlocked, LEVELS.length - 1);
   sel = Math.max(0, opts().findIndex(o => o.dataset.act === 'field' && o.dataset.level === LEVELS[start].id)); highlight(); fitPanel();
 }
 const OPT_DEFS = {
   speed: { label: 'Game speed', vals: SPEEDS, fmt: speedName },
   music: { label: 'Music volume', vals: [0, 0.2, 0.4, 0.6, 0.8, 1], fmt: v => Math.round(v * 100) + '%' },
   sfx: { label: 'Sound volume', vals: [0, 0.2, 0.4, 0.6, 0.8, 1], fmt: v => Math.round(v * 100) + '%' },
+  voice: { label: 'Voice volume', vals: [0, 0.2, 0.4, 0.6, 0.8, 1], fmt: v => Math.round(v * 100) + '%' },
   nums: { label: 'Damage numbers', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
   quickChest: { label: 'Chest animation', vals: [false, true], fmt: v => v ? 'Quick' : 'Full' },
   ui: { label: 'Interface size', vals: [0.8, 1, 1.25], fmt: v => v < 1 ? 'Small' : v > 1 ? 'Large' : 'Normal' },
@@ -4022,7 +4047,7 @@ const OPT_DEFS = {
 function changeOpt(k) {
   const d = OPT_DEFS[k], i = d.vals.indexOf(cfg.opts[k]);
   cfg.opts[k] = d.vals[(i + 1) % d.vals.length]; saveCfg();
-  if (k === 'music') musicVolume(); if (k === 'sfx') sfx('s_hit', 0);
+  if (k === 'music') musicVolume(); if (k === 'sfx') sfx('s_hit', 0); if (k === 'voice') heroVoice('yes', 1, (G && G.heroId) || store.get('tos_hero', 'lothar'));
 }
 /* ---------- Book of War: everything you can find, and how evolutions are made ----------
    Evolution recipes stay hidden until you've made one; once you've maxed a weapon, its partner passive is named. */
@@ -4471,6 +4496,7 @@ function endRun(won) {
     ${unlocked || G.newHeroes.length ? `<h3 class="chestgold">Unlocked</h3>${[unlocked && `New battlefield: ${unlocked}`, ...G.newHeroes.filter(id => !HEROES[id].secret).map(id => `New hero: ${HEROES[id].name}`),
       G.newHeroes.includes('peasant') && 'Someone has been watching from the woodpile. Secret heroes: the Peasant and the Peon!',
       G.newHeroes.includes('deathwing') && 'Deathwing has fallen, and now he answers to you. Secret hero: Deathwing!'].filter(Boolean).map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}` : ''}
+    ${deathRecap()}
     ${fortNews().map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}
     ${nextUp().map(t => `<p class="help nextup">${t}</p>`).join('')}</div><div class="endr">${runBreakdown()}</div></div>
     <div class="opts endopts"><button class="opt" data-act="retry">Retry</button><button class="opt" data-act="choose">Change hero</button><button class="opt" data-act="runlog">Run log</button><button class="opt" data-act="quit" data-back>Title screen</button></div>`);
@@ -4909,7 +4935,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
