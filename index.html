@@ -7,6 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Tides of Survival</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
@@ -1114,7 +1118,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.12.0', BUILD = '2733844 2026-11-19';
+const VERSION = '0.12.1', BUILD = '6627d91 2026-11-19';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -2249,7 +2253,7 @@ function newRun(heroId, levelId, seed) {
   // Starting afresh from the title while an unfinished run is saved: keep the gold that run had collected.
   if (!G && seed == null) { const old = store.get(RUN_KEY, null); if (old && old.gold) { meta.gold += old.gold; saveMeta(); } }
   store.del(RUN_KEY);
-  store.set('tos_hero', heroId); meta.last = { hero: heroId, level: LV.id }; saveMeta();
+  store.set('tos_hero', heroId); meta.last = { hero: heroId, level: LV.id }; saveMeta(); updateHomeIcon();
   applyCursor(HD.side === 'Horde' ? 'orc' : 'human');
   G = { heroId, HD, LV, seed,
     t: 0, kills: 0, spawnAcc: 0, bossN: 0, eliteNext: PACE.elite, eliteN: 0, final: false, swarmNext: 95, pending: 0, state: 'play', banner: null,
@@ -2261,7 +2265,7 @@ function newRun(heroId, levelId, seed) {
   if (typeof startLevel === 'function') startLevel();
   ensureAudio(); sfx('s_start'); playMusic('battle'); heroVoice('ready', 1);
   hideMenu(); showHudBtns(true);
-  if (coarse() && (meta.touchHints = (meta.touchHints || 0) + 1) <= 3) { G.banner = { text: 'Touch and drag anywhere to move', t: 4 }; saveMeta(); }   // the first few runs on a touch screen
+  if (coarse() && (meta.touchHints = (meta.touchHints || 0) + 1) <= 3) { G.banner = { text: 'Touch and drag anywhere to move', t: 4, hint: true }; saveMeta(); }   // the first few runs on a touch screen
   else if (!coarse() && (meta.ctrlHints = (meta.ctrlHints || 0) + 1) <= 5) { G.ctrlHint = 9; saveMeta(); }   // the first few runs: the controls, along the bottom
 }
 function addItem(kind, id) {
@@ -2336,7 +2340,8 @@ function terrainChunk(T, cx, cy) {
   return c;
 }
 // Is the world point blocked? Units walk on half-tile cells (16 px).
-function solidAt(x, y) { const T = G && G.terrain; if (!T) return false; return T.blk[tmod(Math.floor(y / 16), TM) * TM + tmod(Math.floor(x / 16), TM)] !== 0; }
+// Called thousands of times a frame: the map is 256 half-tiles square, so wrap with a mask rather than tmod.
+function solidAt(x, y) { const T = G && G.terrain; if (!T) return false; return T.blk[((Math.floor(y / 16) & 255) << 8) | (Math.floor(x / 16) & 255)] !== 0; }
 // A destroyed building leaves open ground you can walk over.
 function clearBuilding(c, idx) {
   const T = G && G.terrain, b = c.blds[idx]; if (!T || !b) return;
@@ -2396,7 +2401,7 @@ function drawMinimap() {
 /* ---------- the Dark Portal ---------- */
 // The Portal stands in its own clearing. Near it, troops pour through, faster and in bigger groups the longer
 // you stay (heat); walk away and it cools. Troops from the Portal are worth half as much experience again.
-const PORTAL = { near: 520, active: 950, every: 4.5, ramp: 40, cool: 2, max: 5, xp: 1.5, surge: 60 };
+const PORTAL = { near: 520, active: 950, every: 4.5, ramp: 40, cool: 2, max: 5, xp: 1.5, surge: 60, alive: 120 };   // alive: most of its troops on the field at once
 function portalPos() {
   const p = G.terrain && G.terrain.portal; if (!p) return null;
   const P = TN * 32, bx = p.tx * 32 + 64, by = p.ty * 32 + 64, h = G.hero;
@@ -2415,7 +2420,8 @@ function updatePortal(dt) {
   if ((P.spawnT -= dt) > 0) return;
   P.spawnT = PORTAL.every / (1 + P.heat / PORTAL.ramp);
   const n = Math.min(PORTAL.max, 1 + Math.floor(P.heat / 45)), t = Math.min(G.t, RUN_LEN);
-  for (let i = 0; i < n && G.enemies.length < 330; i++) {
+  const from = G.enemies.filter(e => e.portal && !e.dead).length;
+  for (let i = 0; i < n && G.enemies.length < 330 && from + i < PORTAL.alive; i++) {
     const e = spawnEnemy(pickType(t), at.x + rnd(-56, 56), at.y + 84 + rnd(0, 26));   // out of the Portal's mouth
     if (e) { e.xp *= PORTAL.xp; e.portal = true; }
   }
@@ -2698,7 +2704,7 @@ const earlyK = t => t < EARLY.until ? 1 + EARLY.spawn * (1 - t / EARLY.until) : 
 // While a boss (not the final one) is on the field, the army arrives more slowly, so the fight is with him.
 const BOSSFIGHT = { spawn: 0.6 };
 // How close enemies may crowd each other (1 is touching): a little more room makes crowds easier to read and to kite.
-const SPACING = 0.95;
+const SPACING = 0.95, SEP_MAX = 6;
 // After 8:00 the base toughness and numbers grow more slowly, so a 20-minute run ends about as hard as a 15-minute
 // run used to (the extra minutes bring new kinds of enemy rather than ever-bigger numbers).
 const STRETCH = { from: 480, rate: 0.7 };
@@ -2786,6 +2792,7 @@ function banner(text, icon) { G.banner = { text, icon, t: 1.5 }; }
 const TIPS = { runs: 3 };
 function tip(key, text) {
   if (!cfg.opts.tips) return;
+  if (G.banner && G.banner.hint && G.banner.t > 0) return;   // never over the first-run controls hint: the tip comes up next time
   const seen = (meta.tips ||= {}), run = (G.tipRun ||= {});
   if (!run[key]) { if ((seen[key] || 0) >= TIPS.runs) return; run[key] = true; seen[key] = (seen[key] || 0) + 1; saveMeta(); }
   banner(text);
@@ -3329,10 +3336,11 @@ function updateEnemies(dt) {
     } else { e.x += vx * dt + e.kx * dt; e.y += vy * dt + e.ky * dt; }
     const damp = Math.max(0, 1 - dt * 9); e.kx *= damp; e.ky *= damp;
     e.dir = dirOf(dx, dy);
+    let pushes = 0;   // in a pile-up, a few nudges a frame are plenty: more only costs time (the Portal's crowds)
     if (!e.fly) query(e.x, e.y, e.r * 2.2, o => {   // fliers pass over everyone
-      if (o === e || o.fly || o.ship) return;
+      if (o === e || o.fly || o.ship || pushes >= SEP_MAX) return;
       const sx = e.x - o.x, sy = e.y - o.y, dd = sx * sx + sy * sy, rr = (e.r + o.r) * SPACING;
-      if (dd < rr * rr && dd > 0.0001) { const dl = Math.sqrt(dd), p = (rr - dl) * 0.25, px = e.x + sx / dl * p, py = e.y + sy / dl * p; if (e.free || !G.terrain || !footBlocked(px, py, e.r * 0.5) || footBlocked(e.x, e.y, e.r * 0.5)) { e.x = px; e.y = py; } }
+      if (dd < rr * rr && dd > 0.0001) { pushes++; const dl = Math.sqrt(dd), p = (rr - dl) * 0.25, px = e.x + sx / dl * p, py = e.y + sy / dl * p; if (e.free || !G.terrain || !footBlocked(px, py, e.r * 0.5) || footBlocked(e.x, e.y, e.r * 0.5)) { e.x = px; e.y = py; } }
     });
     if (d < e.r + 7 && e.atkT <= 0) { hurtHero(e.dmg * (e.charge && e.charge.phase === 'go' ? 1.5 : 1), e.boss ? 'boss' : e.type); e.atkT = e.boss ? 1.4 : 1.0; e.swing = SWING; }   // bosses swing more slowly: a chance to break away
     if (d > far && e.type !== 'boss') { // wrap stragglers back in front of the hero
@@ -3885,6 +3893,11 @@ function drawHudSafe() {
   if (t) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W0, t); }
   ctx.save(); ctx.translate(l, t); ctx.scale(k, k); W = (W0 - l - r) / k; H = (H0 - t - b) / k;   // the Interface size setting
   try { drawHud(); } finally { W = W0; H = H0; ctx.restore(); }
+  // Below the hero bar, the home indicator's strip: carry the bar's stone down to the bottom edge, so the map doesn't
+  // show through under it (Jon, iPhone 11). Only the bar's contents keep clear of the home indicator.
+  if (b && G) { const ui = A.ui && A.ui[G.HD.side];
+    if (ui && (W0 - l - r) / k >= 320) { const y = H0 - b - 1; ctx.fillStyle = '#000'; ctx.fillRect(0, y, W0, b + 1); for (let x = 0; x < W0; x += ui.panel.width) ctx.drawImage(ui.panel, 0, 0, ui.panel.width, Math.min(ui.panel.height, b + 1), x, y, ui.panel.width, Math.min(ui.panel.height, b + 1)); }
+    else { ctx.fillStyle = '#000'; ctx.fillRect(0, H0 - b, W0, b); } }
   drawJoy();
 }
 function drawJoy() {   // the touch stick, where your thumb went down
@@ -4173,8 +4186,43 @@ overlay.addEventListener('click', e => {
 pauseBtn.addEventListener('click', () => pauseRun());
 speedBtn.addEventListener('click', () => cycleSpeed());
 
+// The home screen icon: "ToS" in the game's own lettering (or the hero you last played), drawn from your own game files when
+// you add the game to your home screen (iOS reads the page's apple-touch-icon then). Nothing of Blizzard's ships with
+// the game: before any files load, the original icon in icons/ stands in (Jon picked this, 20 November 2026).
+let homeIconFor = '';
+function updateHomeIcon() {
+  const id = (meta.last && meta.last.hero) || store.get('tos_hero') || 'lothar', pic = A.icons && A.icons[id], hd = HEROES[id];
+  const link = document.querySelector('link[rel="apple-touch-icon"]'); if (!hd || !link || (HOME_ICON === 'hero' && !pic) || homeIconFor === id + HOME_ICON) return;
+  const c = HOME_ICON === 'tos' ? tosIcon(hd.side) : heroIcon(pic, hd.side); if (!c) return;
+  try { link.href = c.toDataURL('image/png'); homeIconFor = id + HOME_ICON; } catch (e) {}
+}
+let HOME_ICON = 'tos';   // Jon's pick (20 November 2026): "ToS" in Warcraft II's own menu lettering, blue for Alliance, red for Horde; 'hero' draws the last hero's portrait instead
+function iconBack(side) {
+  const S = 180, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  const horde = side === 'Horde', g = x.createRadialGradient(S / 2, S * 0.42, 10, S / 2, S / 2, S * 0.75);
+  g.addColorStop(0, horde ? '#5a1d12' : '#1d3d6e'); g.addColorStop(1, horde ? '#170604' : '#050d1c'); x.fillStyle = g; x.fillRect(0, 0, S, S);
+  return { c, x, S };
+}
+function tosIcon(side) {
+  const f = fonts.title || fonts.large; if (!f) return null;
+  const { c, x, S } = iconBack(side), w = fontWidth(f, 'ToS'), t = document.createElement('canvas'); t.width = Math.max(1, w); t.height = f.mh;
+  fontDraw(t.getContext('2d'), f, 'ToS', 0, 0, 'yellow');
+  const k = Math.floor(150 / t.width) || 1, dw = t.width * k, dh = t.height * k;
+  x.fillStyle = '#c9a65a'; x.fillRect(10, 10, S - 20, 4); x.fillRect(10, S - 14, S - 20, 4);
+  x.drawImage(t, Math.round((S - dw) / 2), Math.round((S - dh) / 2), dw, dh);
+  return c;
+}
+function heroIcon(pic, side) {
+  const { c, x, S } = iconBack(side);
+  const k = Math.floor(140 / pic.width), w = pic.width * k, h = pic.height * k, px = Math.round((S - w) / 2), py = Math.round((S - h) / 2);
+  const bevel = (bx, by, bw, bh, t, lite, dark) => { x.fillStyle = dark; x.fillRect(bx, by, bw, bh); x.fillStyle = lite; x.fillRect(bx, by, bw - t, t); x.fillRect(bx, by, t, bh - t); };
+  x.fillStyle = '#000'; x.fillRect(px - 10, py - 10, w + 20, h + 20);
+  bevel(px - 8, py - 8, w + 16, h + 16, 4, '#ffe089', '#7a5410'); x.fillStyle = '#c9a65a'; x.fillRect(px - 4, py - 4, w + 8, h + 8);
+  x.fillStyle = '#000'; x.fillRect(px - 1, py - 1, w + 2, h + 2); x.drawImage(pic, px, py, w, h);
+  return c;
+}
 function showTitle() {
-  impOpen = false;
+  impOpen = false; updateHomeIcon();
   if (!caughtUp) { caughtUp = true; const got = meta.ladder === 2 ? [] : catchUpUnlocks(); if (meta.ladder !== 2) { meta.ladder = 2; saveMeta(); }   // once, for saves from before the easier goals
     if (got.length) { showHudBtns(false); playMusic('menu'); showMenu(`<h2>New unlocks</h2><p class="sub">The goals for heroes and battlefields are easier now, and your past runs already meet some of them.</p><p>Unlocked: <b>${got.join(', ')}</b>.</p><div class="opts"><button class="opt" data-act="title" data-back>Continue</button></div>`); return; } }
   showHudBtns(false); playMusic('menu');
@@ -5112,14 +5160,24 @@ let SAFE = { t: 0, r: 0, b: 0, l: 0 }, safeOverride = null;
 const safeProbe = document.createElement('div');
 safeProbe.style.cssText = 'position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
 document.body.appendChild(safeProbe);
+// Launched from an iPhone's home screen, the page can report a height that stops short of the home indicator,
+// leaving a black strip under the game. There, size the canvas to the whole screen instead.
+function viewSize() {
+  let w = innerWidth, h = Math.max(innerHeight, document.documentElement.clientHeight || 0);
+  if (navigator.standalone && screen.width && screen.height) { const tall = h >= w, sw = tall ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height), sh = tall ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height); if (Math.abs(sw - w) < 2 && sh > h) h = sh; }
+  return { w, h };
+}
 function resize() {
-  const dpr = window.devicePixelRatio || 1, pw = Math.floor(innerWidth * dpr), ph = Math.floor(innerHeight * dpr);
-  cv.width = pw; cv.height = ph; cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+  const v = viewSize(), dpr = window.devicePixelRatio || 1, pw = Math.floor(v.w * dpr), ph = Math.floor(v.h * dpr);
+  cv.width = pw; cv.height = ph; cv.style.width = v.w + 'px'; cv.style.height = v.h + 'px';
   SCALE = Math.max(1, Math.round(Math.min(pw, ph) / (Object.keys(A.sprites).length ? 420 : 250))); W = pw / SCALE; H = ph / SCALE;
   const cs = getComputedStyle(safeProbe), k = dpr / SCALE, px = v => Math.ceil((parseFloat(v) || 0) * k);
   SAFE = safeOverride ? { ...safeOverride } : { t: px(cs.paddingTop), r: px(cs.paddingRight), b: px(cs.paddingBottom), l: px(cs.paddingLeft) };
 }
 addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 300));
+if (window.visualViewport) visualViewport.addEventListener('resize', resize);
+addEventListener('load', () => setTimeout(resize, 300));   // iOS settles its home screen layout a moment after launch
 let last = performance.now();
 // Hide the pointer while playing; moving the mouse shows it for a moment so the pause button can be clicked.
 let curShownAt = -1e9;
@@ -5157,7 +5215,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
