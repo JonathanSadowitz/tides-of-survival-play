@@ -786,9 +786,9 @@ const ICON_ENTRY = 356, HERO_ICONS = { lothar: 32, uther: 34, alleria: 187, khad
 // Each level uses one of the game's tilesets: palette, megatiles, minitiles and tile table entries in MAINDAT.WAR.
 const LEVELS = [
   { id: 'forest', name: 'Elwynn Forest', blurb: 'Rolling forest and lakes. A good place to start.', ts: [2, 3, 4, 5], ground: '#34501f',
-    bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.35, forestLakes: 4, trees: 0.53, fine: 0.55, rocks: 0.9, dark: 0.3, camps: 0.75 }, hp: 1, mix: {} },
+    bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.35, forestLakes: 4, trees: 0.53, fine: 0.55, rocks: 0.9, dark: 0.3, camps: 0.75 }, hp: 1, late: 1.5, mix: {} },
   { id: 'winter', name: 'Alterac Mountains', blurb: 'Frozen lakes and snowbound pines. Tougher foes march here.', ts: [18, 19, 20, 21], ground: '#b9c4cc',
-    bld: { pal: 18, human: [134, 146, 169, 142, 144, 138, 150], orc: [135, 147, 170, 143, 145, 139, 151] }, sea: { human: [150, 152, 154], orc: [151, 153, 155] }, gen: { clearings: 20, rmin: 10, rmax: 17, lane: 1.2, loops: 0.4, lakes: 0.3, forestLakes: 3, trees: 0.53, rocks: 0.86, dark: 0.3, camps: 0.75 }, hp: 1.3, mix: { tank: 1.5 } },
+    bld: { pal: 18, human: [134, 146, 169, 142, 144, 138, 150], orc: [135, 147, 170, 143, 145, 139, 151] }, sea: { human: [150, 152, 154], orc: [151, 153, 155] }, gen: { clearings: 20, rmin: 10, rmax: 17, lane: 1.2, loops: 0.4, lakes: 0.3, forestLakes: 3, trees: 0.53, rocks: 0.86, dark: 0.3, camps: 0.75 }, hp: 1.45, mix: { tank: 1.5 } },   // hp was 1.3: no harder than Elwynn Forest for the bots (20 November 2026)
   { id: 'waste', name: 'Khaz Modan Wastes', blurb: 'Scorched badlands and rocky ridges. Swarms come thick and fast.', ts: [10, 11, 12, 13], ground: '#6b5434',
     bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1.1, loops: 0.45, lakes: 0.2, forestLakes: 2, trees: 0.55, rocks: 0.7, dark: 0.35, camps: 0.75 }, hp: 1.6, mix: { fast: 1.8 } },
   { id: 'swamp', name: 'Swamp of Sorrows', blurb: 'Murky water and twisted trees. Only the hardiest survive.', ts: [438, 439, 440, 441], ground: '#3f4a2a',
@@ -798,7 +798,7 @@ const LEVELS = [
     gen: { clearings: 20, rmin: 9, rmax: 14, lane: 1.1, loops: 0.45, lakes: 0.15, forestLakes: 1, trees: 0.54, rocks: 0.72, dark: 0.4, camps: 0.7, portal: { x: 26, y: 18, r: 15 } }, hp: 2.4, mix: { tank: 1.3, ranged: 1.2 } },
   { id: 'quel', name: "Quel'Thalas", blurb: 'The elves\' ancient forest: dense woods and narrow paths, with archers and trolls hiding among the trees.', ts: [2, 3, 4, 5], ground: '#2c4a1c',
     bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, ambush: { from: 45, every: 7, max: 7 },
-    gen: { clearings: 18, rmin: 7, rmax: 10, lane: 0.5, loops: 0.55, lakes: 0.25, forestLakes: 3, trees: 0.4, fine: 0.3, rocks: 0.93, dark: 0.35, camps: 0.75, pockets: true }, hp: 3.0, mix: { ranged: 1.4, fast: 1.2 } },
+    gen: { clearings: 18, rmin: 7, rmax: 10, lane: 0.5, loops: 0.55, lakes: 0.25, forestLakes: 3, trees: 0.4, fine: 0.3, rocks: 0.93, dark: 0.35, camps: 0.75, pockets: true }, hp: 2.5, mix: { ranged: 1.4, fast: 1.2 } },
 ];
 const UNLOCK_T = 600; // surviving 10 minutes, after a few runs there (FIELD_RUNS), unlocks the next level
 const UPGRADES = {
@@ -1118,7 +1118,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.12.1', BUILD = '6627d91 2026-11-19';
+const VERSION = '0.13.0', BUILD = '2b93392 2026-11-20';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1921,30 +1921,30 @@ function evoStats(id) {
 const HEROES = {
   lothar:  { name: 'Anduin Lothar', side: 'Alliance', unit: 'Knight', col: '#3f6fd1', start: 'sword', hp: 140, speed: 78, armour: 1,
              sig: 'Lion of Azeroth', sigDesc: '+15% damage and 1 armour.', might: 1.15 },
-  uther:   { name: 'Uther Lightbringer', side: 'Alliance', unit: 'Paladin', col: '#e6e2c8', start: 'aura', hp: 130, speed: 72, armour: 0,
-             sig: 'Holy Light', sigDesc: 'Heals 1 health every second.', regen: 1 },
+  uther:   { name: 'Uther Lightbringer', side: 'Alliance', unit: 'Paladin', col: '#e6e2c8', start: 'aura', hp: 130, speed: 72, armour: 1,   // was no armour and 1 health a second (20 November 2026)
+             sig: 'Holy Light', sigDesc: 'Heals 2 health every second.', regen: 2 },
   alleria: { name: 'Alleria Windrunner', side: 'Alliance', unit: 'Elven Archer', col: '#5fbf5a', start: 'arrows', hp: 90, speed: 84, armour: 0,
              sig: 'Eagle Eye', sigDesc: '10% faster attacks and +30% pickup range.', haste: 0.9, magnet: 1.3 },
   khadgar: { name: 'Khadgar', side: 'Alliance', unit: 'Mage', col: '#b06fe0', start: 'fireball', hp: 80, speed: 72, armour: 0,
              sig: 'Arcane Mastery', sigDesc: '+25% area of effect and 10% faster attacks.', area: 1.25, haste: 0.9 },
-  grom:    { name: 'Grom Hellscream', side: 'Horde', unit: 'Grunt', col: '#c0392b', start: 'cleave', hp: 150, speed: 72, armour: 0,
-             sig: 'Battle Fury', sigDesc: '+30% damage while below half health.', fury: true },
+  grom:    { name: 'Grom Hellscream', side: 'Horde', unit: 'Grunt', col: '#c0392b', start: 'cleave', hp: 165, speed: 72, armour: 1,   // was 150 health, no armour, +30% fury: the weakest hero for the bots (20 November 2026)
+             sig: 'Battle Fury', sigDesc: '+40% damage while below half health.', fury: true },
   zuljin:  { name: "Zul'jin", side: 'Horde', unit: 'Axethrower', col: '#3fb3a8', start: 'axes', hp: 100, speed: 82, armour: 0,
              sig: 'Troll Regeneration', sigDesc: 'Heals 0.8 health every second.', regen: 0.8 },
   chogall: { name: "Cho'gall", side: 'Horde', unit: 'Ogre-Mage', col: '#d07a2c', start: 'runes', hp: 170, speed: 62, armour: 1,
              sig: 'Bloodlust', sigDesc: '+20% damage and 1 armour, but slow.', might: 1.2 },
   teron:   { name: 'Teron Gorefiend', side: 'Horde', unit: 'Death Knight', col: '#6a8a6a', start: 'coil', hp: 100, speed: 76, armour: 0,
              sig: 'Unholy Hunger', sigDesc: 'Every kill heals 0.3 health.', killHeal: 0.3 },
-  danath:  { name: 'Danath Trollbane', side: 'Alliance', unit: 'Footman', col: '#5a7fb0', start: 'shield', hp: 150, speed: 72, armour: 1,
-             sig: 'Defender', sigDesc: 'Sturdy, with 1 armour; Shield Bash stuns what it hits.' },
+  danath:  { name: 'Danath Trollbane', side: 'Alliance', unit: 'Footman', col: '#5a7fb0', start: 'shield', hp: 160, speed: 72, armour: 2,   // was 150 health and 1 armour: the weakest hero for every bot (20 November 2026)
+             sig: 'Defender', sigDesc: 'Sturdy, with 2 armour; Shield Bash stuns what it hits.' },
   turalyon: { name: 'Turalyon', side: 'Alliance', unit: 'Paladin', col: '#f0e6a8', start: 'smite', hp: 130, speed: 74, armour: 1,
              sig: 'Holy Light', sigDesc: 'Once a minute, when you fall below 30% health, you heal back 40%.', holyLight: true },
   kurdran: { name: 'Kurdran Wildhammer', side: 'Alliance', unit: 'Gryphon Rider', col: '#8fb4d8', start: 'hammer', hp: 110, speed: 80, armour: 0, fly: true,
              sig: "Sky'ree", sigDesc: 'Rides his gryphon over trees and water.' },
   kargath: { name: 'Kargath Bladefist', side: 'Horde', unit: 'Grunt', col: '#a8443a', start: 'blades', hp: 140, speed: 78, armour: 0,
              sig: 'Blade Frenzy', sigDesc: 'Every kill speeds up your attacks for a few seconds, stacking up to +20%.', frenzy: true },
-  dentarg: { name: 'Dentarg', side: 'Horde', unit: 'Ogre-Mage', col: '#5a86c0', start: 'slam', hp: 170, speed: 60, armour: 1,
-             sig: 'Two Heads', sigDesc: '+25% area of effect; slow but very tough.', area: 1.25 },
+  dentarg: { name: 'Dentarg', side: 'Horde', unit: 'Ogre-Mage', col: '#5a86c0', start: 'slam', hp: 145, speed: 60, armour: 1,   // was 170 health and +25% area: far ahead of the other heroes for the bots (20 November 2026)
+             sig: 'Two Heads', sigDesc: '+15% area of effect; slow but tough.', area: 1.15 },
   guldan:  { name: "Gul'dan", side: 'Horde', unit: 'Death Knight', col: '#4c8a3a', start: 'whirl', hp: 100, speed: 74, armour: 0,
              sig: 'Dark Pact', sigDesc: '+15% damage and +15% area of effect.', might: 1.15, area: 1.15 },
   // Deathwing: unlocked by slaying him as the final boss.
@@ -2256,7 +2256,7 @@ function newRun(heroId, levelId, seed) {
   store.set('tos_hero', heroId); meta.last = { hero: heroId, level: LV.id }; saveMeta(); updateHomeIcon();
   applyCursor(HD.side === 'Horde' ? 'orc' : 'human');
   G = { heroId, HD, LV, seed,
-    t: 0, kills: 0, spawnAcc: 0, bossN: 0, eliteNext: PACE.elite, eliteN: 0, final: false, swarmNext: 95, pending: 0, state: 'play', banner: null,
+    t: 0, kills: 0, spawnAcc: 0, bossN: 0, eliteNext: PACE.elite + graceFor() * GRACE.pace, grace: graceFor(), eliteN: 0, final: false, swarmNext: 95, pending: 0, state: 'play', banner: null,
     hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
     weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], marks: [], hv: [0, 0], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: [], buffs: {}, stats: { dmg: 0, hp: 0, next: 60, mins: [], lastHit: null }
   };
@@ -2694,7 +2694,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 /* ---------- spawning ---------- */
 // The late game: from 8:00 enemies grow tougher faster, and in the last 3:00 they come thicker and hit harder.
 // Tuned with scripts/balance.js so a full Armoury can win, but has to work for it (docs/TESTING.md).
-const LATE = { from: 640, hp: 2.6, push: 960, spawn: 1.4, dmg: 0.55 };   // scaled to 20-minute runs
+const LATE = { from: 700, hp: 1.4, push: 960, spawn: 0.7, dmg: 0 };   // was from 640, hp 2.6, spawn 1.4, dmg 0.55: experts with a full Armoury reached 20:00 in only a fifth of runs (20 November 2026; Jon: "experts should be able to finish a map")
 // The middle of a run: from 3:00 the army grows tougher and thicker, reaching full strength at 7:00 (tuned to a
 // player who has finished Vampire Survivors; the first three minutes stay gentle for newcomers).
 const MID = { from: 180, to: 540, hp: 0.6, spawn: 0.35 };   // softened 18 November 2026: Jon's runs hit a wall at 5:00
@@ -2712,9 +2712,16 @@ const paceT = t => t <= STRETCH.from ? t : STRETCH.from + (t - STRETCH.from) * S
 const midK = t => Math.max(0, Math.min(1, (t - MID.from) / (MID.to - MID.from)));
 // When each kind of enemy first appears, in seconds.
 const PACE = { scout: 120, siege: 210, elite: 180, flyer: 270, caster: 480, daemon: 720, flock: 600 };
+// A new player's grace (20 November 2026, from the newcomer bot: on a fresh save 61% of runs ended before 4:00, killed
+// by the siege engines, missiles and elites that arrive from 3:00). With little of the Armoury bought, those arrive up to a
+// minute later and enemies hit up to a third softer in the first six minutes. It fades out as the Armoury fills: gone
+// by 30% of it (Jon's save is past that, so his game doesn't change).
+const GRACE = { upTo: 0.3, pace: 60, dmg: 0.33, until: 360 };
+function graceFor() { let n = 0, max = 0; for (const [id, U] of Object.entries(UPGRADES)) { n += meta.ups[id] || 0; max += U.max; } return Math.max(0, 1 - n / max / GRACE.upTo); }
+const late = (k, t) => t > PACE[k] + (G.grace || 0) * GRACE.pace;   // has this kind of enemy arrived yet
 const FINAL = { spawn: 0.25, dmg: 0.6, hp: 1 };   // hp: the final boss's toughness
 const BOSS_HIT = { mark: 0.45, final: 0.5, spd: 0.8 };   // spd: the final boss flies over trees and water, so he's a little slower   // a barrage circle hurts less than a bite; the final boss bites a little softer than his size suggests   // when the final boss comes the army falls back, then trickles in again more thinly
-const lateHp = t => t > LATE.from ? 1 + LATE.hp * ((t - LATE.from) / (RUN_LEN - LATE.from)) ** 1.4 : 1;
+const lateHp = t => t > LATE.from ? 1 + LATE.hp * (G.LV.late || 1) * ((t - LATE.from) / (RUN_LEN - LATE.from)) ** 1.4 : 1;   // LV.late: a battlefield's own late-game steepness
 const pushK = t => t > LATE.push ? (t - LATE.push) / (RUN_LEN - LATE.push) : 0;
 const BOSS_K = [0.35, 0.75, 0.95];   // the 5:00, 10:00 and 15:00 bosses' toughness
 // The sprite for an enemy role on the side you're fighting, falling back to a stand-in (the demo lacks some units).
@@ -2732,7 +2739,7 @@ function spawnEnemy(type, x, y, boss) {
   const bossK = boss ? [BOSS_K[0], BOSS_K[1], BOSS_K[2], FINAL.hp][boss.n - 1] : 1;
   const tp = paceT(t), hpMul = (1 + tp / 240 + (tp / 360) ** 2) * G.LV.hp * (0.6 + 0.4 * EASE(t)) * bossK * lateHp(t) * (1 + MID.hp * midK(t)); G.stats.hp += T.hp * hpMul;
   const e = { type, role: boss ? 'boss' + boss.n : type, sprite: boss && boss.sprite, scale: boss && boss.scale, x, y, hp: T.hp * hpMul, maxHp: T.hp * hpMul, spd: T.spd * (1 + Math.min(0.15, t / 4000)) * rnd(0.92, 1.08),
-    dmg: T.dmg * (1 + tp / 600) * (0.6 + 0.4 * EASE(t)) * (bossK < 1 ? 0.7 : 1) * (boss && boss.final ? BOSS_HIT.final : G.final ? FINAL.dmg : 1) * (1 + LATE.dmg * pushK(t)), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0,
+    dmg: T.dmg * (1 + tp / 600) * (0.6 + 0.4 * EASE(t)) * (bossK < 1 ? 0.7 : 1) * (boss && boss.final ? BOSS_HIT.final : G.final ? FINAL.dmg : 1) * (1 + LATE.dmg * pushK(t)) * (1 - GRACE.dmg * (G.grace || 0) * Math.max(0, 1 - t / GRACE.until)), r: T.r, xp: T.xp, range: T.range, atkT: 0, swing: 0, flash: 0, kx: 0, ky: 0,
     shootT: rnd(1, 3), sigT: 3, dir: 4, t: rnd(0, 5), fly: !!(T.fly || (boss && boss.fly && A.sprites[boss.sprite])), free, elite: !!T.elite };
   if (boss) { e.boss = boss.n; e.bid = boss.id; e.sig = boss.sig; e.drop = boss.drop; if (boss.final) e.spd *= BOSS_HIT.spd; e.final = !!boss.final; e.minion = boss.minion; e.name = bossName(boss); }
   if (e.elite || boss) { seeFoe(boss ? 'b:' + boss.id : type); if (e.elite) banner(`An elite ${FOES[type][foeSide()]} has joined the fight!`); }
@@ -2759,7 +2766,7 @@ const upShare = t => Math.max(0, Math.min(1, (t - UPGRADE.from) / (UPGRADE.to - 
 function upgrade(k, t) { const u = { tank: 'tank_up', ranged: 'ranged_up' }[k]; return u && hasFoe(u) && Math.random() < upShare(t) ? u : k; }
 function pickType(t) {
   const w = { basic: 1, fast: t > 40 ? 0.35 : 0, ranged: t > 210 ? Math.min(0.25, 0.1 + (t - 210) / 1400) : 0, tank: t > 240 ? Math.min(0.4, 0.05 + (t - 240) / 1200) : 0,   // archers and ogres ease in (18 November 2026)
-    scout: t > PACE.scout ? 0.1 : 0, flyer: t > PACE.flyer ? Math.min(0.14, 0.04 + (t - PACE.flyer) / 4000) : 0, siege: t > PACE.siege ? 0.05 : 0 };
+    scout: late('scout', t) ? 0.1 : 0, flyer: t > PACE.flyer ? Math.min(0.14, 0.04 + (t - PACE.flyer) / 4000) : 0, siege: late('siege', t) ? 0.05 : 0 };
   for (const k in w) w[k] *= G.LV.mix[k] || 1;
   w.caster = t > PACE.caster ? Math.min(0.15, 0.05 + (t - PACE.caster) / 6000) : 0;
   w.daemon = t > PACE.daemon ? 0.025 : 0;
@@ -2805,7 +2812,7 @@ function hitEnemy(e, dmg, kx = 0, ky = 0) {
   if (e.dead) return;
   if (e.ship && !RANGED_W.has(G.curW)) return;
   const h = G.hero;
-  const dealt = dmg * h.might * (G.HD.fury && h.hp < h.maxHp / 2 ? 1.3 : 1);
+  const dealt = dmg * h.might * (G.HD.fury && h.hp < h.maxHp / 2 ? 1.4 : 1);
   G.stats.dmg += Math.min(dealt, e.hp); if (G.lg) G.lg.dmg += Math.min(dealt, e.hp);
   if (!e.static) { const w = G.curW || 'other'; (G.wdmg ||= {})[w] = (G.wdmg[w] || 0) + Math.min(dealt, Math.max(0, e.hp)); }   // per weapon, for the end of the run
   e.hp -= dealt; e.flash = 0.1;
@@ -5215,7 +5222,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
