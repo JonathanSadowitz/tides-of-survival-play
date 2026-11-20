@@ -194,7 +194,7 @@
   .breakdown h3{margin:0 0 4px;color:var(--gold);font-size:15px} .wrow{display:grid;grid-template-columns:9em 1fr 9em;gap:6px;align-items:center;font-size:13px;margin:2px 0}
   .wbar{height:8px;background:#16100a;border:1px solid #000} .wbar i{display:block;height:100%;background:linear-gradient(#ffd27a,#b8862a)}
   .hpgraph{width:100%;height:60px;background:#16100a;border:1px solid #000;margin-top:8px} .hpaxis{display:flex;justify-content:space-between;font-size:13px;color:#c9b88f}
-  .savedago{font-size:12px;color:#e8d9b0;text-align:center;margin:-4px 0 4px;text-shadow:0 1px 2px #000}
+  .wcstage button.opt.two{flex-direction:column;gap:1px} .wcstage button.opt .ago{display:block;opacity:.85;font-size:9px;line-height:1}
   .hinfo{margin-top:8px;border:1px solid var(--gold2);border-radius:6px;padding:8px 12px;background:rgba(0,0,0,.25);min-height:104px;text-align:left}
   .hinfo-in{display:flex;gap:12px;align-items:flex-start} .hinfo .nm{color:var(--gold);font-size:18px} .hinfo .ds{display:block;font-size:15px;margin-top:4px}
   .hinfo .opts{margin-top:8px;justify-content:flex-start}
@@ -1116,9 +1116,9 @@ function speedIcon() {
   speedBtn.setAttribute('aria-label', `Game speed: ${speedName(cfg.opts.speed)}`); speedBtn.title = `Game speed: ${speedName(cfg.opts.speed)}`;
 }
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
-function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
+function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.13.0', BUILD = '2b93392 2026-11-20';
+const VERSION = '0.14.0', BUILD = '651e3b1 2026-11-20';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1642,14 +1642,14 @@ function fitStage() {
   const tall = innerHeight > innerWidth * 1.15, z = tall ? innerWidth / 640 : Math.min(innerWidth / 640, innerHeight / 480);
   st.style.zoom = z; st.classList.toggle('tall', tall); st.style.height = tall ? innerHeight / z + 'px' : '';
   const btns = st.querySelector('.wcbtns'), note = st.querySelector('.note'), ver = st.querySelector('.ver'); if (!btns) return;
-  const n = btns.children.length, bh = n * 28 + (n - 1) * 7;
+  const n = btns.children.length, gap = n >= 7 && !tall ? 3 : 7, bh = n * 28 + (n - 1) * gap; btns.style.gap = gap + 'px';   // seven buttons (a saved run to continue) on a phone held sideways: closer together, so each stays big enough to tap
   let k = Math.min(2.4, Math.max(1, 41 / (28 * z))), top;
   if (tall) {   // the art, then the buttons under it
     const sh = innerHeight / z, nh = note ? 80 : 0, room = sh - 490 - 60 - nh; k = Math.max(1, Math.min(k, room / bh));
     const off = Math.max(0, Math.round((sh - (480 + 30 + bh * k + nh)) / 2));   // art and buttons together, centred
     top = off + 510; st.querySelector('img.bg').style.top = off + 'px';
   } else {
-    st.querySelector('img.bg').style.top = ''; k = Math.max(1, Math.min(k, 255 / bh)); top = k > 1 ? Math.max(185, (note ? 400 : 440) - bh * k) : note ? Math.min(236, 424 - bh) : 236; }   // leave room for the note under the buttons
+    st.querySelector('img.bg').style.top = ''; k = Math.max(1, Math.min(k, (n >= 7 ? 275 : 255) / bh)); top = k > 1 ? Math.max(n >= 7 ? 165 : 185, (note ? 400 : 440) - bh * k) : note ? Math.min(236, 424 - bh) : 236; }   // leave room for the note under the buttons
   Object.assign(btns.style, { transform: k > 1 ? `scale(${k})` : '', transformOrigin: 'top left', left: Math.round(315 - 112 * k) + 'px', top: top + 'px' });
   const end = top + bh * k;
   if (note) Object.assign(note.style, tall ? { top: end + 24 + 'px', left: '60px', width: '520px', fontSize: '22px', color: '#e8d9b0' }
@@ -2210,12 +2210,13 @@ function snapRun() {
   const h = G.hero;
   return { v: 1, hero: G.heroId, level: G.LV.id, seed: G.terrain.seed, t: G.t, kills: G.kills, gold: G.gold,
     lab: G.labour || 0, bp: G.bossPlan || null, bossN: G.bossN || 0, eliteNext: G.eliteNext, eliteN: G.eliteN, swarmNext: G.swarmNext,
-    bs: G.enemies.filter(e => e.boss && e.hp > 0).map(b => ({ n: b.boss, f: b.hp / b.maxHp })),   // every boss still alive, as wounded as he is revives: G.revives, rerolls: G.rerolls,
+    bs: G.enemies.filter(e => e.boss && e.hp > 0).map(b => ({ n: b.boss, f: b.hp / b.maxHp })),   // every boss still alive, as wounded as he is
+    revives: G.revives, rerolls: G.rerolls,   // lost from saves 0.11.3 to 0.13.0: a comment swallowed them
     pending: G.pending + (G.state === 'levelup' ? 1 : 0), chests: G.chestQueue,
     h: { x: h.x, y: h.y, hp: h.hp, xp: h.xp, level: h.level, next: h.next },
     w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), e: Object.keys(G.weapons).filter(k => G.weapons[k].evo), p: G.passives, sh: G.hero.shield || 0,
     fort: G.fort ? { s: G.fort.state, at: G.fort.freedAt ?? null } : null, ab: G.aboard ? G.boats.indexOf(G.aboard) : -1,
-    camps: [...G.camps.values()].filter(c => c.dead.size || c.chest).map(c => ({ key: c.key, ox: c.ox, oy: c.oy, dead: [...c.dead], chest: c.chest })) };
+    camps: [...G.camps.values()].filter(c => c.dead.size || c.chest || (c.wallDead && c.wallDead.size)).map(c => ({ key: c.key, ox: c.ox, oy: c.oy, dead: [...c.dead], chest: c.chest, wd: c.wallDead ? [...c.wallDead] : [] })) };
 }
 function saveRun() { const s = snapRun(); if (s) { s.at = Date.now(); store.set(RUN_KEY, s); } }
 // "saved 5 minutes ago", for the Continue button.
@@ -2231,7 +2232,7 @@ function continueRun() {
   G.weapons = {}; for (const [k, l] of Object.entries(s.w || {})) if (WEAPONS[k]) G.weapons[k] = { lvl: l, cd: 0.3, tick: 0, evo: (s.e || []).includes(k) && !!EVOS[k] };
   G.passives = Object.fromEntries(Object.entries(s.p || {}).filter(([k]) => PASSIVES[k]));   // drops retired passives
   // Saves from before the named bosses counted bosses due every 4 minutes from 5:00; they map onto the new 5, 10, 15.
-  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(PACE.elite, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives, rerolls: s.rerolls, pending: s.pending || 0, chestQueue: s.chests || [] });
+  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(PACE.elite, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives ?? up('revival'), rerolls: s.rerolls ?? 1 + up('reroll'), pending: s.pending || 0, chestQueue: s.chests || [] });
   Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next }); G.labour = s.lab || 0; G.bossPlan = s.bp && s.bp.length === BOSSES.length ? s.bp : null;   // runs saved before 20-minute runs plan again
   recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
   for (const b of [].concat(s.bs || [])) if (BOSSES[b.n - 1]) spawnBoss(b.n, b.f);   // older saves kept one boss, not a list
@@ -2239,9 +2240,10 @@ function continueRun() {
   if (G.fort && s.fort) { G.fort.state = s.fort.s; G.fort.freedAt = s.fort.at; G.fort.told = true; }   // the boss you were fighting comes back, wounded as he was
   for (const c of s.camps || []) {
     const camp = G.terrain.camps.find(x => x.id === +c.key.split(':')[0]); if (!camp) continue;
-    G.camps.set(c.key, { key: c.key, c: camp, ox: c.ox, oy: c.oy, dead: new Set(c.dead), chest: c.chest, ents: [], spawnT: 2, live: false, warned: true });
+    G.camps.set(c.key, { key: c.key, c: camp, ox: c.ox, oy: c.oy, dead: new Set(c.dead), wallDead: new Set(c.wd || []), chest: c.chest, ents: [], spawnT: 2, live: false, warned: true });
     if (camp.enemy) for (const i of c.dead) clearBuilding(camp, i);
   }
+  if (G.log) { G.log.cont = Math.round(s.t); G.log.s.length = 0; }   // the log covers only the part played after continuing
   saveRun(); pauseRun(true);
 }
 addEventListener('pagehide', saveRun);
@@ -2462,7 +2464,7 @@ function updateAmbusher(e, d, dx, dy) {
 
 /* ---------- camps ---------- */
 function startLevel() {
-  G.terrain = null; G.camps = new Map(); G.props = [];
+  G.terrain = null; G.camps = new Map(); G.props = []; G.rubble = [];
   if (!loadTileset(G.LV)) return;
   try { G.terrain = buildTerrain(G.LV, G.seed ?? SEED_PARAM ?? ((Math.random() * 1e9) | 0), G.HD.side === 'Horde' ? 'human' : 'orc'); } catch (e) { console.error(e); G.terrain = null; }
   setupFortress();
@@ -2595,6 +2597,75 @@ function updateCamps(dt) {
     } else if (st && st.live && d > 1300) deactivateCamp(st);
   }
 }
+/* ---------- fortress walls ----------
+   A ring of Warcraft II wall round the fortress's compound (Jon, 20 November 2026), so you can tell at a glance it's the
+   one to clear, with a few gaps for gates. Only the buildings inside count for freeing the prisoner; the walls are
+   optional. A section is a tenth as tough as a building, as in Warcraft II (40 hit points against a farm's 400), shows
+   damage below half health and falls to rubble you can walk over. The art is the tileset's own wall tiles: records
+   128 + shape for human walls and 144 + shape for orc walls, each [intact, damaged, rubble]; a lone pillar and a
+   junction of four use the plain wall records (9 and 11 human, 10 and 12 orc). */
+const WALL = { margin: 2, gate: 2, gates: 3, hp: 15, xp: 1 };
+// Shape by which neighbours are wall too (north 1, east 2, south 4, west 8) to the tile record, as Warcraft II picks them.
+const WALL_SHAPE = [-1, 3, 1, 5, 0, 4, 2, 6, 7, 11, 9, 13, 8, 12, 10, -2];
+function wallTile(orc, mask, state) {
+  const ts = loadTileset(G.LV); if (!ts || !ts.atlas) return null;
+  const sh = WALL_SHAPE[mask], rec = sh === -1 ? (orc ? 10 : 9) : sh === -2 ? (orc ? 12 : 11) : (orc ? 144 : 128) + sh, list = ts.recs[rec] || [];
+  if (!list.length) return null;
+  const m = list[Math.min(list.length - 1, Math.floor(list.length / 3) * state)];
+  const key = G.LV.id + ':' + m; (A.wallSpr ||= {});
+  if (!A.wallSpr[key]) { const c = document.createElement('canvas'); c.width = c.height = 32; c.getContext('2d').drawImage(ts.atlas, (m % ts.cols) * 32, Math.floor(m / ts.cols) * 32, 32, 32, 0, 0, 32, 32); A.wallSpr[key] = c; }
+  return A.wallSpr[key];
+}
+// The ring's tiles for a camp (camp-local tile coordinates), worked out once per camp: the outline of the
+// buildings' box plus a margin, minus the gates (the middle of three of its four sides) and any tile that isn't
+// open ground already (trees, water and rock make their own wall).
+function wallRing(c) {
+  if (c.ring) return c.ring;
+  const T = G.terrain, I = (x, y) => tmod(y, TM) * TM + tmod(x, TM);
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const b of c.blds) { x0 = Math.min(x0, b.tx); y0 = Math.min(y0, b.ty); x1 = Math.max(x1, b.tx + b.w - 1); y1 = Math.max(y1, b.ty + b.h - 1); }
+  x0 -= WALL.margin; y0 -= WALL.margin; x1 += WALL.margin; y1 += WALL.margin;
+  if (x1 - x0 > 40 || y1 - y0 > 40) return (c.ring = []);   // a camp drawn across the map's seam: no walls rather than a wrong ring
+  const mx = Math.floor((x0 + x1) / 2), my = Math.floor((y0 + y1) / 2), shut = Math.abs(c.cx * 31 + c.cy * 17 + (T.seed | 0)) % 4;   // the side with no gate
+  const gate = (side, x, y) => side !== shut && (side % 2 ? y === my || y === my + 1 : x === mx || x === mx + 1);
+  const out = [];
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const side = y === y0 ? 0 : x === x1 ? 1 : y === y1 ? 2 : x === x0 ? 3 : -1; if (side < 0 || gate(side, x, y)) continue;
+    let open = true; for (let k = 0; k < 4; k++) { const i = I(x * 2 + (k & 1), y * 2 + (k >> 1)); if (T.blk[i] || T_BLOCK[T.q[i]]) open = false; }
+    if (open) out.push([x, y]);
+  }
+  return (c.ring = out);
+}
+function wallMask(st, w) {
+  const at = (x, y) => st.walls.some(o => !o.dead && o.tx === x && o.ty === y);
+  return at(w.tx, w.ty - 1) | at(w.tx + 1, w.ty) << 1 | at(w.tx, w.ty + 1) << 2 | at(w.tx - 1, w.ty) << 3;
+}
+function wallLook(st) { for (const w of st.walls) if (!w.dead) { const m = wallMask(st, w); w.mask = m; w.spr = wallTile(w.orc, m, w.hp < w.maxHp / 2 ? 1 : 0) || w.spr; } }
+function wallCells(w, v) { const T = G.terrain; for (let k = 0; k < 4; k++) T.blk[tmod(w.ty * 2 + (k >> 1), TM) * TM + tmod(w.tx * 2 + (k & 1), TM)] = v; }
+function buildWalls(st) {
+  const h = G.hero, orc = G.HD.side === 'Alliance';   // the enemy's own walls
+  st.walls = []; st.wallDead ||= new Set();
+  for (const [tx, ty] of wallRing(st.c)) {
+    const key = tx + ',' + ty, x = st.ox + tx * 32 + 16, y = st.oy + ty * 32 + 16;
+    if (st.wallDead.has(key)) { const r = wallTile(orc, 0, 2); if (r) G.rubble.push({ x, y, spr: r, camp: st }); continue; }
+    if (Math.hypot(h.x - x, h.y - y) < 40 || G.enemies.some(e => !e.static && Math.abs(e.x - x) < 20 && Math.abs(e.y - y) < 20)) continue;   // never wall anyone in
+    const hp = WALL.hp * (1 + G.t / 300) * G.LV.hp * PRISON.hp;
+    const w = { type: 'bld', static: true, wall: true, orc, tx, ty, key, x, y, hp, maxHp: hp, r: 14, spr: null, camp: st, flash: 0, kx: 0, ky: 0, dir: 4, t: 0, atkT: 0, swing: 0, xp: WALL.xp, dmg: 0, spd: 0 };
+    st.walls.push(w); G.enemies.push(w); wallCells(w, 2);
+  }
+  wallLook(st);
+}
+function wallDestroyed(e) {
+  const st = e.camp; st.wallDead.add(e.key); wallCells(e, 0);
+  const r = wallTile(e.orc, 0, 2); if (r) G.rubble.push({ x: e.x, y: e.y, spr: r, camp: st });
+  G.fx.push({ k: 'boom', x: e.x, y: e.y, r: 14, t: 0, life: 0.4 }); sfx('s_boom', 0.05);
+  G.gems.push({ x: e.x, y: e.y, v: e.xp });
+  wallLook(st);
+}
+function dropWalls(st) {   // the camp leaves the field: its walls (and rubble) go, and the ground opens again
+  for (const w of st.walls || []) { w.gone = true; if (!w.dead) wallCells(w, 0); } st.walls = [];
+  G.rubble = (G.rubble || []).filter(r => r.camp !== st);
+}
 function activateCamp(st) {
   st.live = true; st.ents = [];
   st.c.blds.forEach((b, i) => {
@@ -2606,7 +2677,7 @@ function activateCamp(st) {
       G.enemies.push(e); st.ents.push(e);
     } else { const pr = { x, y, spr, camp: st }; G.props.push(pr); st.ents.push(pr); }
   });
-  if (isFortCamp(st)) { st.fort = true; if (!st.guard && G.fort.state === 'held') { st.guard = true; const hall = st.ents.find(e => e.kind === 3) || st.ents[0]; if (hall) spawnEnemy('elite' + (G.eliteN++ % 3 + 1), hall.x + rnd(-30, 30), hall.y + hall.r + 20); } }
+  if (isFortCamp(st)) { st.fort = true; buildWalls(st); if (!st.guard && G.fort.state === 'held') { st.guard = true; const hall = st.ents.find(e => e.kind === 3) || st.ents[0]; if (hall) spawnEnemy('elite' + (G.eliteN++ % 3 + 1), hall.x + rnd(-30, 30), hall.y + hall.r + 20); } }
   if (!st.c.enemy && !st.chest) { const gm = { x: st.ox + st.c.cx * 32 + 16, y: st.oy + st.c.cy * 32 + 16, chest: 'camp', camp: st }; G.gems.push(gm); st.ents.push(gm); }
 }
 // A port launches warships onto its lake, two at a time at most, from 4:00 (battleships join from 10:00).
@@ -2665,6 +2736,7 @@ function updateShip(e, d, dx, dy, dt) {
   if (!shipAt(e.x, e.y)) { e.dead = true; }   // a building's water was cleared under it, or the map changed: never leave it on land
 }
 function deactivateCamp(st) {
+  dropWalls(st);
   for (const e of st.ships || []) e.gone = true; st.ships = [];
   st.live = false; for (const e of st.ents) e.gone = true; st.ents = [];
   G.enemies = G.enemies.filter(e => !e.gone); G.props = G.props.filter(p => !p.gone); G.gems = G.gems.filter(g => !g.gone);
@@ -2819,7 +2891,8 @@ function hitEnemy(e, dmg, kx = 0, ky = 0) {
   if (cfg.opts.nums && dealt < 9000 && G.numCount < 70) { G.numCount++; G.fx.push({ k: 'num', x: e.x + rnd(-4, 4), y: e.y - e.r - 4, v: Math.max(1, Math.round(dealt)), t: 0, life: 0.6 }); }
   if (e.type !== 'boss' && !e.static) { e.kx += kx; e.ky += ky; }
   sfx('s_hit');
-  if (e.hp <= 0 && e.static) { e.dead = true; buildingDestroyed(e); return; }
+  if (e.hp <= 0 && e.static) { e.dead = true; if (e.wall) wallDestroyed(e); else buildingDestroyed(e); return; }
+  if (e.wall && e.hp < e.maxHp / 2 && !e.cracked) { e.cracked = true; wallLook(e.camp); }   // the damaged look
   const n0 = G.gems.length;
   if (e.hp <= 0 && e.ship) { for (let i = 0; i < 4 + 3 * (e.type === 'ship2'); i++) G.gems.push({ x: e.x + rnd(-10, 10), y: e.y + rnd(-10, 10), coin: Math.round(rnd(3, 6) * goldMul()) }); }
   if (e.hp <= 0) { e.dead = true; G.kills++; if (G.HD.frenzy) { h.frenzy = Math.min(0.2, (h.frenzy || 0) + 0.015); h.frenzyT = 4; } drop(e); if (e.ship) washAshore(e, n0); addCorpse(e); if (e.type === 'boss') sfx(G.HD.side === 'Horde' && A.sbuf.s_die_ally ? 's_die_ally' : 's_die', 0); if (G.HD.killHeal) h.hp = Math.min(h.maxHp, h.hp + G.HD.killHeal); }
@@ -3415,8 +3488,19 @@ function update(dt) {
    nearest enemy came and how much of the time you were moving; plus every level-up choice and the big moments.
    Copied from the end-of-run screen or Run history as a code, so real runs can be used to tune the game. */
 const LOG_EVERY = 5, LOGS_KEPT = 8;
+// Which device a run came from, coarsely (Jon plays separate saves on his phone and laptop): nothing that identifies
+// a person. Kind, home screen app or browser tab, screen size in points, Interface size and the safe-area insets.
+// The viewport figures are there to diagnose layout bugs on phones (the inner and visual heights against the screen).
+function deviceInfo() {
+  const w = innerWidth, h = innerHeight, short = Math.min(screen.width || w, screen.height || h), touch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+  const app = !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches);
+  return { kind: touch && short < 600 ? 'phone' : touch && short < 1100 && !matchMedia('(pointer: fine)').matches ? 'tablet' : 'desktop', app,
+    scr: `${screen.width}x${screen.height}`, view: `${w}x${h}`, vv: window.visualViewport ? `${Math.round(visualViewport.width)}x${Math.round(visualViewport.height)}` : null,
+    dpr: window.devicePixelRatio || 1, orient: h >= w ? 'portrait' : 'landscape', ui: cfg.opts.ui || 1, safe: SAFE ? [SAFE.t, SAFE.r, SAFE.b, SAFE.l] : null, speed: cfg.opts.speed };
+}
 function logStart() {
-  G.log = { v: 1, hero: G.heroId, level: G.LV.id, ups: { ...meta.ups }, ver: `${VERSION} ${BUILD}`, s: [], picks: [], ev: [] };
+  G.log = { v: 2, hero: G.heroId, level: G.LV.id, ups: { ...meta.ups }, ver: `${VERSION} ${BUILD}`, dev: deviceInfo(), s: [], picks: [], ev: [] };
+  G.inputs = new Set();
   G.lg = { t: 0, dmg: 0, hurt: {}, hits: 0, move: 0, near: 0, nearN: 0, nearMin: 1e9, scan: 0 };
 }
 // Copies a run log or save code. The clipboard API is tried first without touching the text box: on an iPhone,
@@ -3447,6 +3531,7 @@ function logEnd(won) {
   if (!G.log || G.log.done) return;
   const L = G.log; L.done = true; L.won = !!won; L.t = Math.floor(G.t); L.by = won ? null : G.stats.lastHit; L.kills = G.kills; L.lvl = G.hero.level; L.gold = G.gold;
   L.w = Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl + (v.evo ? 'e' : '')])); L.p = { ...G.passives };
+  if (L.dev) L.dev.input = [...(G.inputs || [])];   // what was used to play: touch, keys, mouse, pad
   L.at = Date.now(); const all = store.get('tos_logs', []); all.push(L); store.set('tos_logs', all.slice(-LOGS_KEPT));
 }
 async function runLogCode(L) {
@@ -3815,10 +3900,22 @@ function drawFrame(ui) {
   for (let x = 0; x < W; x += ui.top.width) ctx.drawImage(ui.top, x, 0);
   txt(G.LV.name, 8, 4, 7, '#e8d9b0');
   txt(fmtTime(Math.min(G.t, RUN_LEN)), W / 2, 1, 11, G.final ? '#ff7a5c' : '#f1e6c8', 'center');
-  const gx = W - 60;
+  // Keep clear of the pause and speed buttons on phones: they sit over the top bar's right end (they hid the gold).
+  let gx = W - 60;
+  if (speedBtn.style.display === 'block') { const r = speedBtn.getBoundingClientRect(); if (r.top < 80 && r.width) gx = Math.min(gx, ((r.left - 6) * (window.devicePixelRatio || 1) / SCALE - SAFE.l) / (cfg.opts.ui || 1)); }
   if (A.pick && A.pick.gold) ctx.drawImage(A.pick.gold, gx - fontWidth(fonts.small || { glyphs: [] }, String(G.gold)) - 13, 3, 10, 10);
   txt(String(G.gold), gx, 4, 7, '#ffd24a', 'right');
-  txt(`${G.kills} kills`, gx - 64, 4, 7, '#f1e6c8', 'right');
+  // Kills sit between the clock and the gold. On a narrow bar (a phone held upright with Interface size Large) there's
+  // no room, so they drop to a line of their own under the gold instead of running into the clock (Jon, iPhone 11).
+  const sw = s => fonts.small ? fontWidth(fonts.small, s) : s.length * 5, kt = `${G.kills} kills`;
+  const goldL = gx - sw(String(G.gold)) - 15, clockR = W / 2 + (fonts.game ? fontWidth(fonts.game, '00:00') : 30) / 2 + 6;
+  const kr = Math.min(gx - 64, goldL - 6);
+  const clockL = W - clockR, nameR = 8 + sw(G.LV.name.toUpperCase()) + 8;
+  const k = cfg.opts.ui || 1, at = (l, r, y) => [SAFE.l + l * k, SAFE.l + r * k, SAFE.t + y * k].map(v => v * SCALE / (window.devicePixelRatio || 1));   // in CSS px, for the layout tests
+  G.hudBoxes = { name: at(8, nameR - 8, 4), clock: at(W - clockR, clockR, 1), gold: at(goldL, gx, 4) };
+  if (kr - sw(kt) >= clockR) { txt(kt, kr, 4, 7, '#f1e6c8', 'right'); G.hudBoxes.kills = at(kr - sw(kt), kr, 4); }
+  else if (clockL - nameR >= sw(kt)) { txt(kt, clockL, 4, 7, '#f1e6c8', 'right'); G.hudBoxes.kills = at(clockL - sw(kt), clockL, 4); }   // between the battlefield's name and the clock
+  else { G.hudBoxes.kills = at(gx - sw(kt), gx, ui.top.height + 2); const y = ui.top.height + 2; ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(gx - sw(kt) - 3, y - 1, sw(kt) + 6, 10); txt(kt, gx, y, 7, '#f1e6c8', 'right'); }
   // Speed, when it isn't normal, sits by the clock where it can't be missed.
   if (cfg.opts.speed !== 1 && W >= 560) txt(`${speedName(cfg.opts.speed)} speed`, W / 2 + 34, 4, 7, '#7fd0ff');   // narrow screens: the dial says it, and the words would cover the kills
   drawBar(ui, lite, dark);
@@ -3829,6 +3926,7 @@ function drawFrame(ui) {
 const BAR_H = 26;
 function drawBar(ui, lite, dark) {
   const h = G.hero, y = H - BAR_H, cb = cfg.opts.colours === 'cb';
+  { const k = cfg.opts.ui || 1, d = SCALE / (window.devicePixelRatio || 1); G.hudBoxes && (G.hudBoxes.bar = [(SAFE.t + y * k) * d, (SAFE.t + H * k) * d]); }
   bevel(0, y, W, BAR_H, lite, dark);
   for (let x = 1; x < W - 1; x += ui.panel.width) ctx.drawImage(ui.panel, 0, 0, Math.min(ui.panel.width, W - 1 - x), BAR_H - 2, x, y + 1, Math.min(ui.panel.width, W - 1 - x), BAR_H - 2);
   const pic = A.icons && A.icons[G.heroId];
@@ -3902,8 +4000,9 @@ function drawHudSafe() {
   try { drawHud(); } finally { W = W0; H = H0; ctx.restore(); }
   // Below the hero bar, the home indicator's strip: carry the bar's stone down to the bottom edge, so the map doesn't
   // show through under it (Jon, iPhone 11). Only the bar's contents keep clear of the home indicator.
+  // The stone at every Interface size: at Large the black fallback showed under the bar.
   if (b && G) { const ui = A.ui && A.ui[G.HD.side];
-    if (ui && (W0 - l - r) / k >= 320) { const y = H0 - b - 1; ctx.fillStyle = '#000'; ctx.fillRect(0, y, W0, b + 1); for (let x = 0; x < W0; x += ui.panel.width) ctx.drawImage(ui.panel, 0, 0, ui.panel.width, Math.min(ui.panel.height, b + 1), x, y, ui.panel.width, Math.min(ui.panel.height, b + 1)); }
+    if (ui) { const y = H0 - b - 1; ctx.fillStyle = '#000'; ctx.fillRect(0, y, W0, b + 1); for (let x = 0; x < W0; x += ui.panel.width) ctx.drawImage(ui.panel, 0, 0, ui.panel.width, Math.min(ui.panel.height, b + 1), x, y, ui.panel.width, Math.min(ui.panel.height, b + 1)); }
     else { ctx.fillStyle = '#000'; ctx.fillRect(0, H0 - b, W0, b); } }
   drawJoy();
 }
@@ -3988,6 +4087,7 @@ function renderWorld() {
   const sy = e => e ? e.y + (e.spr ? e.spr.height / 2 - 10 : 0) : h.y;
   list.sort((a, b) => sy(a) - sy(b));
   drawPortalGlow();
+  for (const r of G.rubble || []) if (Math.abs(r.x - h.x) < W / 2 + 40 && Math.abs(r.y - h.y) < H / 2 + 40) ctx.drawImage(r.spr, Math.round(r.x - camX - 16), Math.round(r.y - camY - 16));   // fallen walls, on the ground
   for (const m of G.marks) drawMark(m);
   for (const w of G.whirls || []) drawWhirl(w);
   // Every unit's shadow in one path and one fill, rather than one fill per unit.
@@ -4035,6 +4135,8 @@ const coarse = () => matchMedia('(pointer: coarse)').matches;
 function isPhone() { return coarse() && Math.min(innerWidth, innerHeight) < 600; }   // a touch screen this small (not the Steam Deck)
 const endJoy = e => { if (e.pointerType === 'mouse') { ms.held = false; return; } if (joy && e.pointerId === joy.id) joy = null; };
 cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
+addEventListener('keydown', () => G && G.inputs && G.inputs.add('keys'), true);
+addEventListener('pointerdown', e => G && G.inputs && G.inputs.add(e.pointerType === 'touch' ? 'touch' : e.pointerType === 'pen' ? 'pen' : 'mouse'), true);
 function getPad() { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.connected) return p; return null; }
 function readMove() {
   if (G && G.bot) return G.bot;                 // the balance report's bot steers through this
@@ -4044,7 +4146,7 @@ function readMove() {
   const p = getPad();
   if (p) {
     const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
-    if (Math.hypot(ax, ay) > 0.2) { x += ax; y += ay; }
+    if (Math.hypot(ax, ay) > 0.2) { x += ax; y += ay; if (G && G.inputs) G.inputs.add('pad'); }
     const b = i => p.buttons[i] && p.buttons[i].pressed;
     if (b(14)) x--; if (b(15)) x++; if (b(12)) y--; if (b(13)) y++;
   }
@@ -4235,7 +4337,7 @@ function showTitle() {
   showHudBtns(false); playMusic('menu');
   const l = meta.last, lv = l && LEVELS.find(x => x.id === l.level);
   if (A.menuBg && A.btn) {
-    const sr = savedRun(), quick = sr ? `<button class="opt" data-act="continue" title="${savedAgo(sr.at)}">Continue: ${HEROES[sr.hero].name.split(' ')[0]} ${fmtTime(sr.t)}</button>${sr.at ? `<div class="savedago">${savedAgo(sr.at)}</div>` : ''}`
+    const sr = savedRun(), quick = sr ? `<button class="opt cont" data-act="continue" title="${savedAgo(sr.at)}">Continue: ${HEROES[sr.hero].name.split(' ')[0]} ${fmtTime(sr.t)}</button>`
       : l && HEROES[l.hero] && heroOpen(l.hero) && lv && levelOpen(LEVELS.indexOf(lv)) ? `<button class="opt" data-act="quick">Quick Start: ${HEROES[l.hero].name.split(' ')[0]}</button>` : '';
     overlay.innerHTML = `<div class="wcstage"><img class="bg" src="${A.menuBg}" alt="">
       <div class="wcbtns"><button class="opt" data-act="choose">Start a Run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
@@ -4246,6 +4348,8 @@ function showTitle() {
     sel = 0; wcify(overlay);
     const v = overlay.querySelector('.ver'), vi = fontImage('TIDES OF SURVIVAL', 'small', 'white', 1); if (vi) v.appendChild(vi);
     const vn = overlay.querySelector('.vernum'), vni = fontImage(`V${VERSION}`, 'small', 'white', 1); if (vni) { vn.textContent = ''; vn.appendChild(vni); }   // the same font as the title's own label
+    const cb = overlay.querySelector('.cont');   // "saved 2 h ago" as a smaller second line inside the Continue button, in the game's own lettering
+    if (cb && sr.at) { const ago = fontImage(savedAgo(sr.at).toUpperCase(), 'small', 'white', 1); if (ago) { ago.className = 'ago'; cb.classList.add('two'); cb.appendChild(ago); } else cb.insertAdjacentHTML('beforeend', `<span class="ago">${savedAgo(sr.at)}</span>`); }
     fitStage(); highlight(); return;
   }
   const b = '';
@@ -5222,7 +5326,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
