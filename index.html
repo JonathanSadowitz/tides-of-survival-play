@@ -1118,7 +1118,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.14.0', BUILD = '651e3b1 2026-11-20';
+const VERSION = '0.15.0', BUILD = '7ded6a0 2026-11-20';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1144,7 +1144,7 @@ const store = {
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(() => {}); } catch (e) {}
 let cfg = store.get('tos_cfg', null) || { roles: {}, sounds: {}, palette: null };
 cfg.roles ||= {}; cfg.sounds ||= {};
-cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, voice: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fx: 'full', colours: 'std', tips: true }, cfg.opts || {});
+cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, voice: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fps: false, fx: 'full', colours: 'std', tips: true }, cfg.opts || {});
 if (!cfg.optsV) { if (cfg.opts.music === 0.6) cfg.opts.music = 0.4; cfg.optsV = 2; }   // 60% was the old default: too loud
 const saveCfg = () => store.set('tos_cfg', cfg);
 let best = store.get('tos_best', { time: 0, kills: 0, level: 0 });
@@ -1185,7 +1185,7 @@ const ROLES = [
   ['ranged', 'Horde enemy: ranged (axethrower)'], ['boss', 'Horde boss (dragon)'], ['eshot', 'Horde enemy missile'],
   ['ally_basic', 'Alliance enemy: footman'], ['ally_fast', 'Alliance enemy: fast (dwarves)'], ['ally_tank', 'Alliance enemy: tank (knight)'],
   ['ally_ranged', 'Alliance enemy: ranged (archer)'], ['ally_boss', 'Alliance boss (gryphon rider)'], ['ally_eshot', 'Alliance enemy missile'],
-  ['flyer', 'Horde flyer (dragon)'], ['scout', 'Horde scout (goblin zeppelin)'], ['siege', 'Horde siege (catapult)'], ['stone', 'Catapult stone'],
+  ['flyer', 'Horde flyer (dragon)'], ['scout', 'Horde scout (goblin zeppelin)'], ['siege', 'Horde siege (catapult)'], ['stone', 'Catapult stone'], ['cannon', 'Destroyer cannonball'], ['bigcannon', 'Battleship cannonball (flaming)'],
   ['elite1', 'Horde elite: ogre-mage'], ['elite2', 'Horde elite: troll berserker'], ['elite3', 'Horde elite: death knight'],
   ['boss1', "Horde boss: Gul'dan"], ['boss2', 'Horde boss: Orgrim Doomhammer'], ['boss3', 'Horde boss: Deathwing'],
   ['ally_flyer', 'Alliance flyer (gryphon rider)'], ['ally_scout', 'Alliance scout (flying machine)'], ['ally_siege', 'Alliance siege (ballista)'], ['ally_stone', 'Ballista bolt'], ['hammer', 'Storm hammer'],
@@ -1216,6 +1216,8 @@ const AUTO_ROLES = {
   // and an empty oil tanker's): destroyers 61 and 62, battleship and juggernaught 41 and 42, transports 39 and 40.
   ship: unitR(62, 0), ally_ship: unitR(61, 0), ship2: unitR(42, 0), ally_ship2: unitR(41, 0), transport: unitR(39, 0), transport_orc: unitR(40, 0),
   stone: { e: 348, mode: 'dir5', r0: 0, r1: 0 }, ally_stone: { e: 338, mode: 'dir5', r0: 0, r1: 0 }, hammer: { e: 325, mode: 'dir5', r0: 0, r1: 2 },
+  // Warships' shots (Jon): destroyers fire a small cannonball (348), battleships and juggernaughts the big flaming one (337).
+  cannon: { e: 348, mode: 'dir5', r0: 0, r1: 0 }, bigcannon: { e: 337, mode: 'dir5', r0: 0, r1: 2 },
   elite1: unitR(52), ally_elite1: unitR(51), elite2: unitR(54), ally_elite2: unitR(53), elite3: unitR(58), ally_elite3: unitR(55),
   boss1: unitR(58), ally_boss1: unitR(45), boss2: unitR(46), ally_boss2: unitR(51), boss3: unitR(36, 3), ally_boss3: unitR(35, 3),
   tank_up: unitR(52), ally_tank_up: unitR(51), ranged_up: unitR(54), ally_ranged_up: unitR(53), caster: unitR(58), ally_caster: unitR(55), skel: unitR(69), daemon: unitR(70),
@@ -1988,12 +1990,12 @@ const FIELD_RUNS = 5;   // runs on a battlefield before the next one can open
 const fieldRuns = id => (P_().runsOn || {})[id] || 0;
 const sideTime = side => Math.max(0, ...Object.keys(HEROES).filter(i => HEROES[i].side === side).map(i => P_().time[i] || 0));
 const HERO_UNLOCKS = {
-  alleria:  { cost: 300,  goal: 'Survive 5:00 as an Alliance hero', done: () => sideTime('Alliance') >= 300, best: () => `best ${fmtTime(sideTime('Alliance'))}` },
-  zuljin:   { cost: 300,  goal: 'Survive 5:00 as a Horde hero',     done: () => sideTime('Horde') >= 300,    best: () => `best ${fmtTime(sideTime('Horde'))}` },
-  danath:   { cost: 700,  goal: 'Kill 1,500 enemies in one run as an Alliance hero', done: () => P_().kills.Alliance >= 1500, best: () => `best ${P_().kills.Alliance.toLocaleString('en-GB')} kills` },
-  kargath:  { cost: 700,  goal: 'Kill 1,500 enemies in one run as a Horde hero',     done: () => P_().kills.Horde >= 1500,    best: () => `best ${P_().kills.Horde.toLocaleString('en-GB')} kills` },
-  uther:    { cost: 1200, goal: 'Survive 8:00 as Lothar', done: () => (P_().time.lothar || 0) >= 480, best: () => `best ${fmtTime(P_().time.lothar || 0)}` },
-  chogall:  { cost: 1200, goal: 'Survive 8:00 as Grom',   done: () => (P_().time.grom || 0) >= 480,   best: () => `best ${fmtTime(P_().time.grom || 0)}` },
+  alleria:  { cost: 300,  goal: 'Survive 5:00 as an Alliance hero', done: () => sideTime('Alliance') >= 300, left: () => fmtTime(300 - sideTime('Alliance')) + ' to go', best: () => `best ${fmtTime(sideTime('Alliance'))}` },
+  zuljin:   { cost: 300,  goal: 'Survive 5:00 as a Horde hero',     done: () => sideTime('Horde') >= 300,    left: () => fmtTime(300 - sideTime('Horde')) + ' to go', best: () => `best ${fmtTime(sideTime('Horde'))}` },
+  danath:   { cost: 700,  goal: 'Kill 1,500 enemies in one run as an Alliance hero', done: () => P_().kills.Alliance >= 1500, left: () => (1500 - P_().kills.Alliance).toLocaleString('en-GB') + ' more kills', best: () => `best ${P_().kills.Alliance.toLocaleString('en-GB')} kills` },
+  kargath:  { cost: 700,  goal: 'Kill 1,500 enemies in one run as a Horde hero',     done: () => P_().kills.Horde >= 1500,    left: () => (1500 - P_().kills.Horde).toLocaleString('en-GB') + ' more kills', best: () => `best ${P_().kills.Horde.toLocaleString('en-GB')} kills` },
+  uther:    { cost: 1200, goal: 'Survive 8:00 as Lothar', done: () => (P_().time.lothar || 0) >= 480, left: () => fmtTime(480 - (P_().time.lothar || 0)) + ' to go', best: () => `best ${fmtTime(P_().time.lothar || 0)}` },
+  chogall:  { cost: 1200, goal: 'Survive 8:00 as Grom',   done: () => (P_().time.grom || 0) >= 480,   left: () => fmtTime(480 - (P_().time.grom || 0)) + ' to go', best: () => `best ${fmtTime(P_().time.grom || 0)}` },
   turalyon: { cost: 1800, goal: 'Slay the 5:00 boss as an Alliance hero', done: () => (P_().boss.Alliance || 0) >= 1, best: () => 'not slain yet' },
   dentarg:  { cost: 1800, goal: 'Slay the 5:00 boss as a Horde hero',     done: () => (P_().boss.Horde || 0) >= 1,    best: () => 'not slain yet' },
   kurdran:  { cost: 2800, goal: 'Slay the 10:00 boss as an Alliance hero', done: () => (P_().boss.Alliance || 0) >= 2, best: () => (P_().boss.Alliance || 0) >= 1 ? 'slain the 5:00 boss' : 'not slain yet' },
@@ -2057,17 +2059,26 @@ function catchUpUnlocks() {
   if (got.length) saveMeta();
   return got;
 }
-// The next goals worth chasing, for the end-of-run screen.
+// The next goals worth chasing, for the end-of-run screen: what's next and how close you are (idea 28).
 function nextUp() {
   const out = [], i = meta.unlocked;
   if (A.demo) out.push(`Three more battlefields and two more heroes are waiting in the full game: get ${fullGameLink()} and import it under Game files on the title screen. Your progress carries over.`);
-  else if (i + 1 < LEVELS.length) out.push(`Next battlefield: ${LEVELS[i + 1].name}. Play ${FIELD_RUNS} runs in ${LEVELS[i].name} (${Math.min(FIELD_RUNS, fieldRuns(LEVELS[i].id))} so far) and survive ${fmtTime(UNLOCK_T)} there (best ${fmtTime(P_().lv[LEVELS[i].id] || 0)}).`);
+  else if (i + 1 < LEVELS.length) {
+    const L0 = LEVELS[i], runs = FIELD_RUNS - Math.min(FIELD_RUNS, fieldRuns(L0.id)), best = P_().lv[L0.id] || 0;
+    const togo = `best ${fmtTime(best)}, ${fmtTime(UNLOCK_T - best)} to go`, more = `${runs} more run${runs > 1 ? 's' : ''} in ${L0.name}`;
+    out.push(`<b>Next battlefield: ${LEVELS[i + 1].name}.</b> ${runs && best < UNLOCK_T ? `${more}, and survive ${fmtTime(UNLOCK_T)} there (${togo}).`
+      : runs ? `${more} (you've already survived ${fmtTime(UNLOCK_T)} there).` : best < UNLOCK_T ? `Survive ${fmtTime(UNLOCK_T)} in ${L0.name} (${togo}).` : `It opens after your next run in ${L0.name}.`}`);
+  }
   const h = Object.keys(HERO_UNLOCKS).find(id => !heroOpen(id) && !demoLocked(id));
-  if (h && !isPrisoner(h)) out.push(`Next hero: ${HEROES[h].name}. ${HERO_UNLOCKS[h].goal} (${HERO_UNLOCKS[h].best()}), or buy for ${HERO_UNLOCKS[h].cost} gold in hero select.`);
+  if (h && !isPrisoner(h)) {
+    const U = HERO_UNLOCKS[h], wait = HERO_GAP - (P_().sinceHero ?? HERO_GAP);   // heroes earned by goals come at most one every HERO_GAP runs
+    const how = U.done() ? `Goal met: ${wait > 0 ? `he joins after ${wait} more run${wait > 1 ? 's' : ''}` : 'he joins after your next run'}.` : `${U.goal}: ${U.best()}${U.left ? `, ${U.left()}` : ''}.`;
+    out.push(`<b>Next hero: ${HEROES[h].name}.</b> ${how} Or buy him for ${U.cost.toLocaleString('en-GB')} gold in hero select.`.replace(/\bhim\b|\bhe\b/g, w => h === 'alleria' ? (w === 'him' ? 'her' : 'she') : w));
+  }
   const held = meta.prisoners.filter(id => !heroOpen(id) && !(G && G.revealed || []).includes(id));   // ones found this run are announced above
-  if (held.length) out.push(`Held prisoner: ${held.map(id => HEROES[id].name).join(', ')}. Each is freed from an enemy fortress in a run as one of his own side's heroes.`);
+  if (held.length) out.push(`<b>Held prisoner: ${held.map(id => HEROES[id].name).join(', ')}.</b> Each is freed from an enemy fortress in a run as one of his own side's heroes.`);
   const nextP = PRISON.heroes.find(id => !heroOpen(id) && !meta.prisoners.includes(id) && !demoLocked(id));
-  if (nextP && (!h || isPrisoner(h))) out.push(`Next prisoner: ${HEROES[nextP].name}. ${HERO_UNLOCKS[nextP].goal} (${HERO_UNLOCKS[nextP].best()}) to find where he is held.`);
+  if (nextP && (!h || isPrisoner(h))) { const U = HERO_UNLOCKS[nextP]; out.push(`<b>Next prisoner: ${HEROES[nextP].name}.</b> ${U.goal} (${U.best()}) to find where he is held.`); }
   return out;
 }
 const saveMeta = () => store.set('tos_meta', meta);
@@ -2714,7 +2725,7 @@ function updateShip(e, d, dx, dy, dt) {
   if (d > 1500) { e.dead = true; return; }   // left far behind: it sails off
   if (e.shootT <= 0 && d < e.range) {   // a shot that lands where you're heading, as the catapults do
     e.shootT = e.type === 'ship2' ? 2.8 : 3.4; e.swing = SWING;
-    addMark(h.x + G.hv[0] * 0.5, h.y + G.hv[1] * 0.5, e.type === 'ship2' ? 26 : 20, 1.2, e.dmg, 'ship', { x: e.x, y: e.y });
+    addMark(h.x + G.hv[0] * 0.5, h.y + G.hv[1] * 0.5, e.type === 'ship2' ? 26 : 20, 1.2, e.dmg, 'ship', { x: e.x, y: e.y }, e.type === 'ship2' ? 'big' : 'small');
   }
   // Close in until in range, then hold off at about three quarters of it, always on open water near the shore.
   let want = d > e.range * 0.8 ? 1 : d < e.range * 0.5 ? -0.6 : 0, a = Math.atan2(dy, dx);
@@ -3287,7 +3298,7 @@ function towerShoot(e, dt) {
   e.shootT = PRISON.towerEvery; const ux = dx / d, uy = dy / d;
   G.eshots.push({ x: e.x, y: e.y - 10, vx: ux * 150, vy: uy * 150, dmg: 9 * (1 + G.t / 400), life: 2, dir: dirOf(ux, uy), by: 'tower' });
 }
-function addMark(x, y, r, T, dmg, by, src, drop) { G.marks.push({ x, y, r, t: 0, T, dmg, by, src, role: by === 'siege' || by === 'ship' ? 'stone' : null, drop }); }
+function addMark(x, y, r, T, dmg, by, src, drop) { G.marks.push({ x, y, r, t: 0, T, dmg, by, src, role: by === 'siege' ? 'stone' : by === 'ship' ? (drop === 'big' ? 'bigcannon' : 'cannon') : null, drop: by === 'ship' ? null : drop }); }
 function updateMarks(dt) {
   const h = G.hero;
   for (const m of G.marks) {
@@ -3499,9 +3510,9 @@ function deviceInfo() {
     dpr: window.devicePixelRatio || 1, orient: h >= w ? 'portrait' : 'landscape', ui: cfg.opts.ui || 1, safe: SAFE ? [SAFE.t, SAFE.r, SAFE.b, SAFE.l] : null, speed: cfg.opts.speed };
 }
 function logStart() {
-  G.log = { v: 2, hero: G.heroId, level: G.LV.id, ups: { ...meta.ups }, ver: `${VERSION} ${BUILD}`, dev: deviceInfo(), s: [], picks: [], ev: [] };
+  G.log = { v: 3, hero: G.heroId, level: G.LV.id, ups: { ...meta.ups }, ver: `${VERSION} ${BUILD}`, dev: deviceInfo(), s: [], picks: [], ev: [] };
   G.inputs = new Set();
-  G.lg = { t: 0, dmg: 0, hurt: {}, hits: 0, move: 0, near: 0, nearN: 0, nearMin: 1e9, scan: 0 };
+  G.lg = { t: 0, dmg: 0, hurt: {}, hits: 0, move: 0, near: 0, nearN: 0, nearMin: 1e9, scan: 0, fN: 0, fMs: 0, fMax: 0, upd: 0, rnd: 0 }; G.perf = null;
 }
 // Copies a run log or save code. The clipboard API is tried first without touching the text box: on an iPhone,
 // selecting the box focused it and left the page shifted, so later taps landed below their buttons.
@@ -3524,14 +3535,17 @@ function logTick(dt, moving) {
   }
   if (L.t < LOG_EVERY) return;
   const r = v => Math.round(v), hurt = {}; for (const k in L.hurt) hurt[k] = r(L.hurt[k]);
-  G.log.s.push([r(G.t), +(h.hp / h.maxHp).toFixed(2), h.level, G.kills, G.enemies.length, r(L.dmg / L.t), hurt, L.hits, +(L.move / L.t).toFixed(2), L.nearN ? r(L.near / L.nearN) : -1, L.nearMin < 1e9 ? r(L.nearMin) : -1, G.gold]);
-  Object.assign(L, { t: 0, dmg: 0, hurt: {}, hits: 0, move: 0, near: 0, nearN: 0, nearMin: 1e9 });
+  G.log.s.push([r(G.t), +(h.hp / h.maxHp).toFixed(2), h.level, G.kills, G.enemies.length, r(L.dmg / L.t), hurt, L.hits, +(L.move / L.t).toFixed(2), L.nearN ? r(L.near / L.nearN) : -1, L.nearMin < 1e9 ? r(L.nearMin) : -1, G.gold,
+    L.fN ? r(L.fN * 1000 / L.fMs) : -1, r(L.fMax), L.fN ? +(L.upd / L.fN).toFixed(1) : -1, L.fN ? +(L.rnd / L.fN).toFixed(1) : -1]);   // from log v3: frames a second, slowest frame (ms), update and draw per frame (ms)
+  if (L.fN && G.perf) G.perf.low = Math.min(G.perf.low, L.fN * 1000 / L.fMs);
+  Object.assign(L, { t: 0, dmg: 0, hurt: {}, hits: 0, move: 0, near: 0, nearN: 0, nearMin: 1e9, fN: 0, fMs: 0, fMax: 0, upd: 0, rnd: 0 });
 }
 function logEnd(won) {
   if (!G.log || G.log.done) return;
   const L = G.log; L.done = true; L.won = !!won; L.t = Math.floor(G.t); L.by = won ? null : G.stats.lastHit; L.kills = G.kills; L.lvl = G.hero.level; L.gold = G.gold;
   L.w = Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl + (v.evo ? 'e' : '')])); L.p = { ...G.passives };
-  if (L.dev) L.dev.input = [...(G.inputs || [])];   // what was used to play: touch, keys, mouse, pad
+  if (L.dev) L.dev.input = [...(G.inputs || [])];
+  const R = G.perf; if (R && R.n) L.fps = { avg: Math.round(R.n * 1000 / R.ms), low: R.low < 1e9 ? Math.round(R.low) : null, below30: +(R.slow / R.ms).toFixed(2) };   // the whole run: average, worst five seconds, share of time below 30   // what was used to play: touch, keys, mouse, pad
   L.at = Date.now(); const all = store.get('tos_logs', []); all.push(L); store.set('tos_logs', all.slice(-LOGS_KEPT));
 }
 async function runLogCode(L) {
@@ -3986,6 +4000,10 @@ function drawHud() {
     txt(pads ? 'Move: left stick    Pause: Start    Speed: Y' : 'Move: WASD, arrow keys or the mouse    Pause: Esc or P    Speed: F or Tab', W / 2, H - BAR_H - 14, 7, '#f1e6c8', 'center');
     ctx.globalAlpha = 1;
   }
+  if (cfg.opts.fps && PERF.fps) {   // Show FPS: above the hero bar, bottom left; amber below 50, red below 30
+    const f = PERF.fps, t = `${f} FPS`, x = 6, y = H - BAR_H - 12, w = fonts.small ? fontWidth(fonts.small, t) : t.length * 5;
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x - 2, y - 2, w + 4, 11); txt(t, x, y, 7, f >= 50 ? '#7fe07f' : f >= 30 ? '#ffc04a' : '#ff6a50');
+  }
   if (G.moveTo && !ms.held) {   // where a mouse click sent the hero: a small green cross, as in Warcraft II
     const mx = Math.round(G.moveTo[0] - camX), my = Math.round(G.moveTo[1] - camY);
     ctx.fillStyle = '#000'; ctx.fillRect(mx - 4, my - 1, 9, 3); ctx.fillRect(mx - 1, my - 4, 3, 9);
@@ -4264,7 +4282,11 @@ overlay.addEventListener('click', e => {
   else if (act === 'exportsave') showSaveCode('export');
   else if (act === 'importsave') showSaveCode('import');
   else if (act === 'loadcode') loadSaveCode();
-  else if (act === 'retry') newRun(G.heroId, G.LV.id);
+  else if (act === 'retry') { if (G.state !== 'over') bankRun(); newRun(G.heroId, G.LV.id); }   // a restart mid-run keeps the run's gold, as Quit does
+  // Restart and Quit from the pause screen ask first, with Keep playing chosen, so a stray key or tap never ends a long run (Jon).
+  else if (act === 'askend') { const q = b.dataset.end === 'quit';
+    showMenu(`<h2>Abandon this run?</h2><p class="sub">Your gold so far is kept.</p><div class="opts row"><button class="opt" data-act="keep" data-back>Keep playing</button><button class="opt" data-act="${q ? 'quit' : 'retry'}">${q ? 'Quit' : 'Restart'}</button></div>`); }
+  else if (act === 'keep') pauseRun(true);
   else if (act === 'lab') openLab();
   else if (act === 'import') showImport();
   else if (act === 'impdir') { impBusy(); $('#labPick').click(); }
@@ -4421,6 +4443,7 @@ const OPT_DEFS = {
   quickChest: { label: 'Chest animation', vals: [false, true], fmt: v => v ? 'Quick' : 'Full' },
   ui: { label: 'Interface size', vals: [0.8, 1, 1.25], fmt: v => v < 1 ? 'Small' : v > 1 ? 'Large' : 'Normal' },
   minimap: { label: 'Minimap', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
+  fps: { label: 'Show FPS', vals: [false, true], fmt: v => v ? 'On' : 'Off' },
   fx: { label: 'Effects', vals: ['full', 'reduced'], fmt: v => v === 'full' ? 'Full' : 'Reduced (no glows or light beams)' },
   tips: { label: 'Tips', vals: [true, false], fmt: v => v ? `On for your first ${TIPS.runs} runs of each` : 'Off' },
   colours: { label: 'Colours', vals: ['std', 'cb'], fmt: v => v === 'cb' ? 'Colour-blind friendly (blue health, orange foes)' : 'Standard' },
@@ -4706,8 +4729,8 @@ function pauseRun(again) {
   if (!G || (G.state !== 'play' && !again)) return;
   G.state = 'paused'; showHudBtns(false); joy = null; musicDuck(true); if (!again) guardMenu();
   showMenu(`<h2>Paused</h2>${pauseSheet()}
-    <div class="opts row"><button class="opt" data-act="resume" data-back>Resume</button><button class="opt" data-act="retry">Restart</button>
-    <button class="opt" data-act="settings" data-from="pause">Settings</button><button class="opt" data-act="quit">Quit to title (keep gold)</button></div>`);
+    <div class="opts row"><button class="opt" data-act="resume" data-back>Resume</button><button class="opt" data-act="askend" data-end="retry">Restart</button>
+    <button class="opt" data-act="settings" data-from="pause">Settings</button><button class="opt" data-act="askend" data-end="quit">Quit to title (keep gold)</button></div>`);
   overlay.querySelector('.panel').classList.add('wide', 'scrolls'); drawHeroPics(); fitPanel();
 }
 // The character sheet on the pause screen: who you are, your numbers, and everything you're carrying.
@@ -5293,16 +5316,27 @@ let last = performance.now();
 // Hide the pointer while playing; moving the mouse shows it for a moment so the pause button can be clicked.
 let curShownAt = -1e9;
 addEventListener('pointermove', e => { if (e.pointerType === 'mouse') curShownAt = performance.now(); });
+// Frame timing, for the FPS counter (Settings: Show FPS) and the run log (Jon): real time between frames, and how
+// long the game spent updating and drawing each one, so a log shows whether the game or the screen is the limit.
+const PERF = { times: [], fps: 0 };
+function perfFrame(ms, upd, rnd) {
+  const now = performance.now(); PERF.times.push(now); while (PERF.times.length && now - PERF.times[0] > 1000) PERF.times.shift(); PERF.fps = PERF.times.length;
+  const L = G && G.state === 'play' && G.lg; if (!L) return;
+  L.fN++; L.fMs += ms; L.fMax = Math.max(L.fMax, ms); L.upd += upd; L.rnd += rnd;
+  const R = G.perf ||= { n: 0, ms: 0, slow: 0, low: 1e9 }; R.n++; R.ms += ms; if (ms > 1000 / 30 + 1) R.slow += ms;
+}
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const fms = now - last, dt = Math.min(0.05, fms / 1000); last = now; let upd = 0, rnd = 0;
   attract += dt;
   const hide = !!G && G.state === 'play' && !menuOpen() && now - curShownAt > 1500;
   if (hide !== document.body.classList.contains('nocur')) document.body.classList.toggle('nocur', hide);
   try {
     pollPad(dt);
+    const t0 = performance.now();
     if (G && G.state === 'play') { let rem = dt * cfg.opts.speed; while (rem > 1e-4 && G && G.state === 'play') { const st = Math.min(rem, 0.034); update(st); rem -= st; } }
     else if (G && G.state === 'dying') { G.dieT += dt; for (const c of G.corpses) c.t += dt; for (const f of G.fx) f.t += dt; if (G.dieT > 1.8) endRun(false); }
-    render();
+    const t1 = performance.now(); render(); const t2 = performance.now(); upd = t1 - t0; rnd = t2 - t1;
+    perfFrame(fms, upd, rnd);
   }
   catch (e) { console.error(e); }
   requestAnimationFrame(frame);
@@ -5326,7 +5360,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
