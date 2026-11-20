@@ -801,6 +801,13 @@ const LEVELS = [
   { id: 'quel', name: "Quel'Thalas", blurb: 'The elves\' ancient forest: dense woods and narrow paths, with archers and trolls hiding among the trees.', ts: [2, 3, 4, 5], ground: '#2c4a1c',
     bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, ambush: { from: 45, every: 7, max: 7 },
     gen: { clearings: 18, rmin: 7, rmax: 10, lane: 0.5, loops: 0.55, lakes: 0.25, forestLakes: 3, trees: 0.4, fine: 0.3, rocks: 0.93, dark: 0.35, camps: 0.75, pockets: true }, hp: 2.5, mix: { ranged: 1.4, fast: 1.2 } },
+  // Grim Batol (Phase M1, Jon): the Khaz Modan mountains (wasteland tiles: Jon chose them over winter, where rock can
+  // only meet ice), great masses of rock with narrow passes between them (gen.rockland
+  // turns the background to rock). Demolition squads blast new passes through the rock as the run goes on (DEMO).
+  // Deathwing held the red dragons captive here; he is the final boss against the Horde, and red dragons fly often.
+  { id: 'grim', name: 'Grim Batol', blurb: 'A mountain fortress of the Dragonmaw. Narrow passes through solid rock, and demolition squads blasting new ones.', ts: [10, 11, 12, 13], ground: '#6a5a48',
+    bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, demo: { from: 60, every: 16, squad: 2, blast: 2.2 },
+    gen: { clearings: 22, rmin: 8, rmax: 12, lane: 0.55, loops: 0.6, lakes: 0.1, forestLakes: 1, trees: 0.55, rocks: 0.9, dark: 0.3, camps: 0.7, rockland: 0.82, pockets: true }, hp: 2.6, mix: { fast: 1.3, flyer: 1.8, tank: 1.1 } },
 ];
 const UNLOCK_T = 600; // surviving 10 minutes, after a few runs there (FIELD_RUNS), unlocks the next level
 const UPGRADES = {
@@ -874,6 +881,38 @@ function pnoise(x, y, cell, seed) { // periodic value noise over the half-tile g
 const fbm = (x, y, seed) => pnoise(x, y, 32, seed) * 0.55 + pnoise(x, y, 16, seed + 7) * 0.3 + pnoise(x, y, 8, seed + 13) * 0.15;
 const tmod = (v, n) => ((v % n) + n) % n;
 
+// The megatile for one tile, from the types at its four quarters (shared with blasted rock, which changes them later).
+function pickTile(q, tx, ty, recs, seed) {
+  const I = (x, y) => tmod(y, TM) * TM + tmod(x, TM), pick = (list, h) => list.length ? (h % 100 < 55 ? list[0] : list[h % list.length]) : 0;
+  const a = [q[I(tx * 2, ty * 2)], q[I(tx * 2 + 1, ty * 2)], q[I(tx * 2, ty * 2 + 1)], q[I(tx * 2 + 1, ty * 2 + 1)]], hh = ihash(tx, ty, seed + 9);
+  const kinds = [...new Set(a)];
+  let m = 0;
+  if (kinds.length === 1) m = pick(recs[T_SOLID[a[0]]] || [], hh);
+  else if (kinds.length === 2 && T_PAIR[kinds[0] + ',' + kinds[1]]) {
+    const [grp, first] = T_PAIR[kinds[0] + ',' + kinds[1]];
+    const mask = (a[0] === first) | (a[1] === first) << 1 | (a[2] === first) << 2 | (a[3] === first) << 3;
+    m = pick(recs[16 * grp + T_MASK2P[mask]] || [], hh);
+  }
+  if (!m) m = pick(recs[T_SOLID[Math.max(...a.map(t => T_PRI[t] * 8 + t)) & 7]] || recs[5] || [], hh);
+  return m;
+}
+// Grim Batol's demolition squads blast rock open: every rock corner within r tiles of corner (cx, cy) becomes rubble
+// (dirt) when its neighbours allow it (rock, dirt, grass and shallows sit next to dirt in Warcraft II's tiles), and the
+// tiles round it are picked again. Returns the tiles changed, so the drawn chunks can be refreshed.
+function blastRock(T, cx, cy, r, recs) {
+  const J = (x, y) => [tmod(x, TN), tmod(y, TN)], I = (x, y) => tmod(y, TM) * TM + tmod(x, TM), q = T.q;
+  const corner = (x, y) => q[I(x * 2, y * 2)], ok = new Set([TT.C, TT.G, TT.W, TT.R]), set = [];
+  for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+    if ((x - cx) ** 2 + (y - cy) ** 2 > r * r || corner(x, y) !== TT.R) continue;
+    let fine = true; for (let dy = -1; dy <= 1 && fine; dy++) for (let dx = -1; dx <= 1; dx++) if (!ok.has(corner(x + dx, y + dy))) { fine = false; break; }
+    if (fine) set.push([x, y]);
+  }
+  for (const [x, y] of set) for (const [hx, hy] of [[x * 2, y * 2], [x * 2 - 1, y * 2], [x * 2, y * 2 - 1], [x * 2 - 1, y * 2 - 1]]) { const i = I(hx, hy); q[i] = TT.C; if (T.blk[i] !== 2) T.blk[i] = 0; }
+  const changed = new Set();
+  for (const [x, y] of set) for (const [tx, ty] of [[x, y], [x - 1, y], [x, y - 1], [x - 1, y - 1]]) { const [a, b] = J(tx, ty); changed.add(b * TN + a); }
+  for (const k of changed) T.tiles[k] = pickTile(q, k % TN, (k / TN) | 0, recs, T.seed);
+  return [...changed].map(k => [k % TN, (k / TN) | 0]);
+}
 function buildTerrain(LV, seed, enemySide, opts = {}) {
   const TAU = Math.PI * 2, bldSize = opts.bldSize || (() => null);
   // Modelled on the stock Warcraft II maps: forest is the background, and open ground is a connected
@@ -926,6 +965,7 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
     // Away from the clearings and lanes, trees grow in clumps rather than one solid forest.
     const fine = g.fine ?? 0.42, clump = pnoise(hx, hy, 8, seed + 19) * (1 - fine) + pnoise(hx, hy, 4, seed + 20) * fine, near = Math.min(dc, dl);
     let t = near < edge ? TT.G : clump > g.trees + Math.max(0, 6 - near) * 0.025 ? TT.F : TT.G;
+    if (g.rockland && near > 0.5 && (t === TT.F || near > 2.5) && pnoise(hx, hy, 16, seed + 23) < g.rockland) t = TT.R;   // mountains: rock, not forest, away from the clearings and passes
     if (t === TT.G) {
       if (droad < 0.55 + (pnoise(hx, hy, 8, seed + 14) - 0.5) * 0.5) t = TT.C;
       else if (pnoise(hx, hy, 32, seed + 15) * 0.7 + pnoise(hx, hy, 8, seed + 16) * 0.3 > 1 - g.dark) t = TT.DG;
@@ -1060,21 +1100,8 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
     camps.forEach((c, i) => { c.id = i; delete c.under; });
   }
   // Pick the megatile for each tile from its four quadrants.
-  const ts = { recs: opts.recs || [] }, tiles = new Uint16Array(TN * TN);
-  const pick = (list, h) => list.length ? (h % 100 < 55 ? list[0] : list[h % list.length]) : 0;
-  for (let ty = 0; ty < TN; ty++) for (let tx = 0; tx < TN; tx++) {
-    const a = [q[I(tx * 2, ty * 2)], q[I(tx * 2 + 1, ty * 2)], q[I(tx * 2, ty * 2 + 1)], q[I(tx * 2 + 1, ty * 2 + 1)]], hh = ihash(tx, ty, seed + 9);
-    const kinds = [...new Set(a)];
-    let m = 0;
-    if (kinds.length === 1) m = pick(ts.recs[T_SOLID[a[0]]] || [], hh);
-    else if (kinds.length === 2 && T_PAIR[kinds[0] + ',' + kinds[1]]) {
-      const [grp, first] = T_PAIR[kinds[0] + ',' + kinds[1]];
-      const mask = (a[0] === first) | (a[1] === first) << 1 | (a[2] === first) << 2 | (a[3] === first) << 3;
-      m = pick(ts.recs[16 * grp + T_MASK2P[mask]] || [], hh);
-    }
-    if (!m) m = pick(ts.recs[T_SOLID[Math.max(...a.map(t => T_PRI[t] * 8 + t)) & 7]] || ts.recs[5] || [], hh);
-    tiles[ty * TN + tx] = m;
-  }
+  const tiles = new Uint16Array(TN * TN);
+  for (let ty = 0; ty < TN; ty++) for (let tx = 0; tx < TN; tx++) tiles[ty * TN + tx] = pickTile(q, tx, ty, opts.recs || [], seed);
   // Docks: on each island, the shallows nearest its neighbour, where a transport waits.
   const docks = [];
   if (isles) isles.forEach((o, i) => {
@@ -1089,7 +1116,7 @@ function buildTerrain(LV, seed, enemySide, opts = {}) {
   return { LV, seed, q, blk, tiles, camps, isles, docks, portal, chunks: new Map() };
 }
 
-  return { TT, T_SOLID, T_PRI, T_BLOCK, T_PAIR, T_MASK2P, T_NEXT, TN, TM, ihash, pnoise, tmod, buildTerrain };
+  return { TT, T_SOLID, T_PRI, T_BLOCK, T_PAIR, T_MASK2P, T_NEXT, TN, TM, ihash, pnoise, tmod, buildTerrain, blastRock, pickTile };
 })();
 if (typeof module !== 'undefined') module.exports = Terrain;
 </script>
@@ -1121,7 +1148,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.17.0', BUILD = '7c3a660 2026-11-20';
+const VERSION = '0.18.0', BUILD = 'f2d59b9 2026-11-20';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1711,7 +1738,7 @@ const mu = { names: new Set(), cache: new Map(), gain: null, cur: null, kind: nu
 const MENU_MUSIC = { loopFor: 600, fade: 40 };
 // Each battlefield's own music, from your side's six campaign tracks: later battlefields bring new ones.
 // Past your own side's six, a battlefield plays the other side's tracks ('x' and the number).
-const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6], portal: ['x1', 'x3'], quel: ['x2', 'x4'] };
+const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6], portal: ['x1', 'x3'], quel: ['x2', 'x4'], grim: ['x5', 'x6'] };
 function playlistFor(kind) {
   const horde = G && G.HD.side === 'Horde', pre = horde ? 'ORC' : 'HUMAN', p1 = horde ? 'O' : 'H';
   if (kind === 'menu') return ['OWARROOM'];
@@ -1985,7 +2012,7 @@ const P_ = () => meta.prog;
 meta.prisoners ||= [];   // prisoners revealed and not yet freed
 // Phase I2: the later heroes are prisoners. Meeting a hero's goal reveals where he is held; in a later run as one of
 // his side's heroes, a guarded fortress holds him. Destroy it, then stay alive while he escapes, to free him for good.
-const PRISON = { heroes: ['turalyon', 'dentarg', 'kurdran', 'guldan', 'khadgar', 'teron'], escape: 120, near: 650, far: 1600, hp: 2.5, towerRange: 190, towerEvery: 1.8, garrison: 3.5 };
+const PRISON = { march: 90, heroes: ['turalyon', 'dentarg', 'kurdran', 'guldan', 'khadgar', 'teron'], escape: 120, near: 650, far: 1600, hp: 2.5, towerRange: 190, towerEvery: 1.8, garrison: 3.5 };
 const isPrisoner = id => PRISON.heroes.includes(id);
 // An easy ladder: the first heroes come within a few runs, the later ones take real mastery.
 const HERO_GAP = 2;   // runs between heroes earned by goals
@@ -2255,8 +2282,9 @@ const BOSS_POOL = {
 // The final boss of each battlefield, by the side you're fighting.
 const FINALS = {
   forest: { Horde: 'orgrim', Alliance: 'lothar' }, winter: { Horde: 'guldan', Alliance: 'turalyon' },
-  waste: { Horde: 'deathwing', Alliance: 'kurdran' }, swamp: { Horde: 'chogall', Alliance: 'khadgar' },
+  waste: { Horde: 'kargath', Alliance: 'kurdran' }, swamp: { Horde: 'chogall', Alliance: 'khadgar' },
   portal: { Horde: 'teron', Alliance: 'danath' }, quel: { Horde: 'zuljin', Alliance: 'alleria' },
+  grim: { Horde: 'deathwing', Alliance: 'uther' },   // Phase M1 (Jon): Deathwing moved here from the Wastes
 };
 function planBosses() {   // [5:00, 10:00, 15:00, final]
   const side = foeSide(), fin = FINALS[G.LV.id][side], rest = Object.keys(BOSS_POOL[side]).filter(k => k !== fin);
@@ -2282,7 +2310,7 @@ function snapRun() {
     pending: G.pending + (G.state === 'levelup' ? 1 : 0), chests: G.chestQueue,
     h: { x: h.x, y: h.y, hp: h.hp, xp: h.xp, level: h.level, next: h.next },
     w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), e: Object.keys(G.weapons).filter(k => G.weapons[k].evo), p: G.passives, sh: G.hero.shield || 0,
-    fort: G.fort ? { s: G.fort.state, at: G.fort.freedAt ?? null } : null, ab: G.aboard ? G.boats.indexOf(G.aboard) : -1,
+    fort: G.fort ? { s: G.fort.state, at: G.fort.freedAt ?? null, m: G.fort.march || 0, c: G.fort.camp ?? null, kx: G.fort.kx, ky: G.fort.ky, x: G.fort.x, y: G.fort.y } : null, ab: G.aboard ? G.boats.indexOf(G.aboard) : -1,
     camps: [...G.camps.values()].filter(c => c.dead.size || c.chest || (c.wallDead && c.wallDead.size)).map(c => ({ key: c.key, ox: c.ox, oy: c.oy, dead: [...c.dead], chest: c.chest, wd: c.wallDead ? [...c.wallDead] : [] })) };
 }
 function saveRun() { const s = snapRun(); if (s) { s.at = Date.now(); store.set(RUN_KEY, s); } }
@@ -2304,7 +2332,7 @@ function continueRun() {
   recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
   for (const b of [].concat(s.bs || [])) if (BOSSES[b.n - 1]) spawnBoss(b.n, b.f);   // older saves kept one boss, not a list
   if (s.ab >= 0 && G.boats && G.boats[s.ab]) { const b = G.boats[s.ab]; b.x = G.hero.x; b.y = G.hero.y; G.aboard = b; }
-  if (G.fort && s.fort) { G.fort.state = s.fort.s; G.fort.freedAt = s.fort.at; G.fort.told = true; }   // the boss you were fighting comes back, wounded as he was
+  if (G.fort && s.fort) { Object.assign(G.fort, { state: s.fort.s, freedAt: s.fort.at, told: true, march: s.fort.m || 0, lx: G.hero.x, ly: G.hero.y }); if (s.fort.c != null) Object.assign(G.fort, { camp: s.fort.c, kx: s.fort.kx, ky: s.fort.ky, x: s.fort.x, y: s.fort.y }); else if (s.fort.s !== 'hidden') G.fort.state = 'hidden'; }   // saves from before the march: find it again   // the boss you were fighting comes back, wounded as he was
   for (const c of s.camps || []) {
     const camp = G.terrain.camps.find(x => x.id === +c.key.split(':')[0]); if (!camp) continue;
     G.camps.set(c.key, { key: c.key, c: camp, ox: c.ox, oy: c.oy, dead: new Set(c.dead), wallDead: new Set(c.wd || []), chest: c.chest, ents: [], spawnT: 2, live: false, warned: true });
@@ -2506,6 +2534,45 @@ function drawPortalGlow() {
 /* ---------- Quel'Thalas: archers and trolls hiding in the trees ---------- */
 // Ranged troops wait on the forest's edge, hidden until you come close or they loose their first shot. They never move.
 const AMBUSH = { reveal: 170, near: 230, far: 420 };
+// Grim Batol's demolition squads (Phase M1): from LV.demo.from, every LV.demo.every seconds, a few goblin sappers (or
+// dwarves, against the Horde) set off for the rock near you and blow it open: new passes as the run goes on. The blast
+// hurts anyone close, you included. Kill them on the way and the rock stays.
+function demoTarget(h) {
+  const T = G.terrain, cx0 = Math.round(h.x / 32), cy0 = Math.round(h.y / 32), out = [], q = T.q, I = (x, y) => tmod(y, TM) * TM + tmod(x, TM), C = (x, y) => q[I(x * 2, y * 2)];
+  for (let r = 4; r <= 20 && out.length < 12; r++) for (let k = 0; k < 24 + r * 4; k++) {
+    const a = k / (24 + r * 4) * TAU, x = cx0 + Math.round(Math.cos(a) * r), y = cy0 + Math.round(Math.sin(a) * r);
+    if (C(x, y) === TT.R && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => !T_BLOCK[C(x + dx, y + dy)])) out.push([x, y]);   // rock you can walk up to
+  }
+  return out.length ? out[Math.floor(Math.random() * out.length)] : null;
+}
+function updateDemolition(dt) {
+  const D = G.LV.demo; if (!D || !G.terrain || G.t < D.from || G.final) return;
+  if ((G.demoT = (G.demoT ?? 4) - dt) > 0) return; G.demoT = D.every;
+  const tg = demoTarget(G.hero); if (!tg) return;
+  for (let i = 0; i < D.squad; i++) { const e = spawnEnemy('fast'); if (!e) continue; e.demo = { tx: tg[0], ty: tg[1], t: 0 }; e.xp = 2; }
+  tip('demo', 'Demolition squads! They blast new paths through the rock, and the blast hurts anyone close.');
+}
+function updateDemo(e, dt) {   // true when it has taken over the squad member's move this frame
+  const T = G.terrain, D = G.LV.demo, m = e.demo, gx = m.tx * 32, gy = m.ty * 32, dx = gx - e.x, dy = gy - e.y, d = Math.hypot(dx, dy) || 1;
+  m.t += dt; if (e.stun > 0) return false;
+  if (d < 26 || (m.t > 8 && d < 60)) { blastAt(e, D); return true; }
+  if (m.t > 14) { delete e.demo; return false; }   // lost: join the fight
+  const sp = e.spd, r = e.r * 0.5, vx = dx / d * sp, vy = dy / d * sp, nx = e.x + vx * dt, ny = e.y + vy * dt;
+  if (!footBlocked(nx, e.y, r)) e.x = nx; if (!footBlocked(e.x, ny, r)) e.y = ny; e.dir = dirOf(dx, dy); e.moving = true;
+  return true;
+}
+const DEMO_HURT = 64;
+function blastAt(e, D) {
+  const T = G.terrain, m = e.demo, ch = Terrain.blastRock(T, m.tx, m.ty, D.blast, A.tilesets[T.LV.id].recs);
+  if (ch.length) { T.chunks.clear(); if (G.flow) G.flow.t = -1e9; T.ship = null; }   // redraw the ground, and let the troops find the new way
+  const x = m.tx * 32, y = m.ty * 32;
+  G.fx.push({ k: 'boom', x, y, r: 40, t: 0, life: 0.7 }); sfx('s_boom', 0);
+  const h = G.hero; if (Math.hypot(h.x - x, h.y - y) < DEMO_HURT) hurtHero(e.dmg * 3, 'demo');
+  for (const o of G.enemies) if (o !== e && !o.static && !o.boss && !o.dead && Math.hypot(o.x - x, o.y - y) < DEMO_HURT) { o.hp -= o.maxHp * 0.6; if (o.hp <= 0) { o.dead = true; } }
+  for (const s of G.enemies.filter(o => o.demo && o !== e && o.demo.tx === m.tx && o.demo.ty === m.ty)) delete s.demo;   // the rest of the squad joins the fight
+  e.dead = true; e.hp = 0; logEvent('rock blasted');
+  G.enemies = G.enemies.filter(o => !o.dead || o === e);
+}
 function updateAmbush(dt) {
   const L = G.LV.ambush; if (!L || G.t < L.from || G.final || !G.terrain) return;
   if ((G.ambushT = (G.ambushT ?? 2) - dt) > 0) return;
@@ -2613,24 +2680,40 @@ function drawBoat(b) {
   ctx.globalAlpha = 1;
   if (b.hp < b.maxHp) { const bw = 22; ctx.fillStyle = '#000'; ctx.fillRect(Math.round(x - bw / 2) - 1, Math.round(y + 14), bw + 2, 4); ctx.fillStyle = '#5aa8ff'; ctx.fillRect(Math.round(x - bw / 2), Math.round(y + 15), Math.max(0, Math.round(bw * b.hp / b.maxHp)), 2); }
 }
-// The fortress: the enemy camp with a hall nearest a good walk from the start, holding the first prisoner of your side.
+// The fortress (idea 37, Jon): you march to find it. At the start a banner says he's held some way off; once you've
+// walked about a minute and a half at your hero's own pace (in any direction: kiting counts), the nearest enemy camp
+// with a hall ahead of you, just past the edge of the screen, becomes his fortress, and the arrow and minimap mark
+// come on. No hint before then.
 function setupFortress() {
   G.fort = null; const T = G.terrain; if (!T || A.demo) return;
   const id = meta.prisoners.find(x => HEROES[x] && HEROES[x].side === G.HD.side && !meta.heroes.includes(x)); if (!id) return;
-  const P = TN * 32, h = G.hero; let best = null, bs = 1e9;
+  G.fort = { id, state: 'hidden', march: 0, need: PRISON.march * G.HD.speed, lx: G.hero.x, ly: G.hero.y, told: false };
+}
+function revealFortress() {
+  const F = G.fort, T = G.terrain, P = TN * 32, h = G.hero; let best = null, bs = 1e9;
+  const hv = Math.hypot(G.hv[0], G.hv[1]) > 0.1 ? G.hv : [F.dx || 1, F.dy || 0], ha = Math.atan2(hv[1], hv[0]), away = Math.hypot(W, H) / 2 + 80;
   for (const c of T.camps) {
     if (!c.enemy || c.sea || !c.blds.some(b => b.kind === 3)) continue;
     const wx = c.cx * 32 + 16, wy = c.cy * 32 + 16, kx = Math.round((h.x - wx) / P), ky = Math.round((h.y - wy) / P), x = wx + kx * P, y = wy + ky * P, d = Math.hypot(x - h.x, y - h.y);
-    const sc = (d < PRISON.near ? 3000 : d > PRISON.far ? 1500 : 0) + Math.abs(d - 1000) - c.blds.length * 30;
+    const st = G.camps.get(c.id + ':' + kx + ':' + ky); if (st && (st.dead.size || st.chest)) continue;   // not one you've already been knocking down
+    let da = Math.abs(Math.atan2(y - h.y, x - h.x) - ha); if (da > Math.PI) da = 2 * Math.PI - da;
+    const sc = da * 600 + Math.abs(d - (away + 250)) + (d < away ? 2000 : 0);
     if (sc < bs) { bs = sc; best = { camp: c.id, kx, ky, x, y }; }
   }
-  if (best) G.fort = { id, ...best, state: 'held', told: false };
+  if (!best) return;
+  const key = best.camp + ':' + best.kx + ':' + best.ky, st = G.camps.get(key); if (st) { if (st.live) deactivateCamp(st); G.camps.delete(key); }   // it comes back as the fortress
+  Object.assign(F, best, { state: 'held' });
+  banner(`${HEROES[F.id].name} is held in the fortress ahead! Destroy it to free him.`); G.banner.t = 4; logEvent('fortress found');
 }
 const isFortCamp = st => !!G.fort && st.c.id === G.fort.camp && st.ox === G.fort.kx * TN * 32 && st.oy === G.fort.ky * TN * 32;
 function updateFort(dt) {
   const F = G.fort; if (!F) return;
   const nm = HEROES[F.id].name;
-  if (!F.told && G.t > 2.5) { F.told = true; banner(`${nm} is held prisoner in a fortress nearby. Destroy it to free him!`); G.banner.t = 4; }
+  if (!F.told && G.t > 2.5) { F.told = true; banner(`${nm} is held in a fortress some way off. March on to find him.`); G.banner.t = 4; }
+  if (F.state === 'hidden') {   // count the ground covered (a teleport or a reload can't count as a march)
+    const h = G.hero, step = Math.hypot(h.x - F.lx, h.y - F.ly); if (step < 40) { F.march += step; if (step > 0.5) { F.dx = (h.x - F.lx) / step; F.dy = (h.y - F.ly) / step; } }
+    F.lx = h.x; F.ly = h.y; if (F.march >= F.need && !G.final) revealFortress();
+  }
   if (F.state === 'escaping' && G.t - F.freedAt >= PRISON.escape) {
     F.state = 'escaped'; banner(`${nm} has escaped! He joins your heroes after this run.`); G.banner.t = 4; heroVoice('yes', 1, F.id); logEvent('prisoner escaped');
   }
@@ -3028,7 +3111,7 @@ const RECAP = { secs: 5, low: 0.3 };
 function srcName(k) {
   if (k === 'boss') { const b = G.enemies.find(e => e.boss) ; return b && b.name || G.finalName || 'the boss'; }
   if (FOES[k]) return FOES[k][foeSide()] || FOES[k].Horde;
-  return { shot: 'missiles', sinking: 'your transport sinking', tower: 'the fortress towers', barrage: "the boss's barrage", '?': 'something unseen' }[k] || k;
+  return { shot: 'missiles', sinking: 'your transport sinking', tower: 'the fortress towers', barrage: "the boss's barrage", demo: 'a demolition blast', '?': 'something unseen' }[k] || k;
 }
 function deathRecap() {
   if (G.won || !G.stats.lastHit) return '';
@@ -3456,6 +3539,7 @@ function updateEnemies(dt) {
     let dx = h.x - e.x, dy = h.y - e.y; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
     if (e.ship) { updateShip(e, d, dx, dy, dt); continue; }
     if (e.ambush) { updateAmbusher(e, d, dx, dy); continue; }
+    if (e.demo && updateDemo(e, dt)) continue;
     let sp = e.spd * (e.lust > 0 ? 1.4 : 1);
     if (e.range) {   // ranged units keep their distance
       if (d < e.range * (e.type === 'siege' ? 0.55 : 0.75)) sp = -sp * 0.6; else if (d < e.range) sp = 0;
@@ -3536,7 +3620,7 @@ function update(dt) {
   if (h.frenzy && (h.frenzyT -= dt) <= 0) h.frenzy = Math.max(0, h.frenzy - dt * 0.15);   // Blade Frenzy fades
   if (G.HD.holyLight && h.hp > 0 && h.hp < h.maxHp * 0.3 && G.t >= (G.holyT || 0)) { G.holyT = G.t + 60; h.hp = Math.min(h.maxHp, h.hp + h.maxHp * 0.4); banner('Holy Light!'); G.fx.push({ k: 'pillar', x: h.x, y: h.y, t: 0, life: 0.6 }); }
   h.coilBank = Math.min(COIL_HEAL_PER_S, (h.coilBank || 0) + COIL_HEAL_PER_S * dt);
-  spawn(dt); updateCamps(dt); updateFort(dt); updateBoats(dt); updatePortal(dt); updateAmbush(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
+  spawn(dt); updateCamps(dt); updateFort(dt); updateBoats(dt); updatePortal(dt); updateAmbush(dt); updateDemolition(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
   for (const f of G.fx) f.t += dt; G.fx = G.fx.filter(f => f.t < f.life); G.numCount = 0; for (const f of G.fx) if (f.k === 'num') G.numCount++;
   for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
   if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
@@ -3775,7 +3859,7 @@ function drawMarkShot(m) {
 }
 // The prisoner stands by the fortress's hall, ringed in gold; once freed he slips away over a few seconds.
 function prisonerSpot() {
-  const F = G.fort; if (!F || F.state === 'escaped') return null;
+  const F = G.fort; if (!F || F.state === 'escaped' || F.state === 'hidden') return null;
   const away = F.state === 'escaping' ? Math.min(1, (G.t - F.freedAt) / 4) : 0; if (away >= 1) return null;
   const st = [...G.camps.values()].find(isFortCamp), hall = st && st.ents.find(e => e.kind === 3);
   if (hall && F.px == null) { F.px = hall.x; F.py = hall.y + hall.r + 14; }
