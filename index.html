@@ -194,6 +194,7 @@
   .breakdown h3{margin:0 0 4px;color:var(--gold);font-size:15px} .wrow{display:grid;grid-template-columns:9em 1fr 9em;gap:6px;align-items:center;font-size:13px;margin:2px 0}
   .wbar{height:8px;background:#16100a;border:1px solid #000} .wbar i{display:block;height:100%;background:linear-gradient(#ffd27a,#b8862a)}
   .hpgraph{width:100%;height:60px;background:#16100a;border:1px solid #000;margin-top:8px} .hpaxis{display:flex;justify-content:space-between;font-size:13px;color:#c9b88f}
+  #overlay.banishing .card{outline:2px dashed #e0442a;outline-offset:-3px} #overlay.banishing .banishnote{color:#ff9a80}
   .wcstage button.opt.two{flex-direction:column;gap:1px} .wcstage button.opt .ago{display:block;opacity:.85;font-size:9px;line-height:1}
   .hinfo{margin-top:8px;border:1px solid var(--gold2);border-radius:6px;padding:8px 12px;background:rgba(0,0,0,.25);min-height:104px;text-align:left}
   .hinfo-in{display:flex;gap:12px;align-items:flex-start} .hinfo .nm{color:var(--gold);font-size:18px} .hinfo .ds{display:block;font-size:15px;margin-top:4px}
@@ -812,6 +813,7 @@ const UPGRADES = {
   growth:  { name: 'Growth', desc: '+8% experience', max: 5, cost: 110 },
   greed:   { name: 'Greed', desc: '+15% gold', max: 5, cost: 80 },
   reroll:  { name: 'Fortune', desc: '+1 reroll each run', max: 3, cost: 150 },
+  banish:  { name: 'Exile', desc: '+1 banish each run: a weapon or passive you banish never comes up again that run', max: 3, cost: 150 },
   revival: { name: 'Revival', desc: 'Come back once per run with half health', max: 1, cost: 600 },
 };
 const xpFor = l => 3 + l * 3 + Math.floor(l * l * 0.2);
@@ -1118,7 +1120,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.15.0', BUILD = '7ded6a0 2026-11-20';
+const VERSION = '0.16.0', BUILD = 'edf0ef1 2026-11-20';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -2222,7 +2224,7 @@ function snapRun() {
   return { v: 1, hero: G.heroId, level: G.LV.id, seed: G.terrain.seed, t: G.t, kills: G.kills, gold: G.gold,
     lab: G.labour || 0, bp: G.bossPlan || null, bossN: G.bossN || 0, eliteNext: G.eliteNext, eliteN: G.eliteN, swarmNext: G.swarmNext,
     bs: G.enemies.filter(e => e.boss && e.hp > 0).map(b => ({ n: b.boss, f: b.hp / b.maxHp })),   // every boss still alive, as wounded as he is
-    revives: G.revives, rerolls: G.rerolls,   // lost from saves 0.11.3 to 0.13.0: a comment swallowed them
+    revives: G.revives, rerolls: G.rerolls, banishes: G.banishes, banned: G.banned || [],   // lost from saves 0.11.3 to 0.13.0: a comment swallowed them
     pending: G.pending + (G.state === 'levelup' ? 1 : 0), chests: G.chestQueue,
     h: { x: h.x, y: h.y, hp: h.hp, xp: h.xp, level: h.level, next: h.next },
     w: Object.fromEntries(Object.entries(G.weapons).map(([k, v]) => [k, v.lvl])), e: Object.keys(G.weapons).filter(k => G.weapons[k].evo), p: G.passives, sh: G.hero.shield || 0,
@@ -2243,7 +2245,7 @@ function continueRun() {
   G.weapons = {}; for (const [k, l] of Object.entries(s.w || {})) if (WEAPONS[k]) G.weapons[k] = { lvl: l, cd: 0.3, tick: 0, evo: (s.e || []).includes(k) && !!EVOS[k] };
   G.passives = Object.fromEntries(Object.entries(s.p || {}).filter(([k]) => PASSIVES[k]));   // drops retired passives
   // Saves from before the named bosses counted bosses due every 4 minutes from 5:00; they map onto the new 5, 10, 15.
-  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(PACE.elite, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives ?? up('revival'), rerolls: s.rerolls ?? 1 + up('reroll'), pending: s.pending || 0, chestQueue: s.chests || [] });
+  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(PACE.elite, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives ?? up('revival'), rerolls: s.rerolls ?? 1 + up('reroll'), banishes: s.banishes ?? up('banish'), banishMax: up('banish'), banned: s.banned || [], pending: s.pending || 0, chestQueue: s.chests || [] });
   Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next }); G.labour = s.lab || 0; G.bossPlan = s.bp && s.bp.length === BOSSES.length ? s.bp : null;   // runs saved before 20-minute runs plan again
   recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
   for (const b of [].concat(s.bs || [])) if (BOSSES[b.n - 1]) spawnBoss(b.n, b.f);   // older saves kept one boss, not a list
@@ -2271,10 +2273,10 @@ function newRun(heroId, levelId, seed) {
   G = { heroId, HD, LV, seed,
     t: 0, kills: 0, spawnAcc: 0, bossN: 0, eliteNext: PACE.elite + graceFor() * GRACE.pace, grace: graceFor(), eliteN: 0, final: false, swarmNext: 95, pending: 0, state: 'play', banner: null,
     hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
-    weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], marks: [], hv: [0, 0], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, gold: 0, chestQueue: [], buffs: {}, stats: { dmg: 0, hp: 0, next: 60, mins: [], lastHit: null }
+    weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], marks: [], hv: [0, 0], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, banishes: 0, banishMax: 0, banned: [], gold: 0, chestQueue: [], buffs: {}, stats: { dmg: 0, hp: 0, next: 60, mins: [], lastHit: null }
   };
   addItem('w', HD.start); recalc(); G.hero.hp = G.hero.maxHp; logStart();
-  G.revives = up('revival'); G.rerolls = 1 + up('reroll');
+  G.revives = up('revival'); G.rerolls = 1 + up('reroll'); G.banishes = G.banishMax = up('banish');
   if (typeof startLevel === 'function') startLevel();
   ensureAudio(); sfx('s_start'); playMusic('battle'); heroVoice('ready', 1);
   hideMenu(); showHudBtns(true);
@@ -2599,7 +2601,7 @@ function updateCamps(dt) {
         if (!st.warned) { st.warned = true; if (st.fort) banner(`The fortress! Destroy every building to free ${HEROES[G.fort.id].name}.`); else if (c.sea) tip('port', `An enemy port! Its ships shell the shore: sink them with ranged weapons.`); else tip('camp', `An enemy ${c.side === 'orc' ? 'orc' : 'human'} camp! Destroy it for gold.`); }
         if (c.sea) { portShips(st, dt); continue; }
         st.spawnT -= dt;
-        if (st.spawnT <= 0) {
+        if (st.spawnT <= 0 && !G.final) {   // no new troops once the final boss has come
           st.spawnT = st.fort ? PRISON.garrison : 5.5;
           const live = st.ents.filter(e => !e.dead);
           for (let i = 0; i < 2 + (G.t > 300) + !!st.fort; i++) { const b = live[Math.floor(Math.random() * live.length)], a = rnd(0, TAU), x = b.x + Math.cos(a) * (b.r + 14), y = b.y + Math.sin(a) * (b.r + 14); if (!footBlocked(x, y, 4)) spawnEnemy(Math.random() < 0.7 ? 'basic' : 'fast', x, y); }
@@ -2802,7 +2804,8 @@ const PACE = { scout: 120, siege: 210, elite: 180, flyer: 270, caster: 480, daem
 const GRACE = { upTo: 0.3, pace: 60, dmg: 0.33, until: 360 };
 function graceFor() { let n = 0, max = 0; for (const [id, U] of Object.entries(UPGRADES)) { n += meta.ups[id] || 0; max += U.max; } return Math.max(0, 1 - n / max / GRACE.upTo); }
 const late = (k, t) => t > PACE[k] + (G.grace || 0) * GRACE.pace;   // has this kind of enemy arrived yet
-const FINAL = { spawn: 0.25, dmg: 0.6, hp: 1 };   // hp: the final boss's toughness
+const FINAL = { spawn: 0, dmg: 0.6, hp: 1, broken: 0.15 };   // hp: the final boss's toughness. At 20:00 no new troops come (spawn 0), and the army
+// already on the field stays but breaks: its health falls to 15% and it hits at 60%, so you cut it down and then face him (Jon, 20 November 2026).
 const BOSS_HIT = { mark: 0.45, final: 0.5, spd: 0.8 };   // spd: the final boss flies over trees and water, so he's a little slower   // a barrage circle hurts less than a bite; the final boss bites a little softer than his size suggests   // when the final boss comes the army falls back, then trickles in again more thinly
 const lateHp = t => t > LATE.from ? 1 + LATE.hp * (G.LV.late || 1) * ((t - LATE.from) / (RUN_LEN - LATE.from)) ** 1.4 : 1;   // LV.late: a battlefield's own late-game steepness
 const pushK = t => t > LATE.push ? (t - LATE.push) / (RUN_LEN - LATE.push) : 0;
@@ -2834,10 +2837,9 @@ function spawnBoss(n, frac) {
   G.bossPlan ||= planBosses();
   const id = G.bossPlan[n - 1], B = { ...BOSSES[n - 1], ...BOSS_POOL[foeSide()][id], id, n }, e = spawnEnemy('boss', undefined, undefined, B);
   if (frac) e.hp = e.maxHp * frac;
-  if (!frac) banner(B.final ? `${e.name} has come! Slay him to win.` : `${e.name} approaches!`); logEvent('boss ' + n);
-  if (B.final && !frac) {   // the army falls back as he arrives, so the last fight is with him
-    for (const o of G.enemies) if (!o.static && !o.boss) o.dead = true;
-    G.enemies = G.enemies.filter(o => !o.dead); G.eshots.length = 0; G.marks.length = 0;
+  if (!frac) banner(B.final ? `${e.name} has come! The army wavers: cut it down, then slay him.` : `${e.name} approaches!`); logEvent('boss ' + n);
+  if (B.final && !frac) {   // the army stays, but breaks: easy to kill and weaker, so you cull it, then face him
+    for (const o of G.enemies) if (!o.static && !o.boss) { o.maxHp *= FINAL.broken; o.hp = Math.min(o.hp, o.maxHp); o.dmg *= FINAL.dmg; o.broken = true; }
     G.fx.push({ k: 'ring', x: G.hero.x, y: G.hero.y, r: 400, t: 0, life: 1.2, col: '255,120,60' });
   }
   if (B.final) { G.final = true; G.finalName = e.name; }
@@ -4211,7 +4213,7 @@ function guardMenu(lockMs = 0) {
 }
 const menuLocked = () => performance.now() < menuLockUntil;
 const MENU_LOCK = 0;   // no wait on level-ups or chests: the press and held-key checks are enough
-const RUN_MENU = new Set(['pick', 'reroll', 'skip', 'chestok']);
+const RUN_MENU = new Set(['pick', 'reroll', 'skip', 'chestok', 'banish']);
 function showMenu(html) {
   overlay.className = ''; overlay.innerHTML = `<div class="panel">${html}</div>`; overlay.style.display = 'flex'; sel = 0; titleArt(false);
   if (!G && A.menuBg) { overlay.classList.add('parch'); overlay.style.backgroundImage = `url(${A.menuBg})`; if (!overlay.querySelector('.cards, .hsel, .ftiles, .about')) overlay.classList.add('bare'); }
@@ -4308,7 +4310,9 @@ overlay.addEventListener('click', e => {
   else if (act === 'refund') { meta.gold += meta.spent; meta.spent = 0; meta.ups = {}; saveMeta(); showShop(); }
   else if (act === 'resume') { hideMenu(); G.state = 'play'; showHudBtns(true); musicDuck(false); }
   else if (act === 'pause') pauseRun(true);
-  else if (act === 'pick') pickCard(b.dataset.kind, b.dataset.id);
+  else if (act === 'pick') { if (G.banishing) banishCard(b.dataset.kind, b.dataset.id); else pickCard(b.dataset.kind, b.dataset.id); }
+  // Banish in two steps (Jon): the button, then the card, so a single stray press never banishes anything.
+  else if (act === 'banish') setBanishing(!G.banishing);
   else if (act === 'reroll') { if (G.rerolls > 0) { G.rerolls--; openLevelUp(true); } }
   else if (act === 'skip') { if (G.log) G.log.picks.push([Math.round(G.t), G.hero.level, (G.offer || []).join(','), 'skip']); G.hero.hp = Math.min(G.hero.maxHp, G.hero.hp + G.hero.maxHp * 0.1); resumeOrNext(); }
   else if (act === 'chestok') { const l = $('#loot'); if (l && !l.classList.contains('fast') && performance.now() - G.chestAt < 450 * l.children.length) { l.classList.add('fast'); return; } resumeOrNext(); }
@@ -4326,6 +4330,12 @@ function updateHomeIcon() {
   const link = document.querySelector('link[rel="apple-touch-icon"]'); if (!hd || !link || (HOME_ICON === 'hero' && !pic) || homeIconFor === id + HOME_ICON) return;
   const c = HOME_ICON === 'tos' ? tosIcon(hd.side) : heroIcon(pic, hd.side); if (!c) return;
   try { link.href = c.toDataURL('image/png'); homeIconFor = id + HOME_ICON; } catch (e) {}
+  // The browser tab too (Jon): a small copy of the same picture. The SVG link goes, since browsers prefer it.
+  try {
+    const t = document.createElement('canvas'); t.width = t.height = 64; const x = t.getContext('2d'); x.imageSmoothingEnabled = true; x.drawImage(c, 0, 0, 64, 64);
+    document.querySelectorAll('link[rel="icon"]').forEach(l => l.remove());
+    const l = document.createElement('link'); l.rel = 'icon'; l.type = 'image/png'; l.sizes = '64x64'; l.href = t.toDataURL('image/png'); l.dataset.tos = '1'; document.head.appendChild(l);
+  } catch (e) {}
 }
 let HOME_ICON = 'tos';   // Jon's pick (20 November 2026): "ToS" in Warcraft II's own menu lettering, blue for Alliance, red for Horde; 'hero' draws the last hero's portrait instead
 function iconBack(side) {
@@ -4388,8 +4398,14 @@ function showTitle() {
 // Battlefield select works like hero select: tap a battlefield to see it (a preview of its ground, what it's
 // like, your best time), tap again or press Fight here to start.
 const PREVIEW_SEED = 20261118;
+// Battlefield previews: a whole map is generated to draw each one, which held up the battlefield screen after
+// picking a hero (Jon). Finished pictures are saved in the browser, by battlefield, side and version (a new
+// build with map changes draws them again once), so after the first visit the screen appears at once.
+const PV_KEY = () => `tos_pv_${VERSION}_${A.demo ? 'demo' : 'full'}`;
 function fieldPreview(L, side) {
   A.previews ||= {}; const key = L.id + side; if (A.previews[key] !== undefined) return A.previews[key];
+  const saved = store.get(PV_KEY(), {});
+  if (saved[key]) { const im = new Image(); im.src = saved[key]; return (A.previews[key] = im); }
   let c = null;
   try {
     if (groundColours(L)) {
@@ -4397,6 +4413,7 @@ function fieldPreview(L, side) {
       c = document.createElement('canvas'); c.width = 128; c.height = 96;
       const keep = ctx; ctx = c.getContext('2d');
       try { drawMiniMap(T, 0, 0, 0, 0, 128, 128); ctx.fillStyle = '#fff'; ctx.fillRect(63, 47, 3, 3); } finally { ctx = keep; }
+      try { saved[key] = c.toDataURL('image/png'); for (const k of Object.keys(localStorage)) if (k.startsWith('tos_pv_') && k !== PV_KEY()) localStorage.removeItem(k); store.set(PV_KEY(), saved); } catch (e) {}   // old versions' pictures go
     }
   } catch (e) { console.warn(e); c = null; }
   return (A.previews[key] = c);
@@ -4426,7 +4443,7 @@ function showLevels(heroId) {
     <div id="fieldInfo" class="hinfo"></div>
     <div class="opts" style="margin-top:10px"><button class="opt" data-act="choose" data-back>Back</button></div>`);
   overlay.querySelector('.panel').classList.add('wide');
-  overlay.querySelectorAll('canvas.fpic').forEach(c => { const pv = fieldPreview(LEVELS.find(L => L.id === c.dataset.level), foeSideOf(heroId)); if (pv) c.getContext('2d').drawImage(pv, 0, 0); else c.remove(); });
+  overlay.querySelectorAll('canvas.fpic').forEach(c => { const pv = fieldPreview(LEVELS.find(L => L.id === c.dataset.level), foeSideOf(heroId)); if (!pv) return c.remove(); const draw = () => c.getContext('2d').drawImage(pv, 0, 0); if (pv.complete === false) pv.addEventListener('load', draw, { once: true }); else draw(); });
   overlay.querySelectorAll('.tile.field').forEach(t => t.addEventListener('mouseenter', () => { const i = opts().indexOf(t); if (i >= 0) { sel = i; highlight(); } }));
   const box = overlay.querySelector('#fieldInfo');
   if (box && !isPhone()) { let hMax = 0; LEVELS.forEach((L, i) => { box.innerHTML = fieldDetails(L, i, heroId); wcify(box); hMax = Math.max(hMax, box.offsetHeight); }); box.innerHTML = ''; delete box.dataset.level; box.style.boxSizing = 'border-box'; box.style.minHeight = hMax + 'px'; }
@@ -4739,7 +4756,7 @@ function pauseSheet() {
   const stat = (k, v) => `<b>${k}</b><span>${v}</span>`;
   const stats = [stat('Health', `${Math.ceil(h.hp)} / ${h.maxHp}`), stat('Damage', pct(h.might - 1)), stat('Armour', h.armour), stat('Speed', Math.round(h.speed)),
     stat('Attack speed', pct(1 / h.haste - 1)), stat('Area', pct(h.area - 1)), stat('Pickup range', pct(h.magnet - 1)), stat('Regeneration', `${h.regen.toFixed(1)} per second`),
-    stat('Revives', G.revives), stat('Rerolls', G.rerolls)].join('');
+    stat('Revives', G.revives), stat('Rerolls', G.rerolls), ...(G.banishMax ? [stat('Banishes', G.banishes)] : [])].join('');
   const row = (kind, id, nm, lvl, ds) => `<div class="pitem">${itemIcon(kind, id)}<div><div class="nm">${nm} <span class="lv">Level ${lvl}${lvl >= MAX_LVL ? ' (max)' : ''}</span></div>${ds ? `<div class="ds">${ds}</div>` : ''}</div></div>`;
   const ws = Object.entries(G.weapons).map(([id, w]) => w.evo ? row('w', id, EVOS[id].name, w.lvl, evoStats(id)).replace(/Level \d+ \(max\)/, 'Evolved')
     : row('w', id, WEAPONS[id].name, w.lvl, weaponStats(id, w.lvl) + (w.lvl >= MAX_LVL && EVOS[id] ? ` Evolves into ${EVOS[id].name} with ${PASSIVES[EVOS[id].p].name} and a boss chest.` : ''))).join('');
@@ -4748,13 +4765,14 @@ function pauseSheet() {
       <div><div class="nm">${HD.name}</div><div class="sub">${HD.unit}, level ${h.level}</div>${HD.sig ? `<div class="sigline"><b>${HD.sig}:</b> ${HD.sigDesc}</div>` : ''}</div></div>
     <div class="stats">${stats}</div>
     <div class="stats run">${stat('Battlefield', G.LV.name)}${stat('Time', fmtTime(G.t))}${stat('Kills', G.kills)}${stat('Gold', G.gold)}</div>
-    <div class="items scrollbox"><h3>Weapons</h3>${ws}<h3>Passives</h3>${ps}</div></div>`;
+    <div class="items scrollbox"><h3>Weapons</h3>${ws}<h3>Passives</h3>${ps}${(G.banned || []).length ? `<h3>Banished</h3><p class="sub">${G.banned.map(k => { const [kd, id] = k.split(':'); return kd === 'w' ? WEAPONS[id].name : PASSIVES[id].name; }).join(', ')}</p>` : ''}</div></div>`;
 }
-function choices() {
+function choices(keep = []) {
   const o = [], wc = Object.keys(G.weapons).length, pc = Object.keys(G.passives).length;
-  for (const id in WEAPONS) { const c = G.weapons[id]; if (!c && WEAPONS[id].sig) continue; if (c) { if (c.lvl < MAX_LVL) o.push({ kind: 'w', id, lvl: c.lvl + 1, wgt: 1.2 }); } else if (wc < MAX_SLOTS) o.push({ kind: 'w', id, lvl: 1, wgt: 0.8 }); }
-  for (const id in PASSIVES) { const c = G.passives[id] || 0; if (c) { if (c < MAX_LVL) o.push({ kind: 'p', id, lvl: c + 1, wgt: 1 }); } else if (pc < MAX_SLOTS) o.push({ kind: 'p', id, lvl: 1, wgt: 0.7 }); }
-  const out = [];
+  const out = [], ban = new Set(G.banned || []);
+  for (const id in WEAPONS) { const c = G.weapons[id]; if (!c && WEAPONS[id].sig || ban.has('w:' + id)) continue; if (c) { if (c.lvl < MAX_LVL) o.push({ kind: 'w', id, lvl: c.lvl + 1, wgt: 1.2 }); } else if (wc < MAX_SLOTS) o.push({ kind: 'w', id, lvl: 1, wgt: 0.8 }); }
+  for (const id in PASSIVES) { const c = G.passives[id] || 0; if (ban.has('p:' + id)) continue; if (c) { if (c < MAX_LVL) o.push({ kind: 'p', id, lvl: c + 1, wgt: 1 }); } else if (pc < MAX_SLOTS) o.push({ kind: 'p', id, lvl: 1, wgt: 0.7 }); }
+  for (const k of keep) { const i = o.findIndex(c => c.kind === k.kind && c.id === k.id); if (i >= 0) out.push(o.splice(i, 1)[0]); }   // cards kept when one is banished
   while (out.length < (G.HD.cards || 3) && o.length) {
     let s = o.reduce((a, b) => a + b.wgt, 0), r = Math.random() * s, i = 0;
     for (; i < o.length; i++) { r -= o[i].wgt; if (r <= 0) break; }
@@ -4835,18 +4853,33 @@ function itemInfo(c) {
   return { nm: 'Sack of gold', ds: 'Gain 50 gold.', lv: '<span class="lv">Everything is maxed</span>' };
 }
 const levelSnd = () => G && G.HD.side === 'Horde' && A.sbuf.s_level_orc ? 's_level_orc' : 's_level';
-function openLevelUp(reroll) {
-  G.state = 'levelup'; if (!reroll) G.pending--; joy = null; showHudBtns(false);
+function openLevelUp(reroll, keep) {
+  G.state = 'levelup'; if (!reroll) G.pending--; joy = null; showHudBtns(false); G.banishing = false;
   if (!reroll) guardMenu(MENU_LOCK);
   if (!reroll && !heroVoice('any')) sfx(levelSnd(), 0);   // a random line from the hero, or the jingle if no voices were imported
-  const offer = choices(); G.offer = offer.map(c => c.id);
+  const offer = choices(keep); G.offer = offer.map(c => c.id); G.offerFull = offer;
   const cards = offer.map((c, i) => {
     const { nm, ds, lv, hint } = itemInfo(c);
     return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="chead">${itemIcon(c.kind, c.id)}<span class="ctitle"><span class="nm">${i + 1}. ${nm}</span>${lv}</span></span><span class="ds">${ds}</span>${hint ? `<span class="ds evohint">${hint}</span>` : evoMark(c) ? `<span class="ds evohint">${evoMark(c)}</span>` : ''}</button>`;
   }).join('');
   showMenu(`<h2>Level ${G.hero.level}</h2><div class="cards">${cards}</div>
-    <div class="lvlrow"><button class="opt" data-act="reroll" ${G.rerolls > 0 ? '' : 'disabled'}>Reroll (${G.rerolls})</button><button class="opt" data-act="skip">Skip (+10% health)</button></div>`);
+    <div class="lvlrow"><button class="opt" data-act="reroll" ${G.rerolls > 0 ? '' : 'disabled'}>Reroll (${G.rerolls})</button><button class="opt" data-act="skip">Skip (+10% health)</button>${G.banishMax ? `<button class="opt" data-act="banish" ${G.banishes > 0 ? '' : 'disabled'}>Banish (${G.banishes})</button>` : ''}</div>
+    <p class="sub banishnote" style="display:none">Choose a card to banish: it won't come up again this run.</p>`);
   if (menuLocked()) overlay.classList.add('locked');
+}
+function setBanishing(on) {
+  if (on && !(G.banishes > 0)) return;
+  G.banishing = on; overlay.classList.toggle('banishing', on);
+  const b = overlay.querySelector('[data-act=banish]'), note = overlay.querySelector('.banishnote');
+  if (b) { b.textContent = on ? 'Cancel' : `Banish (${G.banishes})`; delete b.dataset.wc; if (on) b.setAttribute('data-back', ''); else b.removeAttribute('data-back'); wcify(overlay); }
+  if (note) note.style.display = on ? '' : 'none';   // not the hidden attribute: the game lettering's own display rule wins over it
+}
+function banishCard(kind, id) {
+  if (!(G.banishes > 0) || kind === 'food' || kind === 'gold') return setBanishing(false);
+  G.banishes--; (G.banned ||= []).push(kind + ':' + id);
+  if (G.log) G.log.picks.push([Math.round(G.t), G.hero.level, (G.offer || []).join(','), 'banish:' + id]);
+  sfx('s_hit', 0);
+  openLevelUp(true, (G.offerFull || []).filter(c => !(c.kind === kind && c.id === id)));   // the other cards stay; a new one takes its place
 }
 function resumeOrNext() {
   if (G.chestQueue.length) openChest(G.chestQueue.shift());
