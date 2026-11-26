@@ -117,6 +117,7 @@
   button.opt canvas.wct{margin:2px 0}
   .wclines{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
   .panel .sub.wclines{align-items:center}
+  button.opt.wcbtn2{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
   .wclines canvas.wct{margin:0;flex:none}
   .panel.tight h2 canvas.wct{width:auto!important}   /* heading at 1x instead of 2x */
   .panel.tight h2{margin:0}
@@ -1158,7 +1159,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.21.1', BUILD = '4d05093 2026-11-26';
+const VERSION = '0.21.2', BUILD = '6baccc5 2026-11-26';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -4081,7 +4082,18 @@ function wcify(root) {
   for (const [selr, key, scheme, sc] of WC_RULES) root.querySelectorAll(selr).forEach(el => {
     if (el.dataset.wc || el.children.length && !(el.children.length === 1 && el.firstElementChild.tagName === 'B')) return;
     const text = el.textContent.replace(/\s+/g, ' ').trim(); if (!text) return;
-    const img = fontImage(text, key, el.closest('button')?.disabled ? 'grey' : scheme, el.closest('.wcstage') ? 1 : sc); if (!img) return;
+    const col = el.closest('button')?.disabled ? 'grey' : scheme, s2 = el.closest('.wcstage') ? 1 : sc, f = fonts[key];
+    // A label wider than its button wraps onto a second line instead of being squeezed into tiny text.
+    const room = el.tagName === 'BUTTON' && f ? (el.clientWidth - 16) / s2 : 0;
+    if (room > 40 && fontWidth(f, text) > room && text.includes(' ')) {
+      const lines = []; let cur = '';
+      for (const w of text.split(' ')) { const t = cur ? cur + ' ' + w : w; if (cur && fontWidth(f, t) > room) { lines.push(cur); cur = w; } else cur = t; }
+      if (cur) lines.push(cur);
+      el.dataset.wc = '1'; el.setAttribute('aria-label', text); el.textContent = ''; el.classList.add('wclines', 'wcbtn2');
+      for (const ln of lines) { const img = fontImage(ln, key, col, s2); if (img) el.appendChild(img); }
+      return;
+    }
+    const img = fontImage(text, key, col, s2); if (!img) return;
     el.dataset.wc = '1'; el.setAttribute('aria-label', text); el.textContent = ''; el.appendChild(img);
   });
 }
@@ -4702,9 +4714,9 @@ const OPT_DEFS = {
   minimap: { label: 'Minimap', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
   fps: { label: 'Show FPS', vals: [false, true], fmt: v => v ? 'On' : 'Off' },
   fx: { label: 'Effects', vals: ['full', 'reduced'], fmt: v => v === 'full' ? 'Full' : 'Reduced (no glows or light beams)' },
-  tips: { label: 'Tips', vals: [true, false], fmt: v => v ? `On for your first ${TIPS.runs} runs of each` : 'Off' },
+  tips: { label: 'Tips', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
   colours: { label: 'Colours', vals: ['std', 'cb'], fmt: v => v === 'cb' ? 'Colour-blind friendly (blue health, orange foes)' : 'Standard' },
-  sprites: { label: 'Unit sprites', vals: ['updated', 'classic'], fmt: v => v === 'classic' ? 'Classic (paladins, rangers, berserkers and ogre-mages drawn as their base units)' : "Updated (Incos's paladin, ranger, berserker and ogre-mage)" },
+  sprites: { label: 'Unit sprites', vals: ['updated', 'classic'], fmt: v => v === 'classic' ? 'Classic' : 'Updated' },
 };
 function changeOpt(k) {
   const d = OPT_DEFS[k], i = d.vals.indexOf(cfg.opts[k]);
