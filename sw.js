@@ -11,7 +11,7 @@ self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', e => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;
-  if (req.headers.has('range') || url.pathname.includes('/demo/')) return;   // the demo zip: read in parts straight from the network
+  if (req.headers.has('range') || url.pathname.includes('/pack/')) return;   // the asset pack: kept in IndexedDB by the game, so not cached twice
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {

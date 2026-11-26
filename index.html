@@ -248,6 +248,8 @@
     .panel.tight .opts.set{grid-template-columns:1fr}
     .panel.scrolls{max-height:none} .panel.scrolls .scrollbox{overflow:visible}
   }
+.packbar { height: 10px; margin: 14px auto 6px; width: min(360px, 80%); background: #1a1208; border: 1px solid #6b5326; border-radius: 3px; overflow: hidden; }
+.packbar > div { height: 100%; width: 0; background: linear-gradient(#e8c060, #a07420); transition: width .2s; }
 </style>
 </head>
 <body>
@@ -1156,7 +1158,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.20.1', BUILD = 'f61d1ee 2026-11-26';
+const VERSION = '0.21.0', BUILD = '9581401 2026-11-26';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1275,9 +1277,8 @@ function autoAssign(force) {
   if (main) {
     const war = A.wars[main];
     if ((force || !cfg.palette || !A.wars[cfg.palette.file]) && Core.kindOf(war, AUTO_PALETTE) === 'pal') cfg.palette = { file: main, entry: AUTO_PALETTE };
-    const demo = isDemoMain(war);
     for (const [role, r0] of Object.entries(AUTO_ROLES)) {
-      const r = demo && DEMO.roles[role] ? unitR(DEMO.roles[role]) : r0, cur = cfg.roles[role];
+      const r = r0, cur = cfg.roles[role];
       if (!force && cur && A.wars[cur.file] && !(cur.auto && cur.file === main && cur.entry !== r.e)) continue;   // automatic picks follow the table when it's corrected
       if (Core.kindOf(war, r.e) !== 'gfx') continue;
       cfg.roles[role] = { file: main, entry: r.e, mode: r.mode, r0: r.r0, r1: r.r1, auto: true }; n++;
@@ -1305,89 +1306,54 @@ function packWar(items) {
   items.forEach((it, i) => { dv.setUint32(8 + i * 4, p, true); dv.setUint32(p, it.data.length, true); out.set(it.data, p + 4); p += 4 + it.data.length; });
   return out.buffer;
 }
-/* ---------- the shareware demo ----------
-   The free 1996 Warcraft II demo (DOSBOX_WAR2.ZIP from dosgames.com) holds an earlier, smaller MAINDAT.WAR.
-   When it's imported, its pictures are copied into a MAINDAT.WAR laid out like the full game's, so everything
-   else works unchanged. This table holds only entry numbers (full game -> demo), no game data.
-   Each run is [first full entry, first demo entry, count]; found by matching the two archives entry by entry. */
-const DEMO = {
-  marker: 'TOS-DEMO', count: 528, level: 'winter', heroes: ['lothar', 'uther', 'alleria', 'grom', 'zuljin', 'chogall'],
-  runs: [[1,1,1],[18,18,7],[26,26,3],[29,28,1],[38,38,2],[41,41,2],[45,45,4],[51,51,4],[61,61,3],[66,66,1],[118,118,1],[120,120,1],[122,122,4],[128,128,2],
-    [134,134,4],[142,142,4],[150,150,8],[162,162,5],[187,187,1],[189,189,1],[248,199,2],[259,220,2],[262,213,9],[273,224,1],[275,226,2],[279,230,3],[283,234,2],
-    [287,238,12],[301,252,26],[327,277,1],[328,279,14],[342,292,1],[344,295,12],[359,310,12],[379,322,2],[383,326,2],[387,330,4],[393,336,5],[400,343,2],
-    [404,347,4],[410,353,5],[417,360,2],[421,364,4],[427,370,4],[432,375,1],[435,378,2]],
-  // Stand-ins: the winter palette for the forest one, the game font and icon sheet (one slot earlier in the demo),
-  // same-sized winter buildings for the ones the demo lacks, and the circle of power for the runestone.
-  extra: { 2: 18, 282: 233, 356: 308, 146: 144, 138: 150, 169: 134, 147: 145, 139: 151, 170: 135, 181: 166 },
-  heroIcons: { grom: 3, alleria: 4 },   // the grunt and elven archer portraits; the hero portraits came with the expansion
-  // The demo has no dwarves, sappers, gryphon riders or dragons: footmen and axe throwers rush in, and an
-  // oversized champion knight or ogre chieftain leads the attack.
-  roles: { fast: 54, ally_fast: 45, boss: 52, ally_boss: 51 }, bossScale: 1.6, bossNames: { Horde: 'Champion Knight', Alliance: 'Ogre Chieftain' },
-  // The demo names its spell and capture sounds but leaves their data out, so the nearest sounds it does have stand in.
-  sounds: { s_hit: 'Bow Hit', s_hurt: 'Punch', s_die: 'O:Basic Orc Voices/Death', s_die_ally: 'H:Basic Human Voices/Death', s_level: 'H:Basic Human Voices/Ready', s_boom: 'Explosion',
-    s_sword: 'Sword Attack 1', s_bow: 'Bow Fire', s_axe: 'Axe Throw', s_fire: 'Fireball Hit', s_coil: 'Fireball', s_start: 'Placement Success', s_level_orc: 'O:Basic Orc Voices/Ready',
-    s_power: 'Fist', s_buy: 'Placement Success' },
-  // Each hero's own unit voices where the demo has them (the CD has the knight's), else the footman's or grunt's.
-  voices: { lothar: ['H:Knight', 'H:Basic Human Voices'], uther: ['H:Paladin', 'H:Knight', 'H:Basic Human Voices'], alleria: ['H:Elven Archer/Ranger'], grom: ['O:Basic Orc Voices'],
-    zuljin: ['O:Troll Axethrower/Berserker'], chogall: ['O:Ogre-Mage', 'O:Ogre', 'O:Basic Orc Voices'] },
-  shop: 'https://shop.battle.net/product/warcraft-2-battle-net-edition', download: 'https://www.dosgames.com/game/warcraft-2-tides-of-darkness',
-  // Blizzard's Warcraft II shareware CD (v1.08), shipped unmodified next to the game; on itch.io it's fetched from the play site.
-  urls: ['demo/war2sw108.zip', 'https://jonathansadowitz.github.io/tides-of-survival-play/demo/war2sw108.zip'],
-  files: /(^|\/)(MAINDAT\.WAR|REZDAT\.WAR|SFXDAT\.SUD)$/i, size: 37372714,   // the zip never changes (it must stay as released)
+/* ---------- the asset pack (Phase O: the game ships complete) ----------
+   Blizzard approved shipping Warcraft II's art, sounds and voices, but not the music (Jon, 26 November 2026).
+   pack/pack.json lists the game's own WAR archives (built by scripts/build-pack.js from the game's own import,
+   voices compressed to MP3). They download once, with a progress bar, and are kept in IndexedDB like imported
+   files. Files the player imported themselves win: a newer pack never overwrites them. Music comes only from
+   the player's own Install.mpq or game folder. */
+const PACK = {
+  urls: ['pack/', 'https://jonathansadowitz.github.io/tides-of-survival-play/pack/'],   // on itch.io it's fetched from the play site
+  key: 'tos_pack', imported: 'tos_imported',
 };
-// Turn the demo's files into the game's archives and keep them. Returns false if the files aren't the demo.
-async function installDemo(got) {
-  const files = {}; for (const g of got) files[g.name.split('/').pop().toUpperCase()] = g.data;
-  if (!files['MAINDAT.WAR']) return false;
-  for (const w of buildDemoWars(files)) {
-    addWar(w.name, w.buf); await DB.put(w.name, w.buf);
-    if (w.names) { A.wars[w.name].names = w.names; store.set('tos_sndnames_' + w.name, w.names); }
-  }
-  return true;
+// Players who had the 1996 shareware: its MAINDAT.WAR carried this marker as an extra last entry.
+const isDemoMain = w => !!w && w.count === 529 && (() => { const d = Core.safeEntry(w, 528); return !!d && new TextDecoder().decode(d) === 'TOS-DEMO'; })();
+const importedNames = () => new Set(store.get(PACK.imported, []));
+async function fetchBytes(url, onBytes) {
+  const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) throw new Error(`${url}: ${r.status}`);
+  if (!r.body || !r.body.getReader) { const b = new Uint8Array(await r.arrayBuffer()); onBytes(b.length); return b; }
+  const rd = r.body.getReader(), parts = []; let n = 0;
+  for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); n += value.length; onBytes(value.length); }
+  const out = new Uint8Array(n); let p = 0; for (const v of parts) { out.set(v, p); p += v.length; } return out;
 }
-// First launch with no game files: load the shareware demo that ships with the game, so anyone can play straight away.
-async function autoLoadDemo() {
-  for (const url of DEMO.urls) {
+// Load the pack, or the parts of a newer one. force: reload every part the player didn't import.
+// Returns true when the game has the pack.
+async function loadPack(force) {
+  for (const base of PACK.urls) {
+    let man;
+    try { const r = await fetch(base + 'pack.json', { cache: 'no-cache' }); if (!r.ok) continue; man = await r.json(); } catch (e) { continue; }
+    A.credits = man.credits || [];
+    const had = store.get(PACK.key, null), mine = importedNames();
+    const want = man.files.filter(f => !mine.has(f.name) && (force || had !== man.version || !A.wars[f.name]));
+    if (!want.length) { store.set(PACK.key, man.version); return true; }
+    const total = want.reduce((a, f) => a + f.size, 0); let got = 0;
+    overlay.className = ''; overlay.style.display = 'flex';
+    overlay.innerHTML = `<div class="panel"><h2>Tides of Survival</h2><p class="sub">${had ? 'Updating the game\'s art and sounds…' : 'Getting the game\'s art and sounds (once only)…'}</p>
+      <div class="packbar"><div id="packFill"></div></div><p class="help" id="packProg">0 of ${(total / 1048576).toFixed(1)} MB</p></div>`;
+    const tick = n => { got += n; const f = $('#packFill'), t = $('#packProg'); if (f) f.style.width = Math.min(100, 100 * got / total).toFixed(1) + '%'; if (t) t.textContent = `${(Math.min(got, total) / 1048576).toFixed(1)} of ${(total / 1048576).toFixed(1)} MB`; };
     try {
-      overlay.className = ''; overlay.style.display = 'flex';
-      overlay.innerHTML = `<div class="panel"><h2>Tides of Survival</h2><p class="sub">Loading the free Warcraft II demo…</p><p class="help" id="demoProg">Starting</p></div>`;
-      const got = await Core.unzipRemote(url, n => DEMO.files.test(n), (a, b) => { const el = $('#demoProg'); if (el) el.textContent = `${(a / 1048576).toFixed(1)} of ${(b / 1048576).toFixed(1)} MB`; }, DEMO.size);
-      if (await installDemo(got)) { A.demo = true; for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k]; autoAssign(true); return true; }
-    } catch (e) { console.warn('demo', url, e); }
+      for (const f of want) {
+        const b = await fetchBytes(base + f.file, tick), buf = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+        addWar(f.name, buf); await DB.put(f.name, buf);
+        if (f.names) { A.wars[f.name].names = f.names; store.set('tos_sndnames_' + f.name, f.names); }
+      }
+    } catch (e) { console.warn('pack', base, e); continue; }
+    if (A.wars['DEMODATA/SOUNDS.WAR']) { delete A.wars['DEMODATA/SOUNDS.WAR']; await DB.del('DEMODATA/SOUNDS.WAR'); }   // the old shareware's sounds
+    store.set(PACK.key, man.version);
+    for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k];
+    autoAssign(true); return true;
   }
   return false;
-}
-function demoIndex(i) {
-  if (DEMO.extra[i] !== undefined) return DEMO.extra[i];
-  for (const [a, b, n] of DEMO.runs) if (i >= a && i < a + n) return b + i - a;
-  return -1;
-}
-const isDemoMain = w => !!w && w.count === DEMO.count + 1 && (() => { const d = Core.safeEntry(w, DEMO.count); return !!d && new TextDecoder().decode(d) === DEMO.marker; })();
-// Build the game's archives from the demo's files: { 'MAINDAT.WAR', 'REZDAT.WAR', 'SFXDAT.SUD', ... } -> [{ name, buf, names }]
-function buildDemoWars(files) {
-  const out = [], D = Core.parseWar(files['MAINDAT.WAR'].buffer.slice(0));
-  const items = [];
-  for (let i = 0; i < DEMO.count; i++) { const j = demoIndex(i); let data = new Uint8Array(0); if (j >= 0) { const e = Core.safeEntry(D, j); if (e) data = e; } items.push({ data }); }
-  items.push({ data: new TextEncoder().encode(DEMO.marker) });
-  out.push({ name: 'MAINDAT.WAR', buf: packWar(items) });
-  if (files['REZDAT.WAR']) out.push({ name: 'REZDAT.WAR', buf: files['REZDAT.WAR'].buffer.slice(0) });
-  if (files['SFXDAT.SUD']) {
-    const S = Core.parseWar(files['SFXDAT.SUD'].buffer.slice(0)), list = Core.safeEntry(S, 1);
-    // Entry 1 names every sound: pairs of strings (group, sound), one pair per entry from 2 on.
-    const str = new TextDecoder('latin1').decode(list.subarray(4)).split('\0').filter(Boolean), rec = [];
-    for (let k = 0; k + 1 < str.length; k += 2) rec.push({ g: str[k].split('|').pop(), n: str[k + 1].split('|').pop() });
-    const find = q => { const [g, n] = q.includes('/') && /^[HO]:/.test(q) ? q.split('/') : [null, q]; const k = rec.findIndex(r => (g ? r.g === g && r.n === n : r.n === n)); return k < 0 ? null : Core.safeEntry(S, k + 2); };
-    const snd = MPQ_SOUNDS.map(([role]) => ({ role, data: find(DEMO.sounds[role]) })).filter(x => x.data && x.data[0] === 0x52);
-    if (snd.length === MPQ_SOUNDS.length) out.push({ name: 'DEMODATA/SOUNDS.WAR', buf: packWar(snd), names: snd.map(x => x.role) });
-    const vo = [];
-    const hasData = g => rec.some((r, k) => r.g === g && (Core.safeEntry(S, k + 2) || []).length);
-    for (const [hero, groups] of Object.entries(DEMO.voices)) { const grp = groups.find(hasData); if (grp) rec.forEach((r, k) => {
-      if (r.g !== grp) return; const kind = /^Ready/.test(r.n) ? 'ready' : /^Selected/.test(r.n) ? 'what' : /^Acknowledgement/.test(r.n) ? 'yes' : /^Annoyed/.test(r.n) ? 'pissed' : null;
-      const d = kind && Core.safeEntry(S, k + 2); if (d && d[0] === 0x52) vo.push({ role: hero + ':' + kind, data: d });
-    }); }
-    if (vo.length) out.push({ name: 'GAMESFX/VOICES.WAR', buf: packWar(vo), names: vo.map(x => x.role) });
-  }
-  return out;
 }
 const A = { wars: {}, sprites: {}, pal: Core.greyPalette(), palSrc: null, actx: null, sbuf: {}, lastPlay: {}, active: 0 };
 
@@ -1487,7 +1453,6 @@ function upgradedSprite(role, r, g) {
   const u = upgradeArt(k); return u && u.count === g.count && u.w === g.w && u.h === g.h ? u : g;
 }
 function rebuildSprites() {
-  A.demo = isDemoMain(A.wars['MAINDAT.WAR']);
   A.pal = resolvePalette(); A.sprites = {}; A.tilesets = {}; A.bldSpr = {};
   for (const [role, r] of Object.entries(cfg.roles)) {
     const war = A.wars[r.file]; if (!war) continue;
@@ -1499,8 +1464,7 @@ function rebuildSprites() {
     const at = buildAtlas(g, teamPalette(A.pal, roleTeam(role)), r.mode === 'dir5' ? 5 : 10);
     const an = (r.mode || 'dir5') === 'dir5' && /(^|\/)MAINDAT\.WAR$/.test(r.file) ? ANIM[r.entry] : null;
     A.sprites[role] = { ...at, mode: r.mode || 'dir5', r0: r.r0 ?? 0, r1: r.r1 ?? 4, walk: an && an.walk, atk: an && an.atk, die: an && an.die };
-    if (A.demo && /^(ally_)?boss$/.test(role)) A.sprites[role].scale = DEMO.bossScale;   // the demo's stand-in bosses are oversized units
-    else { const k = ROLE_SCALE[role] ?? ROLE_SCALE[role.replace(/^ally_/, '')]; if (k) A.sprites[role].scale = k; }
+    { const k = ROLE_SCALE[role] ?? ROLE_SCALE[role.replace(/^ally_/, '')]; if (k) A.sprites[role].scale = k; }
     if ((role === 'boss3' || role === 'hero_deathwing') && r.entry === 36) {   // Deathwing: the dragon sheet, blackened
       const c = document.createElement('canvas'); c.width = at.canvas.width; c.height = at.canvas.height; const x = c.getContext('2d');
       x.filter = 'grayscale(0.6) brightness(0.62) contrast(1.25)'; x.drawImage(at.canvas, 0, 0); A.sprites[role].canvas = c;
@@ -1523,7 +1487,7 @@ function rebuildSprites() {
   if (icd && Core.isGfu(icd)) {
     const n = Core.u16(icd, 0), iw = Core.u16(icd, 2), ih = Core.u16(icd, 4);
     for (const [id, ix0] of [...Object.entries(HERO_ICONS), ...Object.entries(ITEM_ICONS)]) {
-      const ix = A.demo && DEMO.heroIcons[id] !== undefined ? DEMO.heroIcons[id] : ix0;
+      const ix = ix0;
       if (ix >= n) continue;
       const c = document.createElement('canvas'); c.width = iw; c.height = ih;
       try { c.getContext('2d').putImageData(frameImage(Core.decodeGfuFrame(icd, ix, iw, ih), iw, ih, A.pal), 0, 0); A.icons[id] = c; } catch (e) {}
@@ -1535,11 +1499,10 @@ function rebuildSprites() {
 }
 function assetSummary() {
   const files = warNames().length, sprites = Object.keys(A.sprites).length, sounds = Object.keys(cfg.sounds).filter(k => A.wars[cfg.sounds[k].file]).length;
-  if (!files) return `No Warcraft II files loaded, so you'll see placeholder shapes. Choose <b>Game files</b> and import your Warcraft II folder. (The free demo that comes with the game couldn't be loaded: check your connection and reload.)`;
-  if (A.demo) return `Playing the Warcraft II demo: Alterac Mountains and six heroes. Get ${fullGameLink()} and import it under <b>Game files</b> to unlock everything.`;
+  if (!files) return `The game's art and sounds couldn't be downloaded, so you'll see placeholder shapes. Check your connection and reload, or choose <b>Game files</b> and import your Warcraft II folder.`;
   const extra = (mu.names.size ? `, ${mu.names.size} music tracks` : '') + (A.wars['GAMESFX/VOICES.WAR'] ? ', hero voices' : '');
-  return `Using your Warcraft II files: ${sprites} sprite${sprites === 1 ? '' : 's'}, ${sounds} sound${sounds === 1 ? '' : 's'}${extra}.` + (sprites ? '' : ' Assign some sprites in the Asset Lab (Settings).')
-    + (mu.names.size ? '' : ' Re-import your game folder to add the music.');
+  return `${sprites} sprite${sprites === 1 ? '' : 's'}, ${sounds} sound${sounds === 1 ? '' : 's'}${extra}.` + (sprites ? '' : ' Assign some sprites in the Asset Lab (Settings).')
+    + (mu.names.size ? '' : ' No music: import your own Warcraft II folder under <b>Game files</b> to add it.');
 }
 
 /* ---------- menu art from REZDAT.WAR (TOME.2): background and buttons ---------- */
@@ -1926,6 +1889,11 @@ function voiceLines(heroId, kind) {
   return pick(kind) || (kind === 'ready' ? pick('yes') : null);
 }
 // Once, for players who imported before 0.19: their saved voices are only the workers', so ask for War2Dat.mpq again.
+// Players without their own Warcraft II get everything but the music: say so on the first few visits.
+function musicNote() {
+  const seen = store.get('tos_mnote', 0); if (seen >= 3) return ''; store.set('tos_mnote', seen + 1);
+  return '<div class="note">No music: Blizzard\'s music isn\'t included. Own Warcraft II? Import your folder under Game files to add it.</div>';
+}
 function voiceNote() {
   const w = Object.keys(A.wars).filter(n => /WORKERS\.WAR$/.test(n)).map(n => A.wars[n]);
   if (!w.length || w.some(x => x.names && x.names.some(n => n.startsWith('u_')))) return '';
@@ -2096,14 +2064,12 @@ const HERO_UNLOCKS = {
   khadgar:  { cost: 4000, goal: 'Win any battlefield as an Alliance hero', done: () => P_().won.Alliance, best: () => 'not won yet' },
   teron:    { cost: 4000, goal: 'Win any battlefield as a Horde hero',     done: () => P_().won.Horde,    best: () => 'not won yet' },
 };
-const demoLocked = id => !!A.demo && !DEMO.heroes.includes(id);   // heroes whose sprites the demo doesn't have
 const rosterDone = () => Object.keys(HERO_UNLOCKS).every(id => meta.heroes.includes(id));   // every hero you can earn or buy
-const heroOpen = id => !demoLocked(id) && (HEROES[id] && HEROES[id].secret ? (HEROES[id].secret === 'deathwing' ? !!meta.deathwing : rosterDone()) : START_HEROES.includes(id) || meta.heroes.includes(id));
+const heroOpen = id => (HEROES[id] && HEROES[id].secret ? (HEROES[id].secret === 'deathwing' ? !!meta.deathwing : rosterDone()) : START_HEROES.includes(id) || meta.heroes.includes(id));
 const heroShown = id => !HEROES[id].secret || heroOpen(id);   // the secret heroes don't exist until they're unlocked
 // The first time the whole roster is unlocked, the workers put down their tools. Returns true just that once.
-function revealSecret() { if (meta.secret || A.demo || !rosterDone()) return false; meta.secret = true; saveMeta(); setTimeout(() => heroVoice('done', 1, 'peasant') || heroVoice('ready', 1, 'peasant'), 900); return true; }
-const levelOpen = i => A.demo ? LEVELS[i].id === DEMO.level : i <= meta.unlocked || !!LEVELS[i].test;   // test battlefields are open to try while they're built
-const fullGameLink = () => `<a href="${DEMO.shop}" target="_blank" rel="noopener">Warcraft II: Battle.net Edition</a>`;
+function revealSecret() { if (meta.secret || !rosterDone()) return false; meta.secret = true; saveMeta(); setTimeout(() => heroVoice('done', 1, 'peasant') || heroVoice('ready', 1, 'peasant'), 900); return true; }
+const levelOpen = i => i <= meta.unlocked || !!LEVELS[i].test;   // test battlefields are open to try while they're built
 // Record what this run achieved, then unlock any hero whose goal is now met. Returns the newly unlocked heroes.
 /* ---------- achievements and the curse (Phase L, idea 24) ----------
    Something to chase once everything is unlocked. Achievements are hidden until earned, each pays gold once, and the
@@ -2111,7 +2077,7 @@ const fullGameLink = () => `<a href="${DEMO.shop}" target="_blank" rel="noopener
    battlefield screen; each level adds enemy health and numbers and pays more gold (one difficulty for everyone stays:
    the curse only adds on top). */
 const CURSE = { hp: 0.12, spawn: 0.08, gold: 0.25, max: 5 };   // bot check: at 0.2 and 0.12 a level the expert never won at curse 5 (0 of 36)
-const curseOpen = () => !A.demo && !!(P_().won.Alliance || P_().won.Horde);
+const curseOpen = () => !!(P_().won.Alliance || P_().won.Horde);
 const curseOf = () => (G && G.curse) || 0;
 const mstat = () => (meta.stats ||= { kills: 0, winsBy: {}, winsOn: {}, curseWon: {} });
 const ACH = [
@@ -2173,16 +2139,16 @@ function recordProgress() {
   meta.prisoners = meta.prisoners.filter(id => !meta.heroes.includes(id));
   // Heroes are drip-fed: at most one earned per run, and never in two runs running (19 November 2026: four in a row
   // after a couple of runs was too quick). Buying with gold is always open.
-  if (p.sinceHero >= HERO_GAP) for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!isPrisoner(id) && !meta.heroes.includes(id) && !demoLocked(id) && U.done()) { meta.heroes.push(id); got.push(id); p.sinceHero = 0; break; }
+  if (p.sinceHero >= HERO_GAP) for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!isPrisoner(id) && !meta.heroes.includes(id) && U.done()) { meta.heroes.push(id); got.push(id); p.sinceHero = 0; break; }
   G.revealed = revealPrisoners();
-  if (G.slewDeathwing && !meta.deathwing && !A.demo) { meta.deathwing = true; got.push('deathwing'); }
+  if (G.slewDeathwing && !meta.deathwing) { meta.deathwing = true; got.push('deathwing'); }
   if (revealSecret()) got.push(...SECRET);
   return got;
 }
 // A prisoner's goal met: from now on a fortress holds him in runs as one of his side's heroes.
 function revealPrisoners() {
   const out = [];
-  for (const id of PRISON.heroes) if (!meta.heroes.includes(id) && !meta.prisoners.includes(id) && !demoLocked(id) && HERO_UNLOCKS[id].done()) { meta.prisoners.push(id); out.push(id); }
+  for (const id of PRISON.heroes) if (!meta.heroes.includes(id) && !meta.prisoners.includes(id) && HERO_UNLOCKS[id].done()) { meta.prisoners.push(id); out.push(id); }
   return out;
 }
 function fortNews() {
@@ -2192,30 +2158,29 @@ function fortNews() {
 }
 const enemyOf = side => side === 'Horde' ? 'Alliance' : 'Horde', anSide = side => (side === 'Alliance' ? 'an ' : 'a ') + side;
 function buyHero(id) {
-  const U = HERO_UNLOCKS[id]; if (!U || isPrisoner(id) || heroOpen(id) || demoLocked(id) || meta.gold < U.cost) return false;
+  const U = HERO_UNLOCKS[id]; if (!U || isPrisoner(id) || heroOpen(id) || meta.gold < U.cost) return false;
   meta.gold -= U.cost; meta.heroes.push(id); saveMeta(); sfx('s_buy', 0); return true;
 }
 // Goals were made easier (November 2026): a save that already meets them gets the heroes and battlefields at once.
 let caughtUp = false;
 function catchUpUnlocks() {
   const got = [];
-  for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!isPrisoner(id) && !meta.heroes.includes(id) && !demoLocked(id) && U.done()) { meta.heroes.push(id); got.push(HEROES[id].name); }
+  for (const [id, U] of Object.entries(HERO_UNLOCKS)) if (!isPrisoner(id) && !meta.heroes.includes(id) && U.done()) { meta.heroes.push(id); got.push(HEROES[id].name); }
   for (const id of revealPrisoners()) got.push(`${HEROES[id].name}, held prisoner: free him from ${anSide(enemyOf(HEROES[id].side))} fortress`);
-  while (!A.demo && meta.unlocked + 1 < LEVELS.length && (P_().lv[LEVELS[meta.unlocked].id] || 0) >= UNLOCK_T) { meta.unlocked++; got.push(LEVELS[meta.unlocked].name); }
+  while (meta.unlocked + 1 < LEVELS.length && (P_().lv[LEVELS[meta.unlocked].id] || 0) >= UNLOCK_T) { meta.unlocked++; got.push(LEVELS[meta.unlocked].name); }
   if (got.length) saveMeta();
   return got;
 }
 // The next goals worth chasing, for the end-of-run screen: what's next and how close you are (idea 28).
 function nextUp() {
   const out = [], i = meta.unlocked;
-  if (A.demo) out.push(`Three more battlefields and two more heroes are waiting in the full game: get ${fullGameLink()} and import it under Game files on the title screen. Your progress carries over.`);
-  else if (i + 1 < LEVELS.length) {
+  if (i + 1 < LEVELS.length) {
     const L0 = LEVELS[i], runs = FIELD_RUNS - Math.min(FIELD_RUNS, fieldRuns(L0.id)), best = P_().lv[L0.id] || 0;
     const togo = `best ${fmtTime(best)}, ${fmtTime(UNLOCK_T - best)} to go`, more = `${runs} more run${runs > 1 ? 's' : ''} in ${L0.name}`;
     out.push(`<b>Next battlefield: ${LEVELS[i + 1].name}.</b> ${runs && best < UNLOCK_T ? `${more}, and survive ${fmtTime(UNLOCK_T)} there (${togo}).`
       : runs ? `${more} (you've already survived ${fmtTime(UNLOCK_T)} there).` : best < UNLOCK_T ? `Survive ${fmtTime(UNLOCK_T)} in ${L0.name} (${togo}).` : `It opens after your next run in ${L0.name}.`}`);
   }
-  const h = Object.keys(HERO_UNLOCKS).find(id => !heroOpen(id) && !demoLocked(id));
+  const h = Object.keys(HERO_UNLOCKS).find(id => !heroOpen(id));
   if (h && !isPrisoner(h)) {
     const U = HERO_UNLOCKS[h], wait = HERO_GAP - (P_().sinceHero ?? HERO_GAP);   // heroes earned by goals come at most one every HERO_GAP runs
     const how = U.done() ? `Goal met: ${wait > 0 ? `he joins after ${wait} more run${wait > 1 ? 's' : ''}` : 'he joins after your next run'}.` : `${U.goal}: ${U.best()}${U.left ? `, ${U.left()}` : ''}.`;
@@ -2223,7 +2188,7 @@ function nextUp() {
   }
   const held = meta.prisoners.filter(id => !heroOpen(id) && !(G && G.revealed || []).includes(id));   // ones found this run are announced above
   if (held.length) out.push(`<b>Held prisoner: ${held.map(id => HEROES[id].name).join(', ')}.</b> Each is freed from an enemy fortress in a run as one of his own side's heroes.`);
-  const nextP = PRISON.heroes.find(id => !heroOpen(id) && !meta.prisoners.includes(id) && !demoLocked(id));
+  const nextP = PRISON.heroes.find(id => !heroOpen(id) && !meta.prisoners.includes(id));
   if (nextP && (!h || isPrisoner(h))) { const U = HERO_UNLOCKS[nextP]; out.push(`<b>Next prisoner: ${HEROES[nextP].name}.</b> ${U.goal} (${U.best()}) to find where he is held.`); }
   return out;
 }
@@ -2423,7 +2388,7 @@ function newRun(heroId, levelId, seed) {
     hero: { x: 0, y: 0, face: Math.PI / 2, dir: 4, moveT: 0, hp: HD.hp, maxHp: HD.hp, armour: 0, speed: 70, regen: 0, magnet: 1, might: 1, haste: 1, area: 1, xp: 0, level: 1, next: xpFor(1), hurtT: 0, atkT: 0, atkDir: 4 },
     weapons: {}, passives: {}, enemies: [], shots: [], eshots: [], marks: [], hv: [0, 0], gems: [], fx: [], corpses: [], revives: 0, dieT: 0, numCount: 0, rerolls: 2, banishes: 0, banishMax: 0, banned: [], gold: 0, chestQueue: [], buffs: {}, stats: { dmg: 0, hp: 0, next: 60, mins: [], lastHit: null }
   };
-  G.space = HD.side === 'Horde' && !A.demo && seed == null && (SPACE.force || Math.random() < SPACE.chance);   // idea 38: the rare Orcs in Space run
+  G.space = HD.side === 'Horde' && seed == null && (SPACE.force || Math.random() < SPACE.chance);   // idea 38: the rare Orcs in Space run
   addItem('w', HD.start); recalc(); G.hero.hp = G.hero.maxHp; logStart(); if (G.space) logEvent('orcs in space');
   G.revives = up('revival'); G.rerolls = 1 + up('reroll'); G.banishes = G.banishMax = up('banish');
   if (typeof startLevel === 'function') startLevel();
@@ -2754,7 +2719,7 @@ function drawBoat(b) {
 // with a hall ahead of you, just past the edge of the screen, becomes his fortress, and the arrow and minimap mark
 // come on. No hint before then.
 function setupFortress() {
-  G.fort = null; const T = G.terrain; if (!T || A.demo) return;
+  G.fort = null; const T = G.terrain; if (!T) return;
   const id = meta.prisoners.find(x => HEROES[x] && HEROES[x].side === G.HD.side && !meta.heroes.includes(x)); if (!id) return;
   G.fort = { id, state: 'hidden', march: 0, need: PRISON.march * G.HD.speed, lx: G.hero.x, ly: G.hero.y, told: false };
 }
@@ -3073,7 +3038,7 @@ function spawnEnemy(type, x, y, boss) {
   if (e.elite || boss) { seeFoe(boss ? 'b:' + boss.id : type); if (e.elite) banner(`An elite ${FOES[type][foeSide()]} has joined the fight!`); }
   G.enemies.push(e); return e;
 }
-function bossName(B) { return A.demo && !A.sprites[B.sprite] ? DEMO.bossNames[G.HD.side] : B.name; }   // the demo's stand-ins keep their own names
+function bossName(B) { return B.name; }
 function seeFoe(k) { if (!meta.seen.includes(k)) { meta.seen.push(k); saveMeta(); } }
 function spawnBoss(n, frac) {
   G.bossPlan ||= planBosses();
@@ -4229,7 +4194,7 @@ function drawHud() {
     const clear = btn && btn.top < 48 ? 2 * (btn.left - 6 - W / 2) : W;   // keep clear of the speed and pause buttons on phones
     const bw = Math.max(60, Math.min(200 + 60 * (n - 1), W - 120, clear)), sw = (bw - gap * (n - 1)) / n;
     list.forEach((b, i) => {
-      const full = b.name || (A.demo ? DEMO.bossNames[G.HD.side] : G.HD.side === 'Horde' ? 'Gryphon Rider' : 'Dragon');
+      const full = b.name || (G.HD.side === 'Horde' ? 'Gryphon Rider' : 'Dragon');
       const lw = s => fonts.small ? fontWidth(fonts.small, s) : s.length * 5;
       let name = full; if (lw(name) > sw - 6) name = full.split(' ')[0]; if (lw(name) > sw - 6) name = '';
       uiBar((W - bw) / 2 + i * (sw + gap), 32, sw, 7, b.hp / b.maxHp, '#b8261a', '#ff7a5c', '#5e100a', name);
@@ -4645,7 +4610,7 @@ function showTitle() {
     overlay.innerHTML = `<div class="wcstage"><img class="bg" src="${A.menuBg}" alt="">
       <div class="wcbtns"><button class="opt" data-act="choose">Start a Run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
       <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="import">Game files</button><button class="opt" data-act="about">About</button></div>
-      ${A.demo ? `<div class="note">Demo version: Alterac Mountains and six heroes. Get ${fullGameLink()} and import it under Game files to unlock everything.</div>` : !mu.names.size ? '<div class="note">Import your game folder again under Game files to add the music and hero voices.</div>' : voiceNote()}
+      ${!mu.names.size ? musicNote() : voiceNote()}
       <div class="ver" data-wcsmall="TIDES OF SURVIVAL"></div><div class="vernum">v${VERSION}</div></div>`;
     overlay.className = 'wcmenu'; overlay.style.display = 'flex'; overlay.style.backgroundImage = '';
     sel = 0; wcify(overlay);
@@ -4673,7 +4638,7 @@ const PREVIEW_SEED = 20261118;
 // picking a hero (Jon). Finished pictures are saved in the browser, by battlefield, side and version (a new
 // build with map changes draws them again once), so after the first visit the screen appears at once.
 const MAP_VERSION = 2;   // bump when the map maker or the battlefields change, so saved pictures are drawn again (not on every release)
-const PV_KEY = () => `tos_pv_m${MAP_VERSION}_${A.demo ? 'demo' : 'full'}`;
+const PV_KEY = () => `tos_pv_m${MAP_VERSION}_full`;
 function fieldPreview(L, side) {
   A.previews ||= {}; const key = L.id + side; if (A.previews[key] !== undefined) return A.previews[key];
   const saved = store.get(PV_KEY(), {});
@@ -4698,7 +4663,7 @@ function fieldTile(L, i, heroId) {
 }
 function fieldDetails(L, i, heroId) {
   const open = levelOpen(i), best = P_().lv[L.id] || 0;
-  const why = open ? L.blurb : A.demo ? 'Requires the full game.' : `Play ${FIELD_RUNS} runs in ${LEVELS[i - 1].name} (${Math.min(FIELD_RUNS, fieldRuns(LEVELS[i - 1].id))} so far) and survive ${fmtTime(UNLOCK_T)} there to unlock (best ${fmtTime(P_().lv[LEVELS[i - 1].id] || 0)}).`;
+  const why = open ? L.blurb : `Play ${FIELD_RUNS} runs in ${LEVELS[i - 1].name} (${Math.min(FIELD_RUNS, fieldRuns(LEVELS[i - 1].id))} so far) and survive ${fmtTime(UNLOCK_T)} there to unlock (best ${fmtTime(P_().lv[LEVELS[i - 1].id] || 0)}).`;
   return `<div class="hinfo-in"><div><span class="nm">${L.name}</span>
     <span class="ds">${why}</span>${L.test ? '<span class="ds">A prototype, open to try while it is being built. It may change a lot.</span>' : ''}${open ? `<span class="ds">Difficulty: ${['easy', 'normal', 'hard', 'very hard'][Math.min(i, 3)]}. Your best here: ${best ? fmtTime(best) : 'not played yet'}.</span>` : ''}
     ${open && curseOpen() ? `<span class="ds">${(mstat().curseWon[L.id] ?? -1) >= 1 ? `Won here at curse ${mstat().curseWon[L.id]}.` : mstat().winsOn[L.id] ? 'Won here without a curse.' : 'Not won here yet.'} ${curseLine()}</span>` : ''}
@@ -4723,7 +4688,7 @@ function showLevels(heroId) {
   const box = overlay.querySelector('#fieldInfo');
   if (box && !isPhone()) { let hMax = 0; LEVELS.forEach((L, i) => { box.innerHTML = fieldDetails(L, i, heroId); wcify(box); hMax = Math.max(hMax, box.offsetHeight); }); box.innerHTML = ''; delete box.dataset.level; box.style.boxSizing = 'border-box'; box.style.minHeight = hMax + 'px'; }
   const lastI = meta.last ? LEVELS.findIndex(L => L.id === meta.last.level) : -1;   // the battlefield you played last, if it's open
-  const start = A.demo ? LEVELS.findIndex(L => L.id === DEMO.level) : lastI >= 0 && levelOpen(lastI) ? lastI : Math.min(meta.unlocked, LEVELS.length - 1);
+  const start = lastI >= 0 && levelOpen(lastI) ? lastI : Math.min(meta.unlocked, LEVELS.length - 1);
   sel = Math.max(0, opts().findIndex(o => o.dataset.act === 'field' && o.dataset.level === LEVELS[start].id)); highlight(); fitPanel();
 }
 const OPT_DEFS = {
@@ -4825,7 +4790,7 @@ function showBook(tab = 'weapons') {
       ? card(achIcon(false), a.name, `Earned ${new Date(got[a.id]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`, [a.desc, `+${a.gold} gold`])
       : card(achIcon(true), '???', 'Not yet earned', ['Keep playing to find out.'])).join(''); }
   else body = Object.keys(HEROES).filter(heroShown).map(id => { const H_ = HEROES[id], U = HERO_UNLOCKS[id];
-      const status = heroOpen(id) ? 'Unlocked' : demoLocked(id) ? 'Requires the full game' : isPrisoner(id) ? (meta.prisoners.includes(id) ? `Held prisoner in ${anSide(enemyOf(HEROES[id].side))} fortress: play as ${anSide(HEROES[id].side)} hero to free him.` : `Held prisoner. ${U.goal} (${U.best()}) to find where.`) : `Locked. ${U.goal} (${U.best()}), or buy for ${U.cost} gold.`;
+      const status = heroOpen(id) ? 'Unlocked' : isPrisoner(id) ? (meta.prisoners.includes(id) ? `Held prisoner in ${anSide(enemyOf(HEROES[id].side))} fortress: play as ${anSide(HEROES[id].side)} hero to free him.` : `Held prisoner. ${U.goal} (${U.best()}) to find where.`) : `Locked. ${U.goal} (${U.best()}), or buy for ${U.cost} gold.`;
       return card(`<canvas class="hpic${heroOpen(id) ? '' : ' dim'}" width="48" height="48" data-hero="${id}"></canvas>`, H_.name, `${H_.unit}, ${H_.side}`, [BIOS[id] ? `<i class="bio">${BIOS[id]}</i>` : '', `Starts with <b>${WEAPONS[H_.start].name}</b>. ${H_.hp} health.`, `<b>${H_.sig}:</b> ${H_.sigDesc}`, status]); }).join('');
   showMenu(`<h2>Book of War</h2><div class="opts buyrow booktabs">${BOOK_TABS.map(([k, l]) => `<button class="opt${k === tab ? ' cur' : ''}" data-act="book" data-tab="${k}">${l}</button>`).join('')}</div>
     <div class="bookgrid scrollbox">${body}</div><div class="opts" style="margin-top:12px"><button class="opt" data-act="title" data-back>Back</button></div>`);
@@ -4880,7 +4845,7 @@ function showAbout() {
     <h3>How to play</h3>
     <p>Move with WASD, the arrow keys, the mouse (click to walk, hold to follow), a gamepad, or by dragging on a touch screen. Esc, P or Start pauses; F, Tab or Y changes the game speed. Gold from each run buys upgrades in the Armoury, reaching goals unlocks heroes and battlefields, and a weapon at level 5 with its partner passive evolves from a boss's treasure.</p>
     <h3>Credits</h3>
-    <p>Made by CaptMurdock. Warcraft II and everything in it belong to Blizzard Entertainment: this is an unofficial fan project, not affiliated with or endorsed by Blizzard. The graphics, music and sounds are read from your own copy of the game and never leave your device; the only things that come with this page are Blizzard's 1996 Warcraft II shareware, included unmodified, and the paladin, ranger, troll berserker and ogre-mage sprites from <a href="https://www.moddb.com/company/incos" target="_blank" rel="noopener">Incos</a>'s Accurate Warcraft 2 Sprite Updates, used with permission (Settings, Unit sprites: Classic turns them off).</p>
+    <p>Made by CaptMurdock. Warcraft II and everything in it belong to Blizzard Entertainment: this is an unofficial fan project, not affiliated with or endorsed by Blizzard. Warcraft II's art, sounds and voices come with the game with Blizzard's permission; its music doesn't, so it's read from your own copy of the game if you import it, and never leaves your device. The paladin, ranger, troll berserker and ogre-mage sprites are from <a href="https://www.moddb.com/company/incos" target="_blank" rel="noopener">Incos</a>'s Accurate Warcraft 2 Sprite Updates, used with permission (Settings, Unit sprites: Classic turns them off).</p>
     <p>Play and follow updates at <a href="${ITCH_URL}" target="_blank" rel="noopener">captmurdock.itch.io/tides-of-survival</a>.</p>
     <h3>Version</h3><p>Version ${VERSION} (${built}).</p></div>
     <div class="opts"><button class="opt" data-act="title" data-back>Back</button></div>`);
@@ -4975,7 +4940,7 @@ function showShop(focus) {
 // With a mouse, hovering shows the details and a click picks; on touch or a pad, the first tap or press shows the
 // details and the second picks (or press the Play button).
 function heroTile(id) {
-  const H_ = HEROES[id], open = heroOpen(id), lock = demoLocked(id) ? 'full game' : open ? '' : 'locked';
+  const H_ = HEROES[id], open = heroOpen(id), lock = open ? '' : 'locked';
   return `<button class="opt tile hero${open ? '' : ' locked'}" data-act="hero" data-id="${id}"${open ? '' : ' aria-disabled="true"'}>
     <canvas class="hpic" width="48" height="48" data-hero="${id}"></canvas>
     <span class="tt"><span class="nm">${H_.name}</span><span class="lv ${H_.side === 'Horde' ? 'horde' : 'ally'}">${lock ? `${H_.unit}: ${lock}` : H_.unit}</span></span></button>`;
@@ -4985,8 +4950,7 @@ function heroDetails(id) {
   const about = `<span class="ds">Starts with <b>${WEAPONS[H_.start].name}</b>: ${WEAPONS[H_.start].desc} ${H_.hp} health, ${spd}${H_.fly ? ', flies' : ''}.</span>
     <span class="ds sig"><b>${H_.sig}:</b> ${H_.sigDesc}</span>`;
   let act;
-  if (demoLocked(id)) act = `<span class="ds">Requires the full game: Warcraft II: Battle.net Edition, from the Battle.net Shop.</span>`;
-  else if (!heroOpen(id) && isPrisoner(id)) { const U = HERO_UNLOCKS[id];
+  if (!heroOpen(id) && isPrisoner(id)) { const U = HERO_UNLOCKS[id];
     act = meta.prisoners.includes(id)
       ? `<span class="ds">Held prisoner in ${anSide(enemyOf(H_.side))} fortress. Play as ${anSide(H_.side)} hero: destroy the fortress, then stay alive for ${fmtTime(PRISON.escape)} while ${first} escapes.</span>`
       : `<span class="ds">Held prisoner by the ${enemyOf(H_.side)}. To find where: ${U.goal} (${U.best()}). Then free him from their fortress.</span>`; }
@@ -5262,14 +5226,14 @@ addEventListener('blur', () => { if (G && G.state === 'play') pauseRun(); });   
 let impOpen = false, impState = 'idle';
 function impSummary() {
   const sprites = Object.keys(A.sprites).length, sounds = Object.keys(cfg.sounds).filter(k => A.wars[cfg.sounds[k].file]).length, voices = !!A.wars['GAMESFX/VOICES.WAR'];
-  if (A.demo) return `<p class="sub">You're playing the <b>free Warcraft II demo</b>: Alterac Mountains and six heroes.</p><p class="help">Own the full game? Import it below to unlock every battlefield and hero. No copy yet? Get ${fullGameLink()} from the Battle.net Shop. Your progress carries over either way.</p>`;
-  if (!warNames().length) return `<p class="sub">No Warcraft II files yet, so the game shows placeholder shapes.</p>`;
-  return `${impState === 'done' ? '' : '<p class="sub chestgold">Warcraft II is set up.</p>'}<p class="help">${sprites} sprites, ${sounds} sounds${voices ? ', hero voices' : ''}${mu.names.size ? `, ${mu.names.size} music tracks` : ', no music yet (import your folder again to add it)'}.</p>`;
+  if (!warNames().length) return `<p class="sub">The game's art and sounds couldn't be downloaded, so it shows placeholder shapes. Check your connection and reload, or import your Warcraft II folder below.</p>`;
+  return `${impState === 'done' ? '' : `<p class="sub chestgold">${mu.names.size ? 'Everything is set up, music included.' : 'Everything is set up except the music.'}</p>`}<p class="help">${sprites} sprites, ${sounds} sounds${voices ? ', hero voices' : ''}${mu.names.size ? `, ${mu.names.size} music tracks` : ''}.</p>
+    <p class="help">The game comes with Warcraft II's art, sounds and voices. Blizzard's music isn't included: own Warcraft II (Battle.net Edition)? Import your folder below and the music plays too.</p>`;
 }
 async function showImport(done) {
   impOpen = true; impState = done ? 'done' : 'idle';
   const saved = await savedFolderName();
-  const res = done ? (A.demo || !warNames().length ? `<p class="sub">That folder didn't have the full game in it.</p><p class="help" id="impStatus">${impLog()}</p>` : `<p class="sub chestgold">Done: everything's set up.</p>`) : '';
+  const res = done ? (!mu.names.size ? `<p class="sub">Imported, but that folder had no music in it.</p><p class="help">Warcraft II's music is in <code>Install.mpq</code>, next to <code>War2Dat.mpq</code> in the game folder.</p><p class="help" id="impStatus">${impLog()}</p>` : `<p class="sub chestgold">Done: everything's set up, music included.</p>`) : '';
   showMenu(`<h2>Game files</h2>${res}${impSummary()}
     <p class="help">Choose your <b>Warcraft II</b> folder${canRemember ? ', or any folder above it such as your Games folder: the game searches inside and remembers where it is' : ''}. It reads only the files it needs and sets everything up for you. Nothing is uploaded.</p>
     <div class="opts">${saved ? `<button class="opt" data-act="impagain">Re-import from ${saved}</button>` : ''}<button class="opt" data-act="impdir">Import Warcraft II folder</button>
@@ -5366,17 +5330,8 @@ async function importFolderFiles(all) {
 for (const id of ['#labDir', '#labInput']) $(id).addEventListener('cancel', () => { if (impOpen && impState === 'busy') showImport(); });   // closed the file window
 $('#labInput').onchange = async e => { const fs = [...e.target.files]; e.target.value = ''; await loadFiles(fs); };
 async function loadFiles(list) {
-  const errs = [], notes = [], wasDemo = A.demo;
-  // The shareware demo's zip (DOSBOX_WAR2.ZIP): read its data files straight out of the zip.
-  for (const z of list.filter(f => /\.zip$/i.test(f.name))) {
-    labSide.innerHTML = `<div class="hint">Reading ${z.name}…</div>`;
-    try {
-      const full = A.wars['MAINDAT.WAR'] && !isDemoMain(A.wars['MAINDAT.WAR']);
-      if (full) { notes.push(`${z.name}: you already have the full game loaded, so the demo isn't needed.`); continue; }
-      if (!await installDemo(await Core.unzip(await z.arrayBuffer(), n => DEMO.files.test(n)))) { errs.push(`${z.name}: no Warcraft II demo data inside.`); continue; }
-      notes.push(`${z.name}: loaded the Warcraft II demo. You can play Alterac Mountains with six heroes; import the full game any time to unlock everything.`);
-    } catch (err) { errs.push(`${z.name}: ${err.message}`); }
-  }
+  const errs = [], notes = [], before = new Map(Object.entries(A.wars));
+  for (const z of list.filter(f => /\.zip$/i.test(f.name))) notes.push(`${z.name}: the shareware demo isn't needed any more; the game comes with everything but the music.`);
   list = list.filter(f => !/\.zip$/i.test(f.name));
   const wavs = list.filter(f => /\.wav$/i.test(f.name)); list = list.filter(f => !/\.wav$/i.test(f.name));
   if (wavs.length) {
@@ -5435,12 +5390,8 @@ async function loadFiles(list) {
         : `${f.name}: nothing the game can use inside.${failed ? ' Its sounds use a compression I can\'t read yet.' : ''}`);
     } catch (err) { errs.push(`${f.name}: ${err.message}`); }
   }
-  A.demo = isDemoMain(A.wars['MAINDAT.WAR']);
-  if (!A.demo && A.wars['DEMODATA/SOUNDS.WAR'] && Object.keys(A.wars).some(n => /SOUNDS\.WAR$/.test(n) && n !== 'DEMODATA/SOUNDS.WAR')) {   // the full game's sounds replace the demo's
-    delete A.wars['DEMODATA/SOUNDS.WAR']; await DB.del('DEMODATA/SOUNDS.WAR'); for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k];
-  }
-  if (A.demo !== wasDemo) for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k];
-  const auto = autoAssign(A.demo !== wasDemo);   // switching between the demo and the full game redoes every assignment
+  { const mine = importedNames(); for (const [n, w] of Object.entries(A.wars)) if (before.get(n) !== w) mine.add(n); store.set(PACK.imported, [...mine]); }   // files the player imported: a newer pack never overwrites them
+  const auto = autoAssign(false);
   if (auto) notes.push(`Assigned ${auto} sprites and sounds automatically.`);
   else if (!findMain()) notes.push('For the unit sprites, also load <code>Support/TOMES/TOME.1</code> from the game folder.');
   rebuildSprites(); labRefresh();
@@ -5484,7 +5435,7 @@ function labRenderGrid() {
       <br>• <code>War2Dat.mpq</code>: sound effects
       <br><br>${installPathsHtml()}
       <br>Heroes, enemies, missiles and sounds are then assigned automatically. Files stay in this browser only, so you do this once per device and nothing is uploaded. Old DOS installs work too: load <code>MAINDAT.WAR</code> and <code>SNDDAT.WAR</code>.
-      <br><br><b>No copy of Warcraft II?</b> The free 1996 shareware demo comes with the game and loads by itself the first time you play: Alterac Mountains and six heroes. To play everything, get ${fullGameLink()} from the Battle.net Shop and import it here; your progress carries over.</div>`;
+      <br><br>The game already comes with Warcraft II's art, sounds and voices; importing your own copy adds the music.</div>`;
     return;
   }
   const filter = labFilter.value, frag = document.createDocumentFragment();
@@ -5675,7 +5626,9 @@ async function boot() {
   const files = (await DB.all()) || [];
   for (const f of files) { if (!f.buf) continue; try { const w = addWar(f.name, f.buf); const nm = store.get('tos_sndnames_' + f.name, null); if (nm) w.names = nm; } catch (e) {} }
   try { for (const k of (await DB.musicNames()) || []) mu.names.add(k); } catch (e) {}
-  if (!Object.keys(A.wars).length && !/[?&]nodemo/.test(location.search)) await autoLoadDemo();
+  if (!/[?&]no(pack|demo)/.test(location.search)) {   // the pack: download it the first time (or over the old shareware), else check for a newer one
+    if (!A.wars['MAINDAT.WAR'] || isDemoMain(A.wars['MAINDAT.WAR'])) await loadPack(true); else await loadPack(false).catch(() => {});
+  }
   autoAssign(false);
   rebuildSprites();
   showTitle();
@@ -5688,7 +5641,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, DEMO, demoIndex, buildDemoWars, levelOpen, demoLocked, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, DB, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
