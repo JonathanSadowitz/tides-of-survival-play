@@ -1156,7 +1156,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.20.0', BUILD = '2e26f35 2026-11-26';
+const VERSION = '0.20.1', BUILD = 'f61d1ee 2026-11-26';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1473,7 +1473,7 @@ function buildBossSprites() {
 const UPGRADE_BASE = { paladin: 51, ogremage: 52, ranger: 53, berserker: 54 };   // MAINDAT entry of the unit each replaces
 const UPGRADE_ROLES = { ally_elite1: 'paladin', ally_tank_up: 'paladin', hero_uther: 'paladin', hero_turalyon: 'paladin',
   elite1: 'ogremage', tank_up: 'ogremage', hero_chogall: 'ogremage', hero_dentarg: 'ogremage',
-  ally_elite2: 'ranger', ally_ranged_up: 'ranger', elite2: 'berserker', ranged_up: 'berserker' };
+  ally_elite2: 'ranger', ally_ranged_up: 'ranger', hero_alleria: 'ranger', elite2: 'berserker', ranged_up: 'berserker', hero_zuljin: 'berserker' };
 const upgradeCache = {};
 function upgradeArt(k) {
   if (k in upgradeCache) return upgradeCache[k];
