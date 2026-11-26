@@ -409,9 +409,12 @@ const Core = (() => {
 
   // Palettes are 256 RGB triplets, usually 6-bit VGA values.
   function toPalette(d) {
-    const p = new Uint8Array(768); let max = 0;
-    for (let i = 0; i < 768; i++) max = Math.max(max, d[i]);
-    for (let i = 0; i < 768; i++) p[i] = max < 64 ? (d[i] << 2) | (d[i] >> 4) : d[i];
+    // 6-bit palettes (0 to 63) are scaled up; some mods' 6-bit palettes carry a few marker entries above 63,
+    // so a palette counts as 6-bit when nearly all its values fit in 6 bits.
+    const p = new Uint8Array(768); let high = 0;
+    for (let i = 0; i < 768; i++) if (d[i] > 63) high++;
+    const six = high < 24;
+    for (let i = 0; i < 768; i++) p[i] = six ? Math.min(255, (d[i] << 2) | (d[i] >> 4)) : d[i];
     return p;
   }
   function greyPalette() { const p = new Uint8Array(768); for (let i = 0; i < 256; i++) p[i * 3] = p[i * 3 + 1] = p[i * 3 + 2] = i; return p; }
@@ -791,33 +794,33 @@ const ICON_ENTRY = 356, HERO_ICONS = { lothar: 32, uther: 34, alleria: 187, khad
 /* ---------- levels and permanent upgrades ---------- */
 // Each level uses one of the game's tilesets: palette, megatiles, minitiles and tile table entries in MAINDAT.WAR.
 const LEVELS = [
-  { id: 'forest', name: 'Elwynn Forest', blurb: 'Rolling forest and lakes. A good place to start.', ts: [2, 3, 4, 5], ground: '#34501f',
+  { id: 'forest', name: 'Elwynn Forest', blurb: 'Rolling forest and lakes. A good place to start.', skin: 'ForestRegular', ts: [2, 3, 4, 5], ground: '#34501f',
     bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.35, forestLakes: 4, trees: 0.53, fine: 0.55, rocks: 0.9, dark: 0.3, camps: 0.75 }, hp: 1, late: 1.5, mix: {} },
-  { id: 'winter', name: 'Alterac Mountains', blurb: 'Frozen lakes and snowbound pines. Tougher foes march here.', ts: [18, 19, 20, 21], ground: '#b9c4cc',
+  { id: 'winter', name: 'Alterac Mountains', blurb: 'Frozen lakes and snowbound pines. Tougher foes march here.', skin: 'Glacier', ts: [18, 19, 20, 21], ground: '#b9c4cc',
     bld: { pal: 18, human: [134, 146, 169, 142, 144, 138, 150], orc: [135, 147, 170, 143, 145, 139, 151] }, sea: { human: [150, 152, 154], orc: [151, 153, 155] }, gen: { clearings: 20, rmin: 10, rmax: 17, lane: 1.2, loops: 0.4, lakes: 0.3, forestLakes: 3, trees: 0.53, rocks: 0.86, dark: 0.3, camps: 0.75 }, hp: 1.45, mix: { tank: 1.5 } },   // hp was 1.3: no harder than Elwynn Forest for the bots (20 November 2026)
-  { id: 'waste', name: 'Khaz Modan Wastes', blurb: 'Scorched badlands and rocky ridges. Swarms come thick and fast.', ts: [10, 11, 12, 13], ground: '#6b5434',
+  { id: 'waste', name: 'Khaz Modan Wastes', blurb: 'Scorched badlands and rocky ridges. Swarms come thick and fast.', skin: 'Wasteland', ts: [10, 11, 12, 13], ground: '#6b5434',
     bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1.1, loops: 0.45, lakes: 0.2, forestLakes: 2, trees: 0.55, rocks: 0.7, dark: 0.35, camps: 0.75 }, hp: 1.6, mix: { fast: 1.8 } },
-  { id: 'swamp', name: 'Swamp of Sorrows', blurb: 'Murky water and twisted trees. Only the hardiest survive.', ts: [438, 439, 440, 441], ground: '#3f4a2a',
+  { id: 'swamp', name: 'Swamp of Sorrows', blurb: 'Murky water and twisted trees. Only the hardiest survive.', skin: 'OrcSwamp', ts: [438, 439, 440, 441], ground: '#3f4a2a',
     bld: { pal: 438, human: [479, 491, 80, 487, 489, 483, 495], orc: [480, 492, 81, 488, 490, 484, 496] }, sea: { human: [495, 497, 499], orc: [496, 498, 500] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.55, forestLakes: 6, trees: 0.5, rocks: 0.9, dark: 0.35, camps: 0.75 }, hp: 2, mix: { ranged: 1.6, tank: 1.3 } },
-  { id: 'portal', name: 'The Dark Portal', blurb: 'The blasted lands round the Dark Portal. Stay near it and troops pour through, faster the longer you linger.', ts: [10, 11, 12, 13], ground: '#5e3e2c',
-    bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, portal: { entry: 185 },
+  { id: 'portal', name: 'The Dark Portal', blurb: 'The blasted lands round the Dark Portal. Stay near it and troops pour through, faster the longer you linger.', skin: 'Hell', ts: [438, 439, 440, 441], ground: '#5e3e2c',
+    bld: { pal: 438, human: [479, 491, 80, 487, 489, 483, 495], orc: [480, 492, 81, 488, 490, 484, 496] }, sea: { human: [495, 497, 499], orc: [496, 498, 500] }, portal: { entry: 185 },
     gen: { clearings: 20, rmin: 9, rmax: 14, lane: 1.1, loops: 0.45, lakes: 0.15, forestLakes: 1, trees: 0.54, rocks: 0.72, dark: 0.4, camps: 0.7, portal: { x: 26, y: 18, r: 15 } }, hp: 2.4, mix: { tank: 1.3, ranged: 1.2 } },
-  { id: 'quel', name: "Quel'Thalas", blurb: 'The elves\' ancient forest: dense woods and narrow paths, with archers and trolls hiding among the trees.', ts: [2, 3, 4, 5], ground: '#2c4a1c',
+  { id: 'quel', name: "Quel'Thalas", blurb: 'The elves\' ancient forest: dense woods and narrow paths, with archers and trolls hiding among the trees.', skin: 'SunsetValley', ts: [2, 3, 4, 5], ground: '#2c4a1c',
     bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, ambush: { from: 45, every: 7, max: 7 },
     gen: { clearings: 18, rmin: 7, rmax: 10, lane: 0.5, loops: 0.55, lakes: 0.25, forestLakes: 3, trees: 0.4, fine: 0.3, rocks: 0.93, dark: 0.35, camps: 0.75, pockets: true }, hp: 2.5, mix: { ranged: 1.4, fast: 1.2 } },
   // Grim Batol (Phase M1, Jon): the Khaz Modan mountains (wasteland tiles: Jon chose them over winter, where rock can
   // only meet ice), great masses of rock with narrow passes between them (gen.rockland
   // turns the background to rock). Demolition squads blast new passes through the rock as the run goes on (DEMO).
   // Deathwing held the red dragons captive here; he is the final boss against the Horde, and red dragons fly often.
-  { id: 'grim', name: 'Grim Batol', blurb: 'A mountain fortress of the Dragonmaw. Narrow passes through solid rock, and demolition squads blasting new ones.', ts: [10, 11, 12, 13], ground: '#6a5a48',
+  { id: 'grim', name: 'Grim Batol', blurb: 'A mountain fortress of the Dragonmaw. Narrow passes through solid rock, and demolition squads blasting new ones.', skin: 'Wasteland', ts: [10, 11, 12, 13], ground: '#6a5a48',
     bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, demo: { from: 60, every: 16, squad: 2, blast: 2.2 },
     gen: { clearings: 22, rmin: 8, rmax: 12, lane: 0.55, loops: 0.6, lakes: 0.1, forestLakes: 1, trees: 0.55, rocks: 0.9, dark: 0.3, camps: 0.7, rockland: 0.82, pockets: true }, hp: 2.6, mix: { fast: 1.3, flyer: 1.8, tank: 1.1 } },
   // Blackrock Spire (Phase M2, Jon): the Blackrock clan's mountain stronghold in the Burning Steppes (wasteland tiles).
   // One great fortress: enemy camps close together, each walled with gates and linked to its neighbour by a wall
   // (SPIRE). Every camp you destroy weakens the final boss (Orgrim against the Alliance, Lothar against the Horde,
   // as in the lore, where Lothar fell there to Orgrim).
-  { id: 'brs', name: 'Blackrock Spire', blurb: 'The Blackrock clan\'s great fortress: walled camps linked by walls and gates. Every camp you burn weakens the warlord who waits at the end.', ts: [10, 11, 12, 13], ground: '#5a3c2e',
-    bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, spire: true,
+  { id: 'brs', name: 'Blackrock Spire', blurb: 'The Blackrock clan\'s great fortress: walled camps linked by walls and gates. Every camp you burn weakens the warlord who waits at the end.', skin: 'Volcano', ts: [18, 19, 20, 21], ground: '#5a3c2e',
+    bld: { pal: 18, human: [134, 146, 169, 142, 144, 138, 150], orc: [135, 147, 170, 143, 145, 139, 151] }, sea: { human: [150, 152, 154], orc: [151, 153, 155] }, spire: true,
     gen: { clearings: 26, rmin: 9, rmax: 12, lane: 1.2, loops: 0.6, lakes: 0.08, forestLakes: 1, trees: 0.5, rocks: 0.8, dark: 0.45, camps: 0.95, enemy: 0.92 }, hp: 2.7, mix: { tank: 1.3, ranged: 1.2, caster: 1.2 } },
 ];
 const UNLOCK_T = 600; // surviving 10 minutes, after a few runs there (FIELD_RUNS), unlocks the next level
@@ -1159,7 +1162,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.21.2', BUILD = '6baccc5 2026-11-26';
+const VERSION = '0.22.0', BUILD = '1a163b4 2026-11-26';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1263,6 +1266,9 @@ const AUTO_ROLES = {
   boss1: unitR(58), ally_boss1: unitR(45), boss2: unitR(46), ally_boss2: unitR(51), boss3: unitR(36, 3), ally_boss3: unitR(35, 3),
   tank_up: unitR(52), ally_tank_up: unitR(51), ranged_up: unitR(54), ally_ranged_up: unitR(53), caster: unitR(58), ally_caster: unitR(55), skel: unitR(69), daemon: unitR(70),
   boom: { e: 347, mode: 'cycle', r0: 0, r1: 19 }, rune: { e: 335, mode: 'cycle', r0: 0, r1: 3 },
+  // Phase Q: drawn over these units' frame layouts (UNIF_ART swaps in the art; Classic shows the units underneath).
+  charger: unitR(51), ally_charger: unitR(51), gunner: unitR(54), ally_gunner: unitR(54), gnoll: unitR(58), ally_gnoll: unitR(58),
+  brigand: unitR(53), ally_brigand: unitR(53), bullet: { e: 340, mode: 'dir5', r0: 0, r1: 0 },
 };
 const SWING = 0.45, HSWING = 0.35;
 const ROLE_SCALE = { ship: 0.8, ally_ship: 0.8, ship2: 0.85, ally_ship2: 0.85, transport: 0.8, transport_orc: 0.8, daemon: 0.9, hero_kurdran: 0.8, hero_deathwing: 0.85, flyer: 0.8, scout: 0.8, ally_scout: 0.7, siege: 0.8, ally_siege: 0.8, boss1: 1.5, ally_boss1: 1.6, boss2: 1.6, ally_boss2: 1.4, boss3: 1.3, ally_boss3: 1.35 };
@@ -1334,9 +1340,10 @@ async function loadPack(force) {
     let man;
     try { const r = await fetch(base + 'pack.json', { cache: 'no-cache' }); if (!r.ok) continue; man = await r.json(); } catch (e) { continue; }
     A.credits = man.credits || [];
-    const had = store.get(PACK.key, null), mine = importedNames();
-    const want = man.files.filter(f => !mine.has(f.name) && (force || had !== man.version || !A.wars[f.name]));
-    if (!want.length) { store.set(PACK.key, man.version); return true; }
+    const had = store.get(PACK.key, null), mine = importedNames(), shas = store.get(PACK.key + '_files', {});
+    // Only the parts that changed (by checksum) are fetched again.
+    const want = man.files.filter(f => !mine.has(f.name) && (force || !A.wars[f.name] || (had !== man.version && shas[f.name] !== f.sha)));
+    if (!want.length) { store.set(PACK.key, man.version); store.set(PACK.key + '_files', Object.fromEntries(man.files.map(f => [f.name, f.sha]))); return true; }
     const total = want.reduce((a, f) => a + f.size, 0); let got = 0;
     overlay.className = ''; overlay.style.display = 'flex';
     overlay.innerHTML = `<div class="panel"><h2>Tides of Survival</h2><p class="sub">${had ? 'Updating the game\'s art and sounds…' : 'Getting the game\'s art and sounds (once only)…'}</p>
@@ -1350,9 +1357,9 @@ async function loadPack(force) {
       }
     } catch (e) { console.warn('pack', base, e); continue; }
     if (A.wars['DEMODATA/SOUNDS.WAR']) { delete A.wars['DEMODATA/SOUNDS.WAR']; await DB.del('DEMODATA/SOUNDS.WAR'); }   // the old shareware's sounds
-    store.set(PACK.key, man.version);
-    for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k];
-    autoAssign(true); return true;
+    store.set(PACK.key, man.version); store.set(PACK.key + '_files', Object.fromEntries(man.files.map(f => [f.name, f.sha])));
+    if (want.some(f => /SOUNDS|MAINDAT/.test(f.name))) { for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k]; autoAssign(true); }
+    A.tilesets = {}; return true;
   }
   return false;
 }
@@ -1402,10 +1409,11 @@ function teamPalette(pal, team) {
 const ROLE_TEAM = {
   elite1: 'orange', elite2: 'orange', elite3: 'orange', ally_elite1: 'yellow', ally_elite2: 'yellow', ally_elite3: 'yellow',
   tank_up: 'black', ranged_up: 'black', ally_tank_up: 'white', ally_ranged_up: 'white',
+  gnoll: 'black', ally_gnoll: 'black', brigand: 'black', ally_brigand: 'black',
 };
 const BOSS_TEAM = { Horde: 'violet', Alliance: 'green' };
 const roleTeam = role => ROLE_TEAM[role] ? TEAM[ROLE_TEAM[role]] : HUMAN_ROLE.test(role) ? TEAM.blue : TEAM.red;
-const HUMAN_ROLE = /^(hero|hero_lothar|hero_uther|hero_alleria|hero_khadgar|hero_peasant|hero_danath|hero_turalyon|hero_kurdran|ally_(basic|fast|tank|ranged|boss|flyer|scout|siege|elite[123]|boss[123]|caster|ship|ship2)|transport)$/;
+const HUMAN_ROLE = /^(hero|hero_lothar|hero_uther|hero_alleria|hero_khadgar|hero_peasant|hero_danath|hero_turalyon|hero_kurdran|ally_(basic|fast|tank|ranged|boss|flyer|scout|siege|elite[123]|boss[123]|caster|ship|ship2|charger|gunner)|transport)$/;
 function buildAtlas(g, pal, cols) {
   cols = Math.max(1, Math.min(cols, g.count));
   const rows = Math.ceil(g.count / cols);
@@ -1448,8 +1456,27 @@ function upgradeArt(k) {
     if (b64) { const d = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); if (Core.isGfu(d)) g = Core.decodeGfu(d); } } catch (e) {}
   return (upgradeCache[k] = g);
 }
+// Unification's sprites (Phase P): a hero or troop drawn over a Warcraft II unit, in that unit's frame layout.
+// role -> [name in pack/unif.war, the MAINDAT entry it was drawn over]
+const UNIF_ART = {
+  hero_chogall: ['hero/chogall', 52], hero_dentarg: ['hero/dentarg', 52], hero_teron: ['hero/teron', 58],
+  hero_khadgar: ['hero/khadgar', 55], hero_lothar: ['hero/utherlothar', 51],
+  charger: ['unit/wolfraider', 51], ally_charger: ['hero/knight', 51], gunner: ['unit/rifleman', 54], ally_gunner: ['unit/dwarfrifle', 54],
+  gnoll: ['unit/gnoll', 58], ally_gnoll: ['unit/gnoll', 58], brigand: ['unit/brigand', 53], ally_brigand: ['unit/brigand', 53], bullet: ['unit/bullet', 340],
+};
+// Troops that only exist in Unification's art: with Classic sprites (or without the pack) they don't come at all.
+const UNIF_ONLY = ['charger', 'gunner', 'gnoll', 'brigand'];
+const unifCache = {};
+function unifSprite(name) {
+  if (name in unifCache) return unifCache[name];
+  let g = null; try { const d = unif(name); if (d && Core.isGfu(d)) g = Core.decodeGfu(d); } catch (e) {}
+  return (unifCache[name] = g);
+}
 function upgradedSprite(role, r, g) {
-  const k = UPGRADE_ROLES[role]; if (!k || cfg.opts.sprites === 'classic') return g;
+  if (cfg.opts.sprites === 'classic') return g;
+  const ua = UNIF_ART[role];
+  if (ua && r.entry === ua[1] && /(^|\/)MAINDAT\.WAR$/.test(r.file)) { const u = unifSprite(ua[0]); if (u && u.count === g.count) return u; }
+  const k = UPGRADE_ROLES[role]; if (!k) return g;
   if (r.entry !== UPGRADE_BASE[k] || !/(^|\/)MAINDAT\.WAR$/.test(r.file)) return g;   // only over the unit it was drawn for
   const u = upgradeArt(k); return u && u.count === g.count && u.w === g.w && u.h === g.h ? u : g;
 }
@@ -2253,6 +2280,11 @@ const ET = {
   skel:      { hp: 6, spd: 36, dmg: 5, r: 7, xp: 1, col: '#ddd' },
   daemon:    { hp: 230, spd: 34, dmg: 20, r: 13, xp: 25, col: '#a01010', fly: true },
   // Elites: their own player colour, more health, and one small ability each.
+  // Phase Q: new troops with their own jobs (Unification's sprites).
+  charger:   { hp: 30, spd: 44, dmg: 9, r: 10, xp: 4, col: '#7a5230' },   // stops, marks a line and charges down it
+  gunner:    { hp: 14, spd: 28, dmg: 15, r: 7, xp: 4, col: '#556070', range: 230 },   // aims (a red line) then fires a fast, heavy shot
+  gnoll:     { hp: 14, spd: 46, dmg: 6, r: 9, xp: 2, col: '#8a6a40' },   // neutral creeps in howling packs
+  brigand:   { hp: 26, spd: 56, dmg: 4, r: 8, xp: 3, col: '#605040' },   // thieves: steal the gold on the ground
   elite1: { hp: 170, spd: 30, dmg: 14, r: 11, xp: 20, col: '#e0b030', elite: true },
   elite2: { hp: 115, spd: 32, dmg: 7, r: 9, xp: 20, col: '#e0b030', elite: true, range: 140 },
   elite3: { hp: 115, spd: 28, dmg: 11, r: 9, xp: 20, col: '#e0b030', elite: true, range: 170 },
@@ -2273,6 +2305,10 @@ const FOES = {
   caster: { Horde: 'Death Knight', Alliance: 'Mage', desc: 'Casters join the ranks from 8:00, hurling bolts from range. Death knights raise skeletons.' },
   skel: { Horde: 'Skeleton', Alliance: '', desc: 'Raised by death knights, and by Gul\'dan and Teron. Weak, but many. Horde only.' },
   daemon: { Horde: 'Daemon', Alliance: 'Daemon', desc: 'A rare, terrible flier that answers to neither side. From 12:00.' },
+  charger: { Horde: 'Wolf Raider', Alliance: 'Knight Errant', desc: 'Fast riders. They stop, mark a line and charge down it: step aside. From 2:30.' },
+  gunner: { Horde: 'Hired Gun', Alliance: 'Dwarven Rifleman', desc: 'A long reach and a heavy shot. A red line shows where it aims just before it fires. From 5:00.' },
+  gnoll: { Horde: 'Gnoll', Alliance: 'Gnoll', desc: 'Neutral creeps that come in howling packs every 90 seconds from 1:30, from any direction.' },
+  brigand: { Horde: 'Brigand', Alliance: 'Brigand', desc: 'Thieves after the gold on the ground, from 2:30. Catch one before he gets away and he drops twice what he stole.' },
   elite1: { Horde: 'Ogre-Mage', Alliance: 'Paladin', elite: true, move: { Horde: 'Bloodlust', Alliance: 'Holy Light' }, desc: 'Every few seconds it heals the troops around it and spurs them on to move faster.' },
   elite2: { Horde: 'Troll Berserker', Alliance: 'Ranger', elite: true, move: { Horde: 'Volley', Alliance: 'Volley' }, desc: 'Throws three at once in a spread.' },
   elite3: { Horde: 'Death Knight', Alliance: 'Mage', elite: true, move: { Horde: 'Death Coil', Alliance: 'Fireball' }, desc: 'Casts a slow missile that follows you. Outrun it until it fades.' },
@@ -2421,12 +2457,21 @@ function gainXp(v) {
 }
 
 // Decode a tileset's megatiles (32x32, built from 8x8 minitiles) into one atlas canvas.
+// Unification's art (pack/unif.war, entries named like 'tiles/Volcano/vx4' or 'hero/arthas').
+function unif(name) { const w = A.wars['UNIF.WAR']; if (!w || !w.names) return null; const i = w.names.indexOf(name); return i < 0 ? null : Core.safeEntry(w, i); }
+function tileSkin(LV) {
+  if (!LV.skin || cfg.opts.sprites === 'classic') return null;
+  const g = x => unif(`tiles/${LV.skin}/${x}`), sk = { ppl: g('ppl'), vx4: g('vx4'), vr4: g('vr4'), cv4: g('cv4') };
+  const base = Core.safeEntry(A.wars[findMain()], LV.ts[1]);
+  return sk.ppl && sk.vx4 && sk.vr4 && base && sk.vx4.length === base.length ? sk : null;   // drop-in only: same megatile count
+}
 function loadTileset(LV) {
   A.tilesets ||= {};
   if (A.tilesets[LV.id]) { A.bldSpr = A.tilesets[LV.id].bldSpr; return A.tilesets[LV.id]; }
   const main = findMain(); if (!main) return null;
-  const war = A.wars[main], [pe, me, ne, te] = LV.ts;
-  const pal = Core.safeEntry(war, pe), mega = Core.safeEntry(war, me), mini = Core.safeEntry(war, ne), tab = Core.safeEntry(war, te);
+  const war = A.wars[main], [pe, me, ne, te] = LV.ts, sk = tileSkin(LV);
+  // The battlefield's updated ground (Unification's tilesets, drop-in replacements for Warcraft II's), else the original.
+  const pal = sk ? sk.ppl : Core.safeEntry(war, pe), mega = sk ? sk.vx4 : Core.safeEntry(war, me), mini = sk ? sk.vr4 : Core.safeEntry(war, ne), tab = (sk && sk.cv4) || Core.safeEntry(war, te);
   if (!pal || !mega || !mini || !tab) return null;
   const P = Core.toPalette(pal), n = mega.length >> 5, cols = 32, rows = Math.ceil(n / cols);
   const c = document.createElement('canvas'); c.width = cols * 32; c.height = rows * 32;
@@ -3021,7 +3066,8 @@ const BOSS_K = [0.35, 0.75, 0.95];   // the 5:00, 10:00 and 15:00 bosses' toughn
 // The sprite for an enemy role on the side you're fighting, falling back to a stand-in (the demo lacks some units).
 const FALLBACK = { tank_up: 'tank', ranged_up: 'ranged', caster: 'ranged', skel: 'basic', daemon: 'boss', boss1: 'boss', boss2: 'boss', boss3: 'boss', elite1: 'tank', elite2: 'ranged', elite3: 'ranged', scout: 'fast', flyer: 'boss', siege: 'tank', stone: 'eshot' };
 function foeSprite(r) { const k = (G.HD.side === 'Horde' ? 'ally_' : '') + r; return A.sprites[k] ? k : A.sprites[r] ? r : FALLBACK[r] ? foeSprite(FALLBACK[r]) : r; }
-const hasFoe = r => { const k = foeSprite(r); return k === r || k === 'ally_' + r; };   // its own picture, not a stand-in
+const hasFoe = r => { if (UNIF_ONLY.includes(r) && !(NEWFOES.on && unifFoe(r))) return false; const k = foeSprite(r); return k === r || k === 'ally_' + r; };
+const unifFoe = r => cfg.opts.sprites !== 'classic' && !!A.sprites[(G.HD.side === 'Horde' ? 'ally_' : '') + r] && !!unif(UNIF_ART[(G.HD.side === 'Horde' ? 'ally_' : '') + r][0]);   // its own picture, not a stand-in
 function spawnEnemy(type, x, y, boss) {
   const t = Math.min(G.t, RUN_LEN), T = ET[type], h = G.hero, free = type === 'boss' || T.fly || T.ship;
   if (x === undefined) {
@@ -3040,6 +3086,24 @@ function spawnEnemy(type, x, y, boss) {
   G.enemies.push(e); return e;
 }
 function bossName(B) { return B.name; }
+// A brigand makes for the nearest gold on the ground and pockets it; with enough, or nothing left, he runs for it.
+// Caught, he drops twice what he stole; got away, it's gone (Phase Q).
+function brigand(e, d, dt) {
+  const h = G.hero; e.loot ||= 0;
+  let g = null, best = 520 * 520;
+  if (e.loot < NEWFOES.steal) for (const o of G.gems) if (o.coin && !o.pull && !o.dead) { const q = (o.x - e.x) ** 2 + (o.y - e.y) ** 2; if (q < best) { best = q; g = o; } }
+  if (g) {
+    const gx = g.x - e.x, gy = g.y - e.y, gd = Math.hypot(gx, gy) || 1;
+    if (gd < 9) { g.dead = true; e.loot += g.coin; e.swing = SWING; if (!e.told) { e.told = true; banner('A brigand is stealing your gold!'); } }
+    e.bx = gx / gd; e.by = gy / gd; return true;
+  }
+  if (e.loot > 0) {   // off he goes
+    const fx = e.x - h.x, fy = e.y - h.y, fd = Math.hypot(fx, fy) || 1; e.bx = fx / fd; e.by = fy / fd;
+    if (fd > Math.hypot(W, H) * 0.7) { e.dead = true; banner(`A brigand got away with ${e.loot} gold.`); }
+    return true;
+  }
+  return false;
+}
 function seeFoe(k) { if (!meta.seen.includes(k)) { meta.seen.push(k); saveMeta(); } }
 function spawnBoss(n, frac) {
   G.bossPlan ||= planBosses();
@@ -3056,6 +3120,8 @@ function spawnBoss(n, frac) {
 }
 // Gradually, ogres and knights become ogre-mages and paladins, and axethrowers and archers berserkers and rangers.
 const UPGRADE = { from: 360, to: 1080, max: 0.75 };
+// Phase Q: when the new troops start, and the gnoll packs and brigands.
+const NEWFOES = { on: false, charger: 150, gunner: 300, gnoll: 90, gnollEvery: 90, pack: 6, brigand: 150, brigandEvery: 40, steal: 3 };
 const upShare = t => Math.max(0, Math.min(1, (t - UPGRADE.from) / (UPGRADE.to - UPGRADE.from))) * UPGRADE.max;
 function upgrade(k, t) { const u = { tank: 'tank_up', ranged: 'ranged_up' }[k]; return u && hasFoe(u) && Math.random() < upShare(t) ? u : k; }
 function pickType(t) {
@@ -3064,7 +3130,9 @@ function pickType(t) {
   for (const k in w) w[k] *= G.LV.mix[k] || 1;
   w.caster = t > PACE.caster ? Math.min(0.15, 0.05 + (t - PACE.caster) / 6000) : 0;
   w.daemon = t > PACE.daemon ? 0.025 : 0;
-  for (const k of ['scout', 'flyer', 'siege', 'caster', 'daemon']) if (w[k] && !hasFoe(k)) w[k] = 0;   // only units with their own pictures
+  w.charger = t > NEWFOES.charger ? Math.min(0.12, 0.04 + (t - NEWFOES.charger) / 3000) * (G.LV.mix.charger || 1) : 0;
+  w.gunner = t > NEWFOES.gunner ? Math.min(0.08, 0.03 + (t - NEWFOES.gunner) / 5000) * (G.LV.mix.gunner || 1) : 0;
+  for (const k of ['scout', 'flyer', 'siege', 'caster', 'daemon', 'charger', 'gunner']) if (w[k] && !hasFoe(k)) w[k] = 0;   // only units with their own pictures
   let s = 0; for (const k in w) s += w[k];
   let r = Math.random() * s; for (const k in w) { r -= w[k]; if (r <= 0) return upgrade(k === 'siege' && G.enemies.filter(e => e.type === 'siege').length >= 3 ? 'basic' : k, t); }
   return 'basic';
@@ -3074,6 +3142,15 @@ function spawn(dt) {
   G.spawnAcc += (1 + CURSE.spawn * curseOf()) * (0.7 + paceT(t) / 50) * EASE(t) * earlyK(t) * (1 + LATE.spawn * pushK(t)) * (1 + MID.spawn * midK(t)) * (G.final ? FINAL.spawn : G.enemies.some(e => e.boss && !e.final) ? BOSSFIGHT.spawn : 1) * dt;
   while (G.spawnAcc >= 1) { G.spawnAcc--; if (G.enemies.length < 330) spawnEnemy(pickType(t)); }
   if (G.bossN < BOSSES.length && G.t >= BOSSES[G.bossN].at) spawnBoss(++G.bossN);
+  // Gnoll packs from any direction, and brigands when there's gold lying about (Phase Q).
+  if (t >= (G.gnollNext ?? NEWFOES.gnoll) && !G.final && hasFoe('gnoll')) {
+    G.gnollNext = (G.gnollNext ?? NEWFOES.gnoll) + NEWFOES.gnollEvery; const h = G.hero, a0 = rnd(0, TAU), d = Math.hypot(W, H) / 2 + 20, n = NEWFOES.pack + Math.min(4, Math.floor(t / 180));
+    for (let i = 0; i < n; i++) { const a = a0 + rnd(-0.3, 0.3), dd = d + rnd(0, 50); spawnEnemy('gnoll', h.x + Math.cos(a) * dd, h.y + Math.sin(a) * dd); }
+  }
+  if (t >= (G.brigandNext ?? NEWFOES.brigand) && !G.final) {
+    G.brigandNext = (G.brigandNext ?? NEWFOES.brigand) + NEWFOES.brigandEvery;
+    if (hasFoe('brigand') && G.gems.some(g => g.coin && !g.pull) && G.enemies.filter(e => e.type === 'brigand').length < 2) spawnEnemy('brigand');
+  }
   // An elite every 50 seconds from 3:00 (every 35 from 10:00), taking turns.
   if (G.t >= G.eliteNext && !G.final) { G.eliteNext += G.t >= 600 ? 35 : 50; spawnEnemy('elite' + (G.eliteN++ % 3 + 1)); }
   // The Alliance's late swarms: gnomish flying machines and dwarves, all from one side.
@@ -3155,6 +3232,7 @@ function drop(e) {
     G.gems.push({ x: e.x + 5, y: e.y, coin: Math.round(15 * goldMul()) });
     if (Math.random() < 0.3) { const ids = Object.keys(POWERUPS).filter(id => id !== 'healing' || G.hero.hp < G.hero.maxHp * 0.7); G.gems.push({ x: e.x - 5, y: e.y, pow: ids[Math.floor(Math.random() * ids.length)] }); }
   }
+  if (e.loot) G.gems.push({ x: e.x, y: e.y, coin: e.loot * 2 });   // a caught brigand
   maybePowerup(e);
   if (Math.random() < 0.012) G.gems.push({ x: e.x + rnd(-4, 4), y: e.y + rnd(-4, 4), meat: true });
   if (Math.random() < 0.06 + 0.03 * (e.type === 'tank')) G.gems.push({ x: e.x + rnd(-5, 5), y: e.y + rnd(-5, 5), coin: Math.round((e.type === 'tank' ? 8 : 3) * goldMul()) });
@@ -3537,6 +3615,14 @@ function special(e, d, dx, dy, dt) {
     e.raiseT = e.type === 'elite3' ? 8 : 11; G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 30, t: 0, life: 0.5, col: '120,200,120' });
     for (let i = 0; i < (e.type === 'elite3' ? 3 : 2); i++) { const a = rnd(0, TAU); spawnEnemy('skel', e.x + Math.cos(a) * 22, e.y + Math.sin(a) * 22); }
   }
+  if (e.type === 'gunner') {   // aims for a moment (a red line), then a fast, heavy shot
+    if (e.aimT > 0) { if ((e.aimT -= dt) <= 0) { e.swing = SWING; G.eshots.push({ x: e.x, y: e.y, vx: e.ax * 260, vy: e.ay * 260, dmg: e.dmg, life: 1.4, dir: dirOf(e.ax, e.ay), role: 'bullet' }); e.shootT = 3.6; } }
+    else if (e.shootT <= 0 && d < e.range * 1.1) { e.aimT = 0.8; e.ax = dx; e.ay = dy; }
+  }
+  if (e.type === 'charger') {   // stops, marks a line, then charges down it
+    if (e.charge) { const c = e.charge; c.t -= dt; if (c.phase === 'aim' && c.t <= 0) { c.phase = 'go'; c.t = 0.5; } else if (c.phase === 'go' && c.t <= 0) { e.charge = null; e.sigT = rnd(4, 6); } }
+    else if ((e.sigT -= dt) <= 0 && d < 200 && d > 40) { e.charge = { phase: 'aim', t: 0.7, dx, dy, x: e.x, y: e.y }; e.swing = SWING; }
+  }
   if (e.type === 'siege' && e.shootT <= 0 && d < e.range * 1.15) {   // aims a little ahead of where you're going
     e.shootT = 5.5; e.swing = SWING;
     addMark(h.x + G.hv[0] * 0.6, h.y + G.hv[1] * 0.6, 24, 1.15, e.dmg, 'siege', { x: e.x, y: e.y });
@@ -3616,10 +3702,12 @@ function updateEnemies(dt) {
     if (e.range) {   // ranged units keep their distance
       if (d < e.range * (e.type === 'siege' ? 0.55 : 0.75)) sp = -sp * 0.6; else if (d < e.range) sp = 0;
     }
+    if (e.type === 'brigand' && brigand(e, d, dt)) { dx = e.bx; dy = e.by; }
     if ((e.type === 'ranged' || e.type === 'ranged_up') && e.shootT <= 0 && d < e.range * 1.3) { e.shootT = (e.type === 'ranged_up' ? 2.0 : 2.6) + 1.2 * (1 - EASE(G.t)); e.swing = SWING; G.eshots.push({ x: e.x, y: e.y, vx: dx * 95, vy: dy * 95, dmg: e.dmg, life: 3, dir: dirOf(dx, dy) }); }
     if (e.type === 'caster' && e.shootT <= 0 && d < e.range * 1.3) { e.shootT = 3.2; e.swing = SWING; G.eshots.push({ x: e.x, y: e.y, vx: dx * 75, vy: dy * 75, dmg: e.dmg, life: 3.5, dir: dirOf(dx, dy), role: foeSide() === 'Horde' ? 'coil' : 'fire' }); }
     special(e, d, dx, dy, dt);
-    if (e.charge) { const c = e.charge; dx = c.dx; dy = c.dy; sp = c.phase === 'aim' ? 0 : 270; }
+    if (e.charge) { const c = e.charge; dx = c.dx; dy = c.dy; sp = c.phase === 'aim' ? 0 : e.boss ? 270 : 210; }
+    if (e.aimT > 0) sp = 0;
     let vx = dx * sp, vy = dy * sp;
     if (G.terrain && !e.free && sp && !footBlocked(e.x, e.y, e.r * 0.5)) {
       const look = Math.sign(sp) * 7, r = e.r * 0.5;
@@ -3902,6 +3990,10 @@ function drawEnemy(e) {
   try { return drawEnemyAt(e, x, y, up, role, sp); } finally { if (sp) sp.scale = oldScale; }
 }
 function drawEnemyAt(e, x, y, up, role, sp) {
+  if (e.aimT > 0) {   // a gunner taking aim
+    ctx.strokeStyle = `rgba(255,40,30,${0.4 + 0.4 * (1 - e.aimT / 0.8)})`; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + e.ax * 240, y - 6 + e.ay * 240); ctx.stroke();
+  }
   if (e.charge && e.charge.phase === 'aim') {   // where the charge will go
     const c = e.charge; ctx.strokeStyle = `rgba(255,60,40,${0.35 + 0.3 * Math.sin(e.t * 20)})`; ctx.lineWidth = e.r * 1.4;
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + c.dx * 150, y + c.dy * 150); ctx.stroke();
@@ -4650,11 +4742,11 @@ const PREVIEW_SEED = 20261118;
 // picking a hero (Jon). Finished pictures are saved in the browser, by battlefield, side and version (a new
 // build with map changes draws them again once), so after the first visit the screen appears at once.
 const MAP_VERSION = 2;   // bump when the map maker or the battlefields change, so saved pictures are drawn again (not on every release)
-const PV_KEY = () => `tos_pv_m${MAP_VERSION}_full`;
+const PV_KEY = () => `tos_pv_m${MAP_VERSION}_${cfg.opts.sprites === 'classic' ? 'c' : 'u' + (store.get(PACK.key, '') || '').slice(0, 4)}`;
 function fieldPreview(L, side) {
-  A.previews ||= {}; const key = L.id + side; if (A.previews[key] !== undefined) return A.previews[key];
+  A.previews ||= {}; const key = L.id + side, mk = PV_KEY() + key; if (A.previews[mk] !== undefined) return A.previews[mk];
   const saved = store.get(PV_KEY(), {});
-  if (saved[key]) { const im = new Image(); im.src = saved[key]; return (A.previews[key] = im); }
+  if (saved[key]) { const im = new Image(); im.src = saved[key]; return (A.previews[mk] = im); }
   let c = null;
   try {
     if (groundColours(L)) {
@@ -4665,7 +4757,7 @@ function fieldPreview(L, side) {
       try { saved[key] = c.toDataURL('image/png'); for (const k of Object.keys(localStorage)) if (k.startsWith('tos_pv_') && k !== PV_KEY()) localStorage.removeItem(k); store.set(PV_KEY(), saved); } catch (e) {}   // old versions' pictures go
     }
   } catch (e) { console.warn(e); c = null; }
-  return (A.previews[key] = c);
+  return (A.previews[mk] = c);
 }
 function fieldTile(L, i, heroId) {
   const open = levelOpen(i);
@@ -4716,13 +4808,13 @@ const OPT_DEFS = {
   fx: { label: 'Effects', vals: ['full', 'reduced'], fmt: v => v === 'full' ? 'Full' : 'Reduced (no glows or light beams)' },
   tips: { label: 'Tips', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
   colours: { label: 'Colours', vals: ['std', 'cb'], fmt: v => v === 'cb' ? 'Colour-blind friendly (blue health, orange foes)' : 'Standard' },
-  sprites: { label: 'Unit sprites', vals: ['updated', 'classic'], fmt: v => v === 'classic' ? 'Classic' : 'Updated' },
+  sprites: { label: 'Art', vals: ['updated', 'classic'], fmt: v => v === 'classic' ? 'Classic' : 'Updated' },   // units, heroes and battlefields
 };
 function changeOpt(k) {
   const d = OPT_DEFS[k], i = d.vals.indexOf(cfg.opts[k]);
   cfg.opts[k] = d.vals[(i + 1) % d.vals.length]; saveCfg();
   if (k === 'music') musicVolume(); if (k === 'sfx') sfx('s_hit', 0); if (k === 'voice') heroVoice('yes', 1, (G && G.heroId) || store.get('tos_hero', 'lothar'));
-  if (k === 'sprites' && A.wars['MAINDAT.WAR']) rebuildSprites();
+  if (k === 'sprites') { A.tilesets = {}; if (A.wars['MAINDAT.WAR']) rebuildSprites(); }   // previews are kept per art setting (PV_KEY)
 }
 /* ---------- Book of War: everything you can find, and how evolutions are made ----------
    Evolution recipes stay hidden until you've made one; once you've maxed a weapon, its partner passive is named. */
@@ -5648,7 +5740,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, DB, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, DB, tileSkin, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>

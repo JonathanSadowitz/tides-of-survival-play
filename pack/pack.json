@@ -1,5 +1,5 @@
 {
- "version": "e447dfbb73a1",
+ "version": "678f1bf612b6",
  "built": "2026-11-26",
  "files": [
   {
@@ -298,12 +298,71 @@
     "zuljin:ready",
     "zuljin:yes"
    ]
+  },
+  {
+   "name": "UNIF.WAR",
+   "file": "unif.war",
+   "size": 3494181,
+   "sha": "9881f25fc4157a3e",
+   "names": [
+    "tiles/ForestRegular/ppl",
+    "tiles/ForestRegular/vx4",
+    "tiles/ForestRegular/vr4",
+    "tiles/Glacier/ppl",
+    "tiles/Glacier/vx4",
+    "tiles/Glacier/vr4",
+    "tiles/Wasteland/ppl",
+    "tiles/Wasteland/vx4",
+    "tiles/Wasteland/vr4",
+    "tiles/OrcSwamp/ppl",
+    "tiles/OrcSwamp/vx4",
+    "tiles/OrcSwamp/vr4",
+    "tiles/Hell/ppl",
+    "tiles/Hell/vx4",
+    "tiles/Hell/vr4",
+    "tiles/SunsetValley/ppl",
+    "tiles/SunsetValley/vx4",
+    "tiles/SunsetValley/vr4",
+    "tiles/Volcano/ppl",
+    "tiles/Volcano/vx4",
+    "tiles/Volcano/vr4",
+    "tiles/NocturnValley/ppl",
+    "tiles/NocturnValley/vx4",
+    "tiles/NocturnValley/vr4",
+    "tiles/Jungle/ppl",
+    "tiles/Jungle/vx4",
+    "tiles/Jungle/vr4",
+    "tiles/SnowStorm/ppl",
+    "tiles/SnowStorm/vx4",
+    "tiles/SnowStorm/vr4",
+    "tiles/DesertWooW/ppl",
+    "tiles/DesertWooW/vx4",
+    "tiles/DesertWooW/vr4",
+    "hero/chogall",
+    "hero/dentarg",
+    "hero/teron",
+    "hero/khadgar",
+    "hero/utherlothar",
+    "hero/arthas",
+    "hero/kilrogg",
+    "hero/knight",
+    "unit/wolfraider",
+    "unit/gnoll",
+    "unit/brigand",
+    "unit/rifleman",
+    "unit/dwarfrifle",
+    "unit/bullet"
+   ]
   }
  ],
  "credits": [
   {
    "who": "Blizzard Entertainment",
    "what": "Warcraft II: Tides of Darkness and Beyond the Dark Portal art, sounds and voices, used with permission (music not included)"
+  },
+  {
+   "who": "The Unification mod: dannyldd and its artists (see docs/CREDITS.md)",
+   "what": "tilesets and unit and hero sprites"
   },
   {
    "who": "Incos",
