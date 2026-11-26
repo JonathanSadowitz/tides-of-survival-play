@@ -1162,7 +1162,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.22.0', BUILD = '1a163b4 2026-11-26';
+const VERSION = '0.23.0', BUILD = '2afee58 2026-11-26';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -3121,7 +3121,7 @@ function spawnBoss(n, frac) {
 // Gradually, ogres and knights become ogre-mages and paladins, and axethrowers and archers berserkers and rangers.
 const UPGRADE = { from: 360, to: 1080, max: 0.75 };
 // Phase Q: when the new troops start, and the gnoll packs and brigands.
-const NEWFOES = { on: false, charger: 150, gunner: 300, gnoll: 90, gnollEvery: 90, pack: 6, brigand: 150, brigandEvery: 40, steal: 3 };
+const NEWFOES = { on: true, charger: 150, gunner: 300, gnoll: 120, gnollEvery: 90, pack: 5, brigand: 150, brigandEvery: 40, steal: 3 };
 const upShare = t => Math.max(0, Math.min(1, (t - UPGRADE.from) / (UPGRADE.to - UPGRADE.from))) * UPGRADE.max;
 function upgrade(k, t) { const u = { tank: 'tank_up', ranged: 'ranged_up' }[k]; return u && hasFoe(u) && Math.random() < upShare(t) ? u : k; }
 function pickType(t) {
@@ -3130,7 +3130,7 @@ function pickType(t) {
   for (const k in w) w[k] *= G.LV.mix[k] || 1;
   w.caster = t > PACE.caster ? Math.min(0.15, 0.05 + (t - PACE.caster) / 6000) : 0;
   w.daemon = t > PACE.daemon ? 0.025 : 0;
-  w.charger = t > NEWFOES.charger ? Math.min(0.12, 0.04 + (t - NEWFOES.charger) / 3000) * (G.LV.mix.charger || 1) : 0;
+  w.charger = t > NEWFOES.charger ? Math.min(0.1, 0.03 + (t - NEWFOES.charger) / 3000) * (G.LV.mix.charger || 1) : 0;
   w.gunner = t > NEWFOES.gunner ? Math.min(0.08, 0.03 + (t - NEWFOES.gunner) / 5000) * (G.LV.mix.gunner || 1) : 0;
   for (const k of ['scout', 'flyer', 'siege', 'caster', 'daemon', 'charger', 'gunner']) if (w[k] && !hasFoe(k)) w[k] = 0;   // only units with their own pictures
   let s = 0; for (const k in w) s += w[k];
@@ -5740,7 +5740,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, DB, tileSkin, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, DB, tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
