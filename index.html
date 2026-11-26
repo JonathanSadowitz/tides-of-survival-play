@@ -1179,7 +1179,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.24.0', BUILD = '6c6c1a7 2026-11-26';
+const VERSION = '0.24.1', BUILD = '17509e0 2026-11-26';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -5040,6 +5040,7 @@ function showAbout() {
     <h3>How to play</h3>
     <p>Move with WASD, the arrow keys, the mouse, a gamepad or by dragging on a touch screen. Your weapons attack by themselves. Level up to choose new weapons and upgrades. Esc or P pauses; F changes the speed.</p>
     <p>Spend gold in the Armoury between runs. Reach goals to unlock heroes and battlefields.</p>
+    <p class="thanks">Thanks to Incos, and to Danny (dannyldd) and the Unification team, for their sprite and tile work.</p>
     <p><a href="${ITCH_URL}" target="_blank" rel="noopener">captmurdock.itch.io/tides-of-survival</a> · v${VERSION} (${built})</p></div>
     <div class="opts"><button class="opt" data-act="title" data-back>Back</button></div>`);
   overlay.querySelector('.panel').classList.add('scrolls'); fitPanel();
