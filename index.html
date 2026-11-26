@@ -1179,7 +1179,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.25.0', BUILD = '6ac7bcf 2026-11-26';
+const VERSION = '0.26.0', BUILD = 'cb5839b 2026-11-26';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1205,7 +1205,7 @@ const store = {
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(() => {}); } catch (e) {}
 let cfg = store.get('tos_cfg', null) || { roles: {}, sounds: {}, palette: null };
 cfg.roles ||= {}; cfg.sounds ||= {};
-cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, voice: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fps: false, fx: 'full', colours: 'std', tips: true, sprites: 'updated' }, cfg.opts || {});
+cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, voice: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fps: false, fx: 'full', colours: 'std', tips: true, sprites: 'updated', musicSrc: 'cd' }, cfg.opts || {});
 if (!cfg.optsV) { if (cfg.opts.music === 0.6) cfg.opts.music = 0.4; cfg.optsV = 2; }   // 60% was the old default: too loud
 const saveCfg = () => store.set('tos_cfg', cfg);
 let best = store.get('tos_best', { time: 0, kills: 0, level: 0 });
@@ -1215,8 +1215,8 @@ const DB = {
   async open() {
     try {
       this.db = await new Promise((res, rej) => {
-        const r = indexedDB.open('tides_of_survival', 3);
-        r.onupgradeneeded = () => { const d = r.result; for (const st of ['files', 'music', 'handles']) if (!d.objectStoreNames.contains(st)) d.createObjectStore(st, { keyPath: 'name' }); };
+        const r = indexedDB.open('tides_of_survival', 4);
+        r.onupgradeneeded = () => { const d = r.result; for (const st of ['files', 'music', 'handles', 'synth']) if (!d.objectStoreNames.contains(st)) d.createObjectStore(st, { keyPath: 'name' }); };
         r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
       });
     } catch (e) { this.db = null; }
@@ -1234,7 +1234,9 @@ const DB = {
   clear() { return Promise.all([this.req('readwrite', s => s.clear()), this.req('readwrite', s => s.clear(), 'music')]); }, // keeps the remembered folder
   putMusic(rec) { return this.req('readwrite', s => s.put(rec), 'music'); },
   getMusic(name) { return this.req('readonly', s => s.get(name), 'music'); },
-  musicNames() { return this.req('readonly', s => s.getAllKeys(), 'music'); }
+  musicNames() { return this.req('readonly', s => s.getAllKeys(), 'music'); },
+  getSynth(name) { return this.req('readonly', s => s.get(name), 'synth'); },
+  putSynth(rec) { return this.req('readwrite', s => s.put(rec), 'synth'); }
 };
 
 /* ---------- assets ---------- */
@@ -1356,7 +1358,7 @@ async function loadPack(force) {
   for (const base of PACK.urls) {
     let man;
     try { const r = await fetch(base + 'pack.json', { cache: 'no-cache' }); if (!r.ok) continue; man = await r.json(); } catch (e) { continue; }
-    A.credits = man.credits || [];
+    A.credits = man.credits || []; if (man.synth) store.set('tos_synth', { base, files: man.synth });   // the MIDI player's files, fetched when music first plays
     const had = store.get(PACK.key, null), mine = importedNames(), shas = store.get(PACK.key + '_files', {});
     // Only the parts that changed (by checksum) are fetched again.
     const want = man.files.filter(f => !mine.has(f.name) && (force || !A.wars[f.name] || (had !== man.version && shas[f.name] !== f.sha)));
@@ -1546,9 +1548,9 @@ function rebuildSprites() {
 function assetSummary() {
   const files = warNames().length, sprites = Object.keys(A.sprites).length, sounds = Object.keys(cfg.sounds).filter(k => A.wars[cfg.sounds[k].file]).length;
   if (!files) return `The game's art and sounds couldn't be downloaded, so you'll see placeholder shapes. Check your connection and reload, or import your Warcraft II folder in Settings, Game files.`;
-  const extra = (mu.names.size ? `, ${mu.names.size} music tracks` : '') + (A.wars['GAMESFX/VOICES.WAR'] ? ', hero voices' : '');
+  const extra = (mu.names.size ? `, ${mu.names.size} CD music tracks` : '') + (A.wars['GAMESFX/VOICES.WAR'] ? ', hero voices' : '');
   return `${sprites} sprite${sprites === 1 ? '' : 's'}, ${sounds} sound${sounds === 1 ? '' : 's'}${extra}.` + (sprites ? '' : ' Assign some sprites in the Asset Lab (Settings).')
-    + (mu.names.size ? '' : ' No music yet.');
+    ;
 }
 
 /* ---------- menu art from REZDAT.WAR (TOME.2): background and buttons ---------- */
@@ -1739,7 +1741,7 @@ addEventListener('resize', fitStage);
 function ensureAudio() {
   if (!A.actx) { try { A.actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } }
   if (A.actx.state === 'suspended') A.actx.resume().catch(() => {});
-  if (mu.want && !mu.cur && !mu.pending && mu.names.size) { const k = mu.want; mu.kind = null; playMusic(k); }
+  if (mu.want && !mu.cur && !mu.pending && musicSource()) { const k = mu.want; mu.kind = null; playMusic(k); }
   for (const [role, s] of Object.entries(cfg.sounds)) {
     if (A.sbuf[role] !== undefined) continue;
     const war = A.wars[s.file]; if (!war) continue;
@@ -1834,16 +1836,19 @@ function loadTrack(id) {
 }
 function playMusic(kind) {
   mu.want = kind;
-  if (!A.actx || !mu.names.size) return;
-  if (mu.kind === kind && (mu.cur || mu.done === kind)) return;
-  mu.kind = kind; mu.done = null; mu.list = playlistFor(kind).filter(id => mu.names.has(id)); mu.idx = 0;
+  const src = musicSource();
+  if (!A.actx || !src) return;
+  if (mu.kind === kind && mu.src === src && (mu.cur || mu.done === kind)) return;
+  mu.kind = kind; mu.src = src; mu.done = null; mu.list = playlistFor(kind).filter(id => src === 'cd' ? mu.names.has(id) : midiHas(id)); mu.idx = 0;
   stopMusic(); if (mu.list.length) nextTrack();
 }
 function stopMusic() {
   const c = mu.cur; mu.cur = null; mu.token++;
+  if (c && c.midi) { midiStop(); return; }
   if (c) { try { c.g.gain.cancelScheduledValues(A.actx.currentTime); c.g.gain.setTargetAtTime(0, A.actx.currentTime, 0.25); c.src.stop(A.actx.currentTime + 1.2); } catch (e) {} }
 }
 async function nextTrack() {
+  if (mu.src === 'midi') return midiNext();
   const tok = ++mu.token, id = mu.list[mu.idx % mu.list.length]; mu.idx++;
   mu.pending = true; const buf = await loadTrack(id); mu.pending = false;
   if (tok !== mu.token || !buf) return;
@@ -1858,6 +1863,70 @@ async function nextTrack() {
   src.start(); mu.cur = { src, g, id };
   if (menu) { const t = A.actx.currentTime + MENU_MUSIC.loopFor; g.gain.setValueAtTime(1, t); g.gain.linearRampToValueAtTime(0, t + MENU_MUSIC.fade); src.stop(t + MENU_MUSIC.fade + 0.1); }
   if (mu.kind === 'battle') { const nx = mu.list[mu.idx % mu.list.length]; setTimeout(() => loadTrack(nx), 4000); } // prepare the next one in the background
+}
+/* ---------- MIDI music (Phase T): everyone hears the music, no import needed ----------
+   The pack's MIDI.WAR holds Warcraft II's songs as MIDI (from freemidi.org's Warcraft II page, Jon's pick). They play
+   through GeneralUser GS (S. Christian Collins), a soundfont voiced like Roland's Sound Canvas, cut down to what the
+   songs use (music.sf3, 2 MB), with spessasynth (Apache-2.0; music-synth.js and music-worklet.js). Those three files
+   are fetched the first time music plays and kept. Imported CD tracks play instead when there are any, unless
+   Settings, Music says MIDI. The MIDI set has only four battle songs a side, so V and VI borrow (MIDI_BORROW). */
+const MIDI_BORROW = { 5: 3, 6: 2 };
+const MIDI_OF = { HWARROOM: 'human-mission-review', OWARROOM: 'orc-mission-review', HVICTORY: 'human-victory', OVICTORY: 'orc-victory', HDEFEAT: 'human-defeat', ODEFEAT: 'orc-defeat' };
+function midiSong(id) { const m = /^(HUMAN|ORC)(\d)$/.exec(id); return m ? `${m[1] === 'HUMAN' ? 'human' : 'orc'}-music-${MIDI_BORROW[m[2]] || m[2]}` : MIDI_OF[id]; }
+const midiWar = () => { const w = A.wars['MIDI.WAR']; return w && w.names ? w : null; };
+const midiHas = id => { const w = midiWar(); return !!(w && w.names.includes(midiSong(id))); };
+function musicSource() {
+  if (mu.names.size && cfg.opts.musicSrc !== 'midi') return 'cd';
+  if (midiWar() && store.get('tos_synth', null) && !md.failed) return 'midi';
+  return mu.names.size ? 'cd' : null;
+}
+const md = { p: null, synth: null, seq: null, g: null, failed: false, level: 0.8 };   // level: the songs peak above full scale
+// A file of the MIDI player: kept in the browser after the first fetch, fetched again only when the pack changes it.
+async function synthFile(f, base) {
+  const rec = await DB.getSynth(f.file); if (rec && rec.sha === f.sha) return rec.buf;
+  const b = await fetchBytes(base + f.file, () => {}), buf = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+  await DB.putSynth({ name: f.file, sha: f.sha, buf }); return buf;
+}
+function midiEngine() {
+  if (md.p) return md.p;
+  md.p = (async () => {
+    const man = store.get('tos_synth', null); if (!man || !A.actx || !A.actx.audioWorklet) throw new Error('no MIDI player');
+    const bases = [man.base, ...PACK.urls.filter(u => u !== man.base)];
+    const get = async f => { for (const b of bases) { try { return await synthFile(f, b); } catch (e) {} } throw new Error('could not fetch ' + f.file); };
+    const [js, wk, sf] = await Promise.all(['music-synth.js', 'music-worklet.js', 'music.sf3'].map(n => get(man.files.find(f => f.file === n))));
+    const url = buf => URL.createObjectURL(new Blob([buf], { type: 'text/javascript' }));
+    if (!window.TOS_SYNTH) await new Promise((ok, no) => { const s = document.createElement('script'); s.src = url(js); s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+    await A.actx.audioWorklet.addModule(url(wk));
+    const synth = new TOS_SYNTH.WorkletSynthesizer(A.actx); await synth.isReady;
+    await synth.soundBankManager.addSoundBank(sf, 'main');
+    if (!mu.gain) { mu.gain = A.actx.createGain(); mu.gain.connect(A.actx.destination); musicVolume(); }
+    md.g = A.actx.createGain(); md.g.gain.value = 0; synth.connect(md.g); md.g.connect(mu.gain);
+    md.seq = new TOS_SYNTH.Sequencer(synth); md.synth = synth;
+    md.seq.eventHandler.addEvent('songEnded', 'tos', () => { const c = mu.cur; if (!c || !c.midi || c.loop) return; if (mu.kind === 'battle') { mu.cur = null; nextTrack(); } else { mu.cur = null; if (mu.kind === 'menu') mu.done = 'menu'; } });
+    return true;
+  })().catch(e => { console.warn('MIDI music', e); md.failed = true; md.p = null; return false; });
+  return md.p;
+}
+async function midiNext() {
+  const tok = ++mu.token, id = mu.list[mu.idx % mu.list.length]; mu.idx++;
+  mu.pending = true; const ok = await midiEngine(); mu.pending = false;
+  if (tok !== mu.token) return;
+  if (!ok) { mu.src = null; if (mu.names.size) { const k = mu.kind; mu.kind = null; playMusic(k); } return; }
+  const w = midiWar(), i = w.names.indexOf(midiSong(id)), d = Core.safeEntry(w, i); if (!d) return;
+  const menu = mu.kind === 'menu', loop = menu || mu.kind === 'battle' && mu.list.length === 1, t = A.actx.currentTime;
+  md.seq.loopCount = loop ? 1e9 : 0;
+  md.seq.loadNewSongList([{ binary: d.slice().buffer, fileName: midiSong(id) + '.mid' }]); md.seq.play();
+  md.g.gain.cancelScheduledValues(t); md.g.gain.setValueAtTime(0, t); md.g.gain.setTargetAtTime(md.level, t, 0.3);
+  mu.cur = { midi: true, id, loop };
+  if (menu) {   // ten minutes, then a slow fade, as with the CD tracks
+    const at = t + MENU_MUSIC.loopFor; md.g.gain.setValueAtTime(md.level, at); md.g.gain.linearRampToValueAtTime(0, at + MENU_MUSIC.fade);
+    setTimeout(() => { if (tok === mu.token && mu.cur && mu.cur.midi) { md.seq.pause(); mu.cur = null; mu.done = 'menu'; } }, (MENU_MUSIC.loopFor + MENU_MUSIC.fade + 0.2) * 1000);
+  }
+}
+function midiStop() {
+  if (!md.g || !md.seq) return;
+  const t = A.actx.currentTime, tok = mu.token; md.g.gain.cancelScheduledValues(t); md.g.gain.setTargetAtTime(0, t, 0.25);
+  setTimeout(() => { if (mu.token === tok || !(mu.cur && mu.cur.midi)) try { md.seq.pause(); } catch (e) {} }, 1200);
 }
 // Read only the music out of a large MPQ File, using slices so the whole archive never sits in memory.
 async function mpqFileMusic(file, onProgress) {
@@ -1936,11 +2005,6 @@ function voiceLines(heroId, kind) {
   return pick(kind) || (kind === 'ready' ? pick('yes') : null);
 }
 // Once, for players who imported before 0.19: their saved voices are only the workers', so ask for War2Dat.mpq again.
-// Players without their own Warcraft II get everything but the music: say so on the first few visits.
-function musicNote() {
-  const seen = store.get('tos_mnote', 0); if (seen >= 3) return ''; store.set('tos_mnote', seen + 1);
-  return '<div class="note">Own Warcraft II? Add its music in Settings, Game files.</div>';
-}
 function voiceNote() {
   const w = Object.keys(A.wars).filter(n => /WORKERS\.WAR$/.test(n)).map(n => A.wars[n]);
   if (!w.length || w.some(x => x.names && x.names.some(n => n.startsWith('u_')))) return '';
@@ -4805,7 +4869,7 @@ function showTitle() {
     overlay.innerHTML = `<div class="wcstage"><img class="bg" src="${A.menuBg}" alt="">
       <div class="wcbtns"><button class="opt" data-act="choose">Start a Run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
       <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="about">About</button></div>
-      ${!mu.names.size ? musicNote() : voiceNote()}
+      ${voiceNote()}
       <div class="ver" data-wcsmall="TIDES OF SURVIVAL"></div><div class="vernum">v${VERSION}</div></div>`;
     overlay.className = 'wcmenu'; overlay.style.display = 'flex'; overlay.style.backgroundImage = '';
     sel = 0; wcify(overlay);
@@ -4900,12 +4964,14 @@ const OPT_DEFS = {
   tips: { label: 'Tips', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
   colours: { label: 'Colours', vals: ['std', 'cb'], fmt: v => v === 'cb' ? 'Colour-blind friendly (blue health, orange foes)' : 'Standard' },
   sprites: { label: 'Art', vals: ['updated', 'classic'], fmt: v => v === 'classic' ? 'Classic' : 'Updated' },   // units, heroes and battlefields
+  musicSrc: { label: 'Music', vals: ['cd', 'midi'], fmt: v => v === 'midi' ? 'MIDI' : 'CD tracks', show: () => mu.names.size > 0 },   // only once there are CD tracks to choose
 };
 function changeOpt(k) {
   const d = OPT_DEFS[k], i = d.vals.indexOf(cfg.opts[k]);
   cfg.opts[k] = d.vals[(i + 1) % d.vals.length]; saveCfg();
   if (k === 'music') musicVolume(); if (k === 'sfx') sfx('s_hit', 0); if (k === 'voice') heroVoice('yes', 1, (G && G.heroId) || store.get('tos_hero', 'lothar'));
-  if (k === 'sprites') { A.tilesets = {}; if (A.wars['MAINDAT.WAR']) rebuildSprites(); }   // previews are kept per art setting (PV_KEY)
+  if (k === 'sprites') { A.tilesets = {}; if (A.wars['MAINDAT.WAR']) rebuildSprites(); }
+  if (k === 'musicSrc' && mu.want) { const w = mu.want; mu.kind = null; playMusic(w); }   // previews are kept per art setting (PV_KEY)
 }
 /* ---------- Book of War: everything you can find, and how evolutions are made ----------
    Evolution recipes stay hidden until you've made one; once you've maxed a weapon, its partner passive is named. */
@@ -5048,7 +5114,7 @@ function showAbout() {
   overlay.querySelector('.panel').classList.add('scrolls'); fitPanel();
 }
 function showSettings(from, focus) {
-  const keys = Object.keys(OPT_DEFS);
+  const keys = Object.keys(OPT_DEFS).filter(k => !OPT_DEFS[k].show || OPT_DEFS[k].show());
   const rows = keys.map(k => `<button class="opt" data-act="opt" data-k="${k}" data-from="${from}">${OPT_DEFS[k].label}: ${OPT_DEFS[k].fmt(cfg.opts[k])}</button>`).join('');
   const xfer = from === 'pause' ? '' : `<button class="opt" data-act="history">Run history</button><button class="opt" data-act="exportsave">Copy save code</button><button class="opt" data-act="importsave">Load save code</button><button class="opt" data-act="import">Game files (music)</button><button class="opt" data-act="lab">Asset Lab (advanced)</button><button class="opt" data-act="resettips">Show tips again</button><button class="opt danger" data-act="reset">Reset progress</button>`;
   showMenu(`<h2>Settings</h2><div class="opts set">${rows}${xfer}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
@@ -5424,12 +5490,12 @@ addEventListener('blur', () => { if (G && G.state === 'play') pauseRun(); });   
 let impOpen = false, impState = 'idle';
 function impSummary() {
   if (!warNames().length) return `<p class="sub">The game's art couldn't be downloaded. Check your connection and reload.</p>`;
-  return mu.names.size ? `<p class="sub chestgold">Music: ${mu.names.size} tracks.</p>` : `<p class="help">Own Warcraft II? Import its folder to add the music.</p>`;
+  return mu.names.size ? `<p class="sub chestgold">CD music: ${mu.names.size} tracks.</p>` : `<p class="help">Own Warcraft II? Import its folder to hear its CD music.</p>`;
 }
 async function showImport(done) {
   impOpen = true; impState = done ? 'done' : 'idle';
   const saved = await savedFolderName();
-  const res = done ? (mu.names.size ? '' : `<p class="sub">No music found. It's in <code>Install.mpq</code> in the game folder.</p>`) : '';
+  const res = done ? (mu.names.size ? '' : `<p class="sub">No CD music found. It's in <code>Install.mpq</code> in the game folder.</p>`) : '';
   showMenu(`<h2>Game files</h2>${res}${impSummary()}
     <div class="opts">${saved ? `<button class="opt" data-act="impagain">Re-import from ${saved}</button>` : ''}<button class="opt" data-act="impdir">Import Warcraft II folder</button>
     <button class="opt" data-act="impfiles">Choose files instead</button><button class="opt" data-act="settings" data-from="title" data-back>Back</button></div>
@@ -5836,7 +5902,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, DB, tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, DB, md, showSettings, musicSource, midiHas, midiSong, ensureAudio, playlistFor, LEVELS_IDS: () => LEVELS.map(l => l.id), tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>

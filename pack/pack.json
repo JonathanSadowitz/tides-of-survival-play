@@ -1,5 +1,5 @@
 {
- "version": "5dff0963450d",
+ "version": "167ef566b13c",
  "built": "2026-11-26",
  "files": [
   {
@@ -413,6 +413,29 @@
     "arthas:yes",
     "arthas:yes"
    ]
+  },
+  {
+   "name": "MIDI.WAR",
+   "file": "midi.war",
+   "size": 381583,
+   "sha": "e22b18d3db16b169",
+   "names": [
+    "human-defeat",
+    "human-mission-review",
+    "human-music-1",
+    "human-music-2",
+    "human-music-3",
+    "human-music-4",
+    "human-victory",
+    "intro",
+    "orc-defeat",
+    "orc-mission-review",
+    "orc-music-1",
+    "orc-music-2",
+    "orc-music-3",
+    "orc-music-4",
+    "orc-victory"
+   ]
   }
  ],
  "credits": [
@@ -428,6 +451,43 @@
    "who": "Incos",
    "what": "updated paladin, ranger, troll berserker and ogre-mage sprites",
    "url": "https://www.moddb.com/company/incos"
+  },
+  {
+   "who": "S. Christian Collins",
+   "what": "GeneralUser GS soundfont (cut down to the instruments the songs use)",
+   "url": "https://www.schristiancollins.com/generaluser"
+  },
+  {
+   "who": "spessasus",
+   "what": "spessasynth_lib MIDI player (Apache-2.0)",
+   "url": "https://github.com/spessasus/spessasynth_lib"
+  },
+  {
+   "who": "S. Christian Collins",
+   "what": "GeneralUser GS soundfont (cut down to the instruments the songs use)",
+   "url": "https://www.schristiancollins.com/generaluser"
+  },
+  {
+   "who": "spessasus",
+   "what": "spessasynth_lib MIDI player (Apache-2.0)",
+   "url": "https://github.com/spessasus/spessasynth_lib"
+  }
+ ],
+ "synth": [
+  {
+   "file": "music-synth.js",
+   "size": 506323,
+   "sha": "95416292e5229058"
+  },
+  {
+   "file": "music-worklet.js",
+   "size": 838361,
+   "sha": "c5f3177d4e352505"
+  },
+  {
+   "file": "music.sf3",
+   "size": 2083054,
+   "sha": "7b6d48cdd68835ae"
   }
  ]
 }
