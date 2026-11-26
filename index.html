@@ -1179,7 +1179,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.24.1', BUILD = '17509e0 2026-11-26';
+const VERSION = '0.25.0', BUILD = '6ac7bcf 2026-11-26';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1486,6 +1486,7 @@ const UNIF_ONLY = ['charger', 'gunner', 'gnoll', 'brigand'];
 const unifCache = {};
 function unifSprite(name) {
   if (name in unifCache) return unifCache[name];
+  if (!A.wars['UNIF.WAR']) return null;   // not loaded yet (the pack still on its way): don't remember the miss
   let g = null; try { const d = unif(name); if (d && Core.isGfu(d)) g = Core.decodeGfu(d); } catch (e) {}
   return (unifCache[name] = g);
 }
@@ -1922,7 +1923,8 @@ function drawFromBag(key, idx) {
   }
   const i = bag.pop(); vo.prev.set(key, i); return i;
 }
-const voiceWars = () => [A.wars['GAMESFX/VOICES.WAR'], ...Object.keys(A.wars).filter(n => /WORKERS\.WAR$/.test(n)).map(n => A.wars[n])].filter(w => w && w.names);
+// UNIFVOX.WAR (in the pack, Phase S): Unification's lines for Lothar, Uther and Arthas, who have none in Warcraft II.
+const voiceWars = () => [A.wars['GAMESFX/VOICES.WAR'], A.wars['UNIFVOX.WAR'], ...Object.keys(A.wars).filter(n => /WORKERS\.WAR$/.test(n)).map(n => A.wars[n])].filter(w => w && w.names);
 // Which recorded lines a hero says for a kind of line: the first source in his chain that has that kind
 // ('any' = any line but 'ready'). 'ready' with nothing recorded falls back to his acknowledgements.
 function voiceLines(heroId, kind) {

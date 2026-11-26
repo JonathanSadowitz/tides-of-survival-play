@@ -1,5 +1,5 @@
 {
- "version": "678f1bf612b6",
+ "version": "5dff0963450d",
  "built": "2026-11-26",
  "files": [
   {
@@ -353,12 +353,72 @@
     "unit/dwarfrifle",
     "unit/bullet"
    ]
+  },
+  {
+   "name": "UNIFVOX.WAR",
+   "file": "unifvox.war",
+   "size": 565392,
+   "sha": "b414b043c916a341",
+   "names": [
+    "uther:pissed",
+    "uther:pissed",
+    "uther:pissed",
+    "uther:what",
+    "uther:what",
+    "uther:what",
+    "uther:what",
+    "uther:yes",
+    "uther:yes",
+    "uther:yes",
+    "uther:yes",
+    "uther:yes",
+    "uther:yes",
+    "uther:yes",
+    "uther:yes",
+    "lothar:pissed",
+    "lothar:pissed",
+    "lothar:pissed",
+    "lothar:what",
+    "lothar:what",
+    "lothar:what",
+    "lothar:what",
+    "lothar:yes",
+    "lothar:yes",
+    "lothar:yes",
+    "lothar:yes",
+    "lothar:yes",
+    "lothar:yes",
+    "lothar:yes",
+    "arthas:pissed",
+    "arthas:pissed",
+    "arthas:pissed",
+    "arthas:pissed",
+    "arthas:pissed",
+    "arthas:pissed",
+    "arthas:pissed",
+    "arthas:ready",
+    "arthas:what",
+    "arthas:what",
+    "arthas:what",
+    "arthas:what",
+    "arthas:what",
+    "arthas:yes",
+    "arthas:yes",
+    "arthas:yes",
+    "arthas:yes",
+    "arthas:yes",
+    "arthas:yes",
+    "arthas:yes",
+    "arthas:yes",
+    "arthas:yes",
+    "arthas:yes"
+   ]
   }
  ],
  "credits": [
   {
    "who": "Blizzard Entertainment",
-   "what": "Warcraft II: Tides of Darkness and Beyond the Dark Portal art, sounds and voices, used with permission (music not included)"
+   "what": "Warcraft II: Tides of Darkness and Beyond the Dark Portal art, sounds and voices, used with permission"
   },
   {
    "who": "The Unification mod: dannyldd and its artists (see docs/CREDITS.md)",
