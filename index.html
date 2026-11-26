@@ -1158,7 +1158,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.21.0', BUILD = '9581401 2026-11-26';
+const VERSION = '0.21.1', BUILD = '4d05093 2026-11-26';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1499,10 +1499,10 @@ function rebuildSprites() {
 }
 function assetSummary() {
   const files = warNames().length, sprites = Object.keys(A.sprites).length, sounds = Object.keys(cfg.sounds).filter(k => A.wars[cfg.sounds[k].file]).length;
-  if (!files) return `The game's art and sounds couldn't be downloaded, so you'll see placeholder shapes. Check your connection and reload, or choose <b>Game files</b> and import your Warcraft II folder.`;
+  if (!files) return `The game's art and sounds couldn't be downloaded, so you'll see placeholder shapes. Check your connection and reload, or import your Warcraft II folder in Settings, Game files.`;
   const extra = (mu.names.size ? `, ${mu.names.size} music tracks` : '') + (A.wars['GAMESFX/VOICES.WAR'] ? ', hero voices' : '');
   return `${sprites} sprite${sprites === 1 ? '' : 's'}, ${sounds} sound${sounds === 1 ? '' : 's'}${extra}.` + (sprites ? '' : ' Assign some sprites in the Asset Lab (Settings).')
-    + (mu.names.size ? '' : ' No music: import your own Warcraft II folder under <b>Game files</b> to add it.');
+    + (mu.names.size ? '' : ' No music yet.');
 }
 
 /* ---------- menu art from REZDAT.WAR (TOME.2): background and buttons ---------- */
@@ -1892,13 +1892,13 @@ function voiceLines(heroId, kind) {
 // Players without their own Warcraft II get everything but the music: say so on the first few visits.
 function musicNote() {
   const seen = store.get('tos_mnote', 0); if (seen >= 3) return ''; store.set('tos_mnote', seen + 1);
-  return '<div class="note">No music: Blizzard\'s music isn\'t included. Own Warcraft II? Import your folder under Game files to add it.</div>';
+  return '<div class="note">Own Warcraft II? Add its music in Settings, Game files.</div>';
 }
 function voiceNote() {
   const w = Object.keys(A.wars).filter(n => /WORKERS\.WAR$/.test(n)).map(n => A.wars[n]);
   if (!w.length || w.some(x => x.names && x.names.some(n => n.startsWith('u_')))) return '';
   const seen = store.get('tos_vnote', 0); if (seen >= 3) return ''; store.set('tos_vnote', seen + 1);
-  return '<div class="note">Every hero now has a voice of his own. Import War2Dat.mpq again under Game files to hear them.</div>';
+  return '<div class="note">Every hero now has a voice of his own. Import War2Dat.mpq again in Settings, Game files to hear them.</div>';
 }
 function heroVoice(kind, chance = 1, heroId) {
   heroId ||= G && G.heroId; if (!heroId || Math.random() > chance) return;
@@ -4609,7 +4609,7 @@ function showTitle() {
       : l && HEROES[l.hero] && heroOpen(l.hero) && lv && levelOpen(LEVELS.indexOf(lv)) ? `<button class="opt" data-act="quick">Quick Start: ${HEROES[l.hero].name.split(' ')[0]}</button>` : '';
     overlay.innerHTML = `<div class="wcstage"><img class="bg" src="${A.menuBg}" alt="">
       <div class="wcbtns"><button class="opt" data-act="choose">Start a Run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
-      <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="import">Game files</button><button class="opt" data-act="about">About</button></div>
+      <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="about">About</button></div>
       ${!mu.names.size ? musicNote() : voiceNote()}
       <div class="ver" data-wcsmall="TIDES OF SURVIVAL"></div><div class="vernum">v${VERSION}</div></div>`;
     overlay.className = 'wcmenu'; overlay.style.display = 'flex'; overlay.style.backgroundImage = '';
@@ -4626,7 +4626,7 @@ function showTitle() {
   showMenu(`<h1>Tides of Survival</h1><p class="sub">A Warcraft II survivors-like fan game</p>
     <div class="status">${assetSummary()}</div>
     <div class="opts"><button class="opt" data-act="choose">Start a run</button>${quick}<button class="opt" data-act="shop">Armoury (${meta.gold} gold)</button>
-      <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="import">Game files</button><button class="opt" data-act="about">About</button></div>
+      <button class="opt" data-act="book">Book of War</button><button class="opt" data-act="settings" data-from="title">Settings</button><button class="opt" data-act="about">About</button></div>
     <p class="help long">Move with WASD, arrow keys, a gamepad stick, or by dragging on the screen. Your weapons attack by themselves. F, Tab or the Y button changes game speed.</p>${b}
     <p class="fine">Unofficial fan project, not affiliated with or endorsed by Blizzard Entertainment. Graphics, music and sounds are read from your own copy of Warcraft II and never leave your device. Nothing from the game is included in this page.</p>`);
   titleArt(true);
@@ -4841,20 +4841,18 @@ function toast(text) {
 function showAbout() {
   const built = BUILD === 'dev' ? 'development copy' : `build ${BUILD}`;
   showMenu(`<h2>About</h2><div class="about">
-    <p><b>Tides of Survival</b> is a survivors-like set in the world of Warcraft II: Tides of Darkness. Pick a hero of the Alliance or the Horde, survive twenty minutes against an ever-growing army and its named heroes, and slay the final boss. Your weapons attack by themselves; you choose where to go and what to take when you level up.</p>
+    <p><b>Tides of Survival</b>: pick a hero of the Alliance or the Horde and survive twenty minutes against an ever-growing army, then slay the final boss.</p>
     <h3>How to play</h3>
-    <p>Move with WASD, the arrow keys, the mouse (click to walk, hold to follow), a gamepad, or by dragging on a touch screen. Esc, P or Start pauses; F, Tab or Y changes the game speed. Gold from each run buys upgrades in the Armoury, reaching goals unlocks heroes and battlefields, and a weapon at level 5 with its partner passive evolves from a boss's treasure.</p>
-    <h3>Credits</h3>
-    <p>Made by CaptMurdock. Warcraft II and everything in it belong to Blizzard Entertainment: this is an unofficial fan project, not affiliated with or endorsed by Blizzard. Warcraft II's art, sounds and voices come with the game with Blizzard's permission; its music doesn't, so it's read from your own copy of the game if you import it, and never leaves your device. The paladin, ranger, troll berserker and ogre-mage sprites are from <a href="https://www.moddb.com/company/incos" target="_blank" rel="noopener">Incos</a>'s Accurate Warcraft 2 Sprite Updates, used with permission (Settings, Unit sprites: Classic turns them off).</p>
-    <p>Play and follow updates at <a href="${ITCH_URL}" target="_blank" rel="noopener">captmurdock.itch.io/tides-of-survival</a>.</p>
-    <h3>Version</h3><p>Version ${VERSION} (${built}).</p></div>
+    <p>Move with WASD, the arrow keys, the mouse, a gamepad or by dragging on a touch screen. Your weapons attack by themselves. Level up to choose new weapons and upgrades. Esc or P pauses; F changes the speed.</p>
+    <p>Spend gold in the Armoury between runs. Reach goals to unlock heroes and battlefields.</p>
+    <p><a href="${ITCH_URL}" target="_blank" rel="noopener">captmurdock.itch.io/tides-of-survival</a> · v${VERSION} (${built})</p></div>
     <div class="opts"><button class="opt" data-act="title" data-back>Back</button></div>`);
   overlay.querySelector('.panel').classList.add('scrolls'); fitPanel();
 }
 function showSettings(from, focus) {
   const keys = Object.keys(OPT_DEFS);
   const rows = keys.map(k => `<button class="opt" data-act="opt" data-k="${k}" data-from="${from}">${OPT_DEFS[k].label}: ${OPT_DEFS[k].fmt(cfg.opts[k])}</button>`).join('');
-  const xfer = from === 'pause' ? '' : `<button class="opt" data-act="history">Run history</button><button class="opt" data-act="exportsave">Copy save code</button><button class="opt" data-act="importsave">Load save code</button><button class="opt" data-act="lab">Asset Lab (advanced)</button><button class="opt" data-act="resettips">Show tips again</button><button class="opt danger" data-act="reset">Reset progress</button>`;
+  const xfer = from === 'pause' ? '' : `<button class="opt" data-act="history">Run history</button><button class="opt" data-act="exportsave">Copy save code</button><button class="opt" data-act="importsave">Load save code</button><button class="opt" data-act="import">Game files (music)</button><button class="opt" data-act="lab">Asset Lab (advanced)</button><button class="opt" data-act="resettips">Show tips again</button><button class="opt danger" data-act="reset">Reset progress</button>`;
   showMenu(`<h2>Settings</h2><div class="opts set">${rows}${xfer}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
   if (focus) { sel = keys.indexOf(focus); highlight(); }
 }
@@ -5225,26 +5223,23 @@ addEventListener('blur', () => { if (G && G.state === 'play') pauseRun(); });   
    assigns everything itself. The Asset Lab, with every file, entry and assignment, is under Settings. */
 let impOpen = false, impState = 'idle';
 function impSummary() {
-  const sprites = Object.keys(A.sprites).length, sounds = Object.keys(cfg.sounds).filter(k => A.wars[cfg.sounds[k].file]).length, voices = !!A.wars['GAMESFX/VOICES.WAR'];
-  if (!warNames().length) return `<p class="sub">The game's art and sounds couldn't be downloaded, so it shows placeholder shapes. Check your connection and reload, or import your Warcraft II folder below.</p>`;
-  return `${impState === 'done' ? '' : `<p class="sub chestgold">${mu.names.size ? 'Everything is set up, music included.' : 'Everything is set up except the music.'}</p>`}<p class="help">${sprites} sprites, ${sounds} sounds${voices ? ', hero voices' : ''}${mu.names.size ? `, ${mu.names.size} music tracks` : ''}.</p>
-    <p class="help">The game comes with Warcraft II's art, sounds and voices. Blizzard's music isn't included: own Warcraft II (Battle.net Edition)? Import your folder below and the music plays too.</p>`;
+  if (!warNames().length) return `<p class="sub">The game's art couldn't be downloaded. Check your connection and reload.</p>`;
+  return mu.names.size ? `<p class="sub chestgold">Music: ${mu.names.size} tracks.</p>` : `<p class="help">Own Warcraft II? Import its folder to add the music.</p>`;
 }
 async function showImport(done) {
   impOpen = true; impState = done ? 'done' : 'idle';
   const saved = await savedFolderName();
-  const res = done ? (!mu.names.size ? `<p class="sub">Imported, but that folder had no music in it.</p><p class="help">Warcraft II's music is in <code>Install.mpq</code>, next to <code>War2Dat.mpq</code> in the game folder.</p><p class="help" id="impStatus">${impLog()}</p>` : `<p class="sub chestgold">Done: everything's set up, music included.</p>`) : '';
+  const res = done ? (mu.names.size ? '' : `<p class="sub">No music found. It's in <code>Install.mpq</code> in the game folder.</p>`) : '';
   showMenu(`<h2>Game files</h2>${res}${impSummary()}
-    <p class="help">Choose your <b>Warcraft II</b> folder${canRemember ? ', or any folder above it such as your Games folder: the game searches inside and remembers where it is' : ''}. It reads only the files it needs and sets everything up for you. Nothing is uploaded.</p>
     <div class="opts">${saved ? `<button class="opt" data-act="impagain">Re-import from ${saved}</button>` : ''}<button class="opt" data-act="impdir">Import Warcraft II folder</button>
-    <button class="opt" data-act="impfiles">Choose files instead</button><button class="opt" data-act="title" data-back>Back</button></div>
+    <button class="opt" data-act="impfiles">Choose files instead</button><button class="opt" data-act="settings" data-from="title" data-back>Back</button></div>
     <details class="help imppaths"><summary>Where is my Warcraft II folder?</summary>${installPathsHtml()}</details>`);
   overlay.classList.remove('bare');   // a solid panel: this screen is mostly reading
 }
 const impLog = () => [...labSide.querySelectorAll('.hint')].map(h => h.innerHTML).join('<br>');
 function impBusy() {
   impState = 'busy';
-  showMenu(`<h2>Game files</h2><p class="sub">Importing Warcraft II…</p><p class="help" id="impStatus">Waiting for you to choose a folder.</p><div class="opts"><button class="opt" data-act="import" data-back>Cancel</button></div>`);
+  showMenu(`<h2>Game files</h2><p class="sub">Importing…</p><p class="help" id="impStatus">Choose a folder.</p><div class="opts"><button class="opt" data-act="import" data-back>Cancel</button></div>`);
   overlay.classList.remove('bare');
 }
 // Mirror the import's progress messages onto the simple screen.
