@@ -178,7 +178,7 @@
   .pitem .lv{color:var(--gold);font-size:14px}
   button.card.hero{width:330px}
   .hsel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;max-width:1100px;margin:0 auto}
-  .ftiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  .ftiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px} button.tile.field .nm{font-size:13px}
   button.tile.field{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;min-height:0;width:auto;min-width:0}
   button.tile.field .fpic{width:100%;max-width:128px;height:auto;image-rendering:pixelated;border:1px solid #000}
   button.tile.field .tt{display:flex;flex-direction:column;align-items:center;white-space:normal} button.tile.field .nm{font-size:15px;color:var(--gold)} button.tile.field .lv{font-size:13px} button.tile.field.locked{opacity:.6} button.tile.field.locked .fpic{filter:grayscale(1) brightness(.8)}
@@ -790,18 +790,35 @@ const ANIM = {
   38: { walk: [0, 1], die: [2, 3] }, 47: { atk: rr(5, 9), die: rr(10, 12) }, 69: { walk: rr(0, 4), atk: rr(5, 8), die: rr(9, 13) }, 70: { atk: rr(5, 9), die: rr(10, 14) }, 48: { atk: rr(5, 9), die: rr(10, 12) }, 63: { walk: [0, 1] }, 49: { walk: [0, 1], atk: [2, 3] }, 50: { walk: [0, 1], atk: [2, 3] } };
 // Portrait icons (46x38) in MAINDAT.WAR entry 356.
 const ICON_ENTRY = 356, HERO_ICONS = { lothar: 32, uther: 34, alleria: 187, khadgar: 195, grom: 190, zuljin: 35, chogall: 36, teron: 189, peasant: 0, peon: 1,
-  danath: 188, turalyon: 193, kurdran: 191, kargath: 186, dentarg: 194, guldan: 33, deathwing: 192 };   // the icon sheet's hero portraits (Wargus order)
+  danath: 188, turalyon: 193, kurdran: 191, kargath: 186, dentarg: 194, guldan: 33, deathwing: 192, arthas: 10, kilrogg: 3 };   // the icon sheet's hero portraits (Wargus order)
 /* ---------- levels and permanent upgrades ---------- */
 // Each level uses one of the game's tilesets: palette, megatiles, minitiles and tile table entries in MAINDAT.WAR.
 const LEVELS = [
   { id: 'forest', name: 'Elwynn Forest', blurb: 'Rolling forest and lakes. A good place to start.', skin: 'ForestRegular', ts: [2, 3, 4, 5], ground: '#34501f',
     bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.35, forestLakes: 4, trees: 0.53, fine: 0.55, rocks: 0.9, dark: 0.3, camps: 0.75 }, hp: 1, late: 1.5, mix: {} },
+  // Phase R (Jon: new battlefields mixed in among the early ones). Each has one twist.
+  // Duskwood: night falls for good; you see only what your torch lights (LV.night).
+  { id: 'dusk', name: 'Duskwood', blurb: 'A forest of endless night. You see only what your torch lights, and gnolls hunt in the dark.', skin: 'NocturnValley', ts: [2, 3, 4, 5], ground: '#1c2a1a',
+    bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, night: { r: 230 },
+    gen: { clearings: 20, rmin: 9, rmax: 14, lane: 1, loops: 0.4, lakes: 0.3, forestLakes: 3, trees: 0.5, fine: 0.5, rocks: 0.9, dark: 0.35, camps: 0.75 }, hp: 1.1, mix: {} },
   { id: 'winter', name: 'Alterac Mountains', blurb: 'Frozen lakes and snowbound pines. Tougher foes march here.', skin: 'Glacier', ts: [18, 19, 20, 21], ground: '#b9c4cc',
     bld: { pal: 18, human: [134, 146, 169, 142, 144, 138, 150], orc: [135, 147, 170, 143, 145, 139, 151] }, sea: { human: [150, 152, 154], orc: [151, 153, 155] }, gen: { clearings: 20, rmin: 10, rmax: 17, lane: 1.2, loops: 0.4, lakes: 0.3, forestLakes: 3, trees: 0.53, rocks: 0.86, dark: 0.3, camps: 0.75 }, hp: 1.45, mix: { tank: 1.5 } },   // hp was 1.3: no harder than Elwynn Forest for the bots (20 November 2026)
+  // Stranglethorn Vale: a jungle crawling with creeps: gnoll packs twice as often and twice the brigands (LV.creeps).
+  { id: 'stv', name: 'Stranglethorn Vale', blurb: 'Steaming jungle, thick with gnoll packs and brigands after your gold.', skin: 'Jungle', ts: [2, 3, 4, 5], ground: '#2f5a1c',
+    bld: { pal: 2, human: [92, 104, 80, 100, 102, 96, 108], orc: [93, 105, 81, 101, 103, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, creeps: { every: 45, brigand: 20 },
+    gen: { clearings: 20, rmin: 8, rmax: 13, lane: 0.8, loops: 0.5, lakes: 0.4, forestLakes: 4, trees: 0.47, fine: 0.4, rocks: 0.92, dark: 0.35, camps: 0.75 }, hp: 1.55, mix: { ranged: 1.3 } },
   { id: 'waste', name: 'Khaz Modan Wastes', blurb: 'Scorched badlands and rocky ridges. Swarms come thick and fast.', skin: 'Wasteland', ts: [10, 11, 12, 13], ground: '#6b5434',
     bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1.1, loops: 0.45, lakes: 0.2, forestLakes: 2, trees: 0.55, rocks: 0.7, dark: 0.35, camps: 0.75 }, hp: 1.6, mix: { fast: 1.8 } },
+  // Durotar: red desert ridden by raiders: squads of chargers sweep in (LV.raids).
+  { id: 'durotar', name: 'Durotar', blurb: 'Sunbaked badlands. Squads of riders sweep in from the dust and charge.', skin: 'DesertWooW', ts: [10, 11, 12, 13], ground: '#a8844c',
+    bld: { pal: 10, human: [173, 104, 80, 100, 175, 96, 108], orc: [174, 105, 81, 101, 176, 97, 109] }, sea: { human: [108, 110, 112], orc: [109, 111, 113] }, raids: { from: 120, every: 70, squad: 3 },
+    gen: { clearings: 20, rmin: 10, rmax: 15, lane: 1.2, loops: 0.45, lakes: 0.1, forestLakes: 1, trees: 0.56, rocks: 0.75, dark: 0.35, camps: 0.75 }, hp: 1.8, mix: { charger: 2, fast: 1.2 } },
   { id: 'swamp', name: 'Swamp of Sorrows', blurb: 'Murky water and twisted trees. Only the hardiest survive.', skin: 'OrcSwamp', ts: [438, 439, 440, 441], ground: '#3f4a2a',
     bld: { pal: 438, human: [479, 491, 80, 487, 489, 483, 495], orc: [480, 492, 81, 488, 490, 484, 496] }, sea: { human: [495, 497, 499], orc: [496, 498, 500] }, gen: { clearings: 20, rmin: 9, rmax: 15, lane: 1, loops: 0.35, lakes: 0.55, forestLakes: 6, trees: 0.5, rocks: 0.9, dark: 0.35, camps: 0.75 }, hp: 2, mix: { ranged: 1.6, tank: 1.3 } },
+  // Northrend: blizzards sweep in, slowing everyone (LV.storm).
+  { id: 'north', name: 'Northrend', blurb: 'The frozen north. Blizzards sweep in and slow everything to a crawl, you included.', skin: 'SnowStorm', ts: [18, 19, 20, 21], ground: '#dfe6ea',
+    bld: { pal: 18, human: [134, 146, 169, 142, 144, 138, 150], orc: [135, 147, 170, 143, 145, 139, 151] }, sea: { human: [150, 152, 154], orc: [151, 153, 155] }, storm: { every: 75, first: 50, len: 16, slow: 0.7 },
+    gen: { clearings: 20, rmin: 10, rmax: 16, lane: 1.1, loops: 0.4, lakes: 0.35, forestLakes: 3, trees: 0.53, rocks: 0.86, dark: 0.3, camps: 0.75 }, hp: 2.1, mix: { tank: 1.4, flyer: 1.3 } },
   { id: 'portal', name: 'The Dark Portal', blurb: 'The blasted lands round the Dark Portal. Stay near it and troops pour through, faster the longer you linger.', skin: 'Hell', ts: [438, 439, 440, 441], ground: '#5e3e2c',
     bld: { pal: 438, human: [479, 491, 80, 487, 489, 483, 495], orc: [480, 492, 81, 488, 490, 484, 496] }, sea: { human: [495, 497, 499], orc: [496, 498, 500] }, portal: { entry: 185 },
     gen: { clearings: 20, rmin: 9, rmax: 14, lane: 1.1, loops: 0.45, lakes: 0.15, forestLakes: 1, trees: 0.54, rocks: 0.72, dark: 0.4, camps: 0.7, portal: { x: 26, y: 18, r: 15 } }, hp: 2.4, mix: { tank: 1.3, ranged: 1.2 } },
@@ -1162,7 +1179,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.23.0', BUILD = '2afee58 2026-11-26';
+const VERSION = '0.24.0', BUILD = '6c6c1a7 2026-11-26';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1225,7 +1242,7 @@ const ROLES = [
   ['hero', 'Hero (default for all)'],
   ['hero_lothar', 'Hero: Anduin Lothar'], ['hero_uther', 'Hero: Uther Lightbringer'], ['hero_alleria', 'Hero: Alleria Windrunner'], ['hero_khadgar', 'Hero: Khadgar'],
   ['hero_grom', 'Hero: Grom Hellscream'], ['hero_zuljin', "Hero: Zul'jin"], ['hero_chogall', "Hero: Cho'gall"], ['hero_teron', 'Hero: Teron Gorefiend'], ['hero_peasant', 'Hero: Peasant'], ['hero_peon', 'Hero: Peon'],
-  ['hero_danath', 'Hero: Danath Trollbane'], ['hero_turalyon', 'Hero: Turalyon'], ['hero_kurdran', 'Hero: Kurdran Wildhammer'], ['hero_kargath', 'Hero: Kargath Bladefist'], ['hero_dentarg', 'Hero: Dentarg'], ['hero_guldan', "Hero: Gul'dan"], ['hero_deathwing', 'Hero: Deathwing'], ['basic', 'Horde enemy: grunt'], ['fast', 'Horde enemy: fast (sappers)'], ['tank', 'Horde enemy: tank (ogre)'],
+  ['hero_danath', 'Hero: Danath Trollbane'], ['hero_turalyon', 'Hero: Turalyon'], ['hero_kurdran', 'Hero: Kurdran Wildhammer'], ['hero_kargath', 'Hero: Kargath Bladefist'], ['hero_arthas', 'Hero: Arthas Menethil'], ['hero_kilrogg', 'Hero: Kilrogg Deadeye'], ['hero_dentarg', 'Hero: Dentarg'], ['hero_guldan', "Hero: Gul'dan"], ['hero_deathwing', 'Hero: Deathwing'], ['basic', 'Horde enemy: grunt'], ['fast', 'Horde enemy: fast (sappers)'], ['tank', 'Horde enemy: tank (ogre)'],
   ['ranged', 'Horde enemy: ranged (axethrower)'], ['boss', 'Horde boss (dragon)'], ['eshot', 'Horde enemy missile'],
   ['ally_basic', 'Alliance enemy: footman'], ['ally_fast', 'Alliance enemy: fast (dwarves)'], ['ally_tank', 'Alliance enemy: tank (knight)'],
   ['ally_ranged', 'Alliance enemy: ranged (archer)'], ['ally_boss', 'Alliance boss (gryphon rider)'], ['ally_eshot', 'Alliance enemy missile'],
@@ -1249,7 +1266,7 @@ const unitR = (e, r1 = 4) => ({ e, mode: 'dir5', r0: 0, r1 });
 const AUTO_ROLES = {
   hero: unitR(45), hero_lothar: unitR(51), hero_uther: unitR(51), hero_alleria: unitR(53), hero_khadgar: unitR(55),
   hero_grom: unitR(46), hero_zuljin: unitR(54), hero_chogall: unitR(52), hero_teron: unitR(58), hero_peasant: unitR(47), hero_peon: unitR(48),
-  hero_danath: unitR(45), hero_turalyon: unitR(51), hero_kurdran: unitR(35, 3), hero_kargath: unitR(46), hero_dentarg: unitR(52), hero_guldan: unitR(58), hero_deathwing: unitR(36, 3),
+  hero_danath: unitR(45), hero_turalyon: unitR(51), hero_kurdran: unitR(35, 3), hero_kargath: unitR(46), hero_dentarg: unitR(52), hero_guldan: unitR(58), hero_arthas: unitR(51), hero_kilrogg: unitR(46), hero_deathwing: unitR(36, 3),
   basic: unitR(46), fast: unitR(34), tank: unitR(52), ranged: unitR(54), boss: unitR(36, 3),
   ally_basic: unitR(45), ally_fast: unitR(33), ally_tank: unitR(51), ally_ranged: unitR(53), ally_boss: unitR(35, 3),
   proj: { e: 339, mode: 'dir5', r0: 0, r1: 0 }, bolt: { e: 338, mode: 'dir5', r0: 0, r1: 0 }, axe: { e: 340, mode: 'dir5', r0: 0, r1: 2 },
@@ -1413,7 +1430,7 @@ const ROLE_TEAM = {
 };
 const BOSS_TEAM = { Horde: 'violet', Alliance: 'green' };
 const roleTeam = role => ROLE_TEAM[role] ? TEAM[ROLE_TEAM[role]] : HUMAN_ROLE.test(role) ? TEAM.blue : TEAM.red;
-const HUMAN_ROLE = /^(hero|hero_lothar|hero_uther|hero_alleria|hero_khadgar|hero_peasant|hero_danath|hero_turalyon|hero_kurdran|ally_(basic|fast|tank|ranged|boss|flyer|scout|siege|elite[123]|boss[123]|caster|ship|ship2|charger|gunner)|transport)$/;
+const HUMAN_ROLE = /^(hero|hero_arthas|hero_lothar|hero_uther|hero_alleria|hero_khadgar|hero_peasant|hero_danath|hero_turalyon|hero_kurdran|ally_(basic|fast|tank|ranged|boss|flyer|scout|siege|elite[123]|boss[123]|caster|ship|ship2|charger|gunner)|transport)$/;
 function buildAtlas(g, pal, cols) {
   cols = Math.max(1, Math.min(cols, g.count));
   const rows = Math.ceil(g.count / cols);
@@ -1460,7 +1477,7 @@ function upgradeArt(k) {
 // role -> [name in pack/unif.war, the MAINDAT entry it was drawn over]
 const UNIF_ART = {
   hero_chogall: ['hero/chogall', 52], hero_dentarg: ['hero/dentarg', 52], hero_teron: ['hero/teron', 58],
-  hero_khadgar: ['hero/khadgar', 55], hero_lothar: ['hero/utherlothar', 51],
+  hero_khadgar: ['hero/khadgar', 55], hero_lothar: ['hero/utherlothar', 51], hero_arthas: ['hero/arthas', 51], hero_kilrogg: ['hero/kilrogg', 46],
   charger: ['unit/wolfraider', 51], ally_charger: ['hero/knight', 51], gunner: ['unit/rifleman', 54], ally_gunner: ['unit/dwarfrifle', 54],
   gnoll: ['unit/gnoll', 58], ally_gnoll: ['unit/gnoll', 58], brigand: ['unit/brigand', 53], ally_brigand: ['unit/brigand', 53], bullet: ['unit/bullet', 340],
 };
@@ -1763,7 +1780,7 @@ const mu = { names: new Set(), cache: new Map(), gain: null, cur: null, kind: nu
 const MENU_MUSIC = { loopFor: 600, fade: 40 };
 // Each battlefield's own music, from your side's six campaign tracks: later battlefields bring new ones.
 // Past your own side's six, a battlefield plays the other side's tracks ('x' and the number).
-const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6], portal: ['x1', 'x3'], quel: ['x2', 'x4'], grim: ['x5', 'x6'], brs: ['x1', 'x6'] };
+const FIELD_MUSIC = { forest: [1, 2], winter: [3, 4], waste: [5], swamp: [6], portal: ['x1', 'x3'], quel: ['x2', 'x4'], grim: ['x5', 'x6'], brs: ['x1', 'x6'], dusk: [2, 'x2'], stv: [1, 'x4'], north: [3, 'x3'], durotar: [5, 'x5'] };
 function playlistFor(kind) {
   const horde = G && G.HD.side === 'Horde', pre = horde ? 'ORC' : 'HUMAN', p1 = horde ? 'O' : 'H';
   if (kind === 'menu') return ['OWARROOM'];
@@ -1892,7 +1909,7 @@ const WORKER_VOICES = {
 const VOICE_FROM = { lothar: ['lothar', 'u_knight'], uther: ['uther', 'u_paladin'], alleria: ['alleria', 'u_elves'], khadgar: ['khadgar', 'u_mage'],
   grom: ['grom', 'u_grunt'], zuljin: ['zuljin', 'u_troll'], chogall: ['chogall', 'u_ogremage'], teron: ['teron', 'u_dk'], danath: ['danath', 'u_footman'],
   turalyon: ['turalyon', 'u_paladin'], kurdran: ['kurdran', 'u_gryphon'], kargath: ['kargath', 'u_grunt'], dentarg: ['dentarg', 'u_ogremage'],
-  guldan: ['guldan', 'u_dk'], deathwing: ['deathwing', 'u_dragon'], peasant: ['peasant'], peon: ['peon'] };
+  guldan: ['guldan', 'u_dk'], deathwing: ['deathwing', 'u_dragon'], arthas: ['arthas', 'u_paladin'], kilrogg: ['kilrogg', 'u_grunt'], peasant: ['peasant'], peon: ['peon'] };
 const VOICE_KIND = [['what', /what\d*\.wav$/i], ['yes', /ye?s+(sir|sr|r)\d*\.wav$/i], ['pissed', /piss/i], ['ready', /ready\.wav$/i]];
 const vo = { last: 0, buf: new Map(), bags: new Map(), prev: new Map() };
 // Shuffle bag: every line plays once in random order before any repeats, and a new round never opens with the line just played.
@@ -1957,6 +1974,8 @@ const WEAPONS = {
   shield:  { name: 'Shield Bash', desc: 'Slams the shield into whoever is in front of you, stunning them and shoving them back.', up: ['more damage', 'wider and longer stun', 'also bashes behind you', 'more damage and reach'], sig: true },
   smite:   { name: 'Holy Smite', desc: 'A pillar of light falls on the toughest enemy near you; each hit heals you a little.', up: ['more damage', 'a second pillar', 'more damage', 'a third pillar'], sig: true },
   hammer:  { name: 'Storm Hammer', desc: 'A hurled hammer whose lightning leaps from enemy to enemy.', up: ['more damage', 'leaps to one more', 'more damage', 'leaps to two more'], sig: true },
+  frost:   { name: 'Frost Strike', desc: 'A cone of biting frost ahead of you that slows whatever it touches.', up: ['more damage', 'a longer cone', 'slows for longer', 'a wider cone'], sig: true },
+  deadeye: { name: 'Deadeye Axe', desc: 'Hurls an axe at the furthest enemy in reach; one throw in four strikes two and a half times as hard.', up: ['more damage', 'a second axe', 'more damage', 'a third axe'], sig: true },
   blades:  { name: 'Bladefist', desc: 'A flurry of quick slashes at whatever is in front of you.', up: ['more damage', 'a third slash', 'wider slashes', 'more damage'], sig: true },
   slam:    { name: 'Ogre Slam', desc: 'Pounds the ground, sending a shockwave out all around you.', up: ['more damage', 'a wider wave', 'more damage', 'a second wave'], sig: true },
   whirl:   { name: 'Whirlwind', desc: 'Calls up a whirlwind that drifts into the enemy, tearing at all it touches.', up: ['more damage', 'one more whirlwind', 'lasts longer', 'one more whirlwind'], sig: true },
@@ -1978,6 +1997,8 @@ const EVOS = {
   shield:   { p: 'armour',   name: 'Bulwark',             desc: 'Bashes all around you at once, stunning everything near.' },
   smite:    { p: 'heal',     name: 'Wrath of the Light',  desc: 'Six pillars at a time, and each heals more.' },
   hammer:   { p: 'haste',    name: 'Thunderclap',         desc: 'The lightning leaps through up to eight enemies, twice as fast.' },
+  frost:    { p: 'armour',   name: 'Frostmourne',         desc: 'A ring of frost bursts from you every second, slowing everything near.' },
+  deadeye:  { p: 'might',    name: 'Eye of the Hollow',   desc: 'Four axes at a time, every one a deadly throw.' },
   blades:   { p: 'might',    name: 'Bladestorm',          desc: 'A ring of blades spins around you without pause.' },
   slam:     { p: 'area',     name: 'Earthshatter',        desc: 'Three waves, each far wider and harder.' },
   whirl:    { p: 'vitality', name: 'Cyclone',             desc: 'Three great whirlwinds that last twice as long.' },
@@ -2003,6 +2024,8 @@ function evoStats(id) {
     case 'smite': return '6 pillars of 110 damage, each healing 3.';
     case 'hammer': return 'Leaps through 8 enemies for 60 damage each, every 0.7 s.';
     case 'blades': return 'A ring of blades, 26 damage to everything within 55, five times a second.';
+    case 'frost': return 'A ring of frost, 50 damage within 80, slowing for 2 s, every second.';
+    case 'deadeye': return '4 axes of 90 damage at the furthest enemies, every 1.4 s.';
     case 'slam': return '3 waves of 90 damage out to about 150.';
     case 'whirl': return '3 whirlwinds, 14 damage four times a second, lasting 8 s.';
     case 'breath': return '70 damage in a ring of fire out to about 95, every 0.9 s.';
@@ -2038,6 +2061,11 @@ const HEROES = {
              sig: 'Two Heads', sigDesc: '+15% area of effect; slow but tough.', area: 1.15 },
   guldan:  { name: "Gul'dan", side: 'Horde', unit: 'Death Knight', col: '#4c8a3a', start: 'whirl', hp: 100, speed: 74, armour: 0,
              sig: 'Dark Pact', sigDesc: '+15% damage and +15% area of effect.', might: 1.15, area: 1.15 },
+  // Phase R (Jon): one new hero a side.
+  arthas:  { name: 'Arthas Menethil', side: 'Alliance', unit: 'Paladin', col: '#9fc4e8', start: 'frost', hp: 135, speed: 74, armour: 1,
+             sig: 'Hunger of the Blade', sigDesc: 'Every kill heals 0.25 health; his frost slows what it hits.', killHeal: 0.25 },
+  kilrogg: { name: 'Kilrogg Deadeye', side: 'Horde', unit: 'Grunt', col: '#8a5a3a', start: 'deadeye', hp: 145, speed: 76, armour: 1,
+             sig: 'Bleeding Hollow', sigDesc: '+30% pickup range, and 10% faster attacks.', magnet: 1.3, haste: 0.9 },
   // Deathwing: unlocked by slaying him as the final boss.
   deathwing: { name: 'Deathwing', side: 'Horde', unit: 'Dragon', col: '#3a3a3a', start: 'breath', hp: 260, speed: 70, armour: 3, fly: true, secret: 'deathwing',
              sig: 'Aspect of Death', sigDesc: 'Flies over trees and water, with 3 armour and great health.' },
@@ -2062,6 +2090,9 @@ const MAX_LVL = 5, MAX_SLOTS = 6;
 
 let meta = store.get('tos_meta', null) || { gold: 0, spent: 0, ups: {}, unlocked: 0, last: null };
 meta.ups ||= {};
+// Phase R: four battlefields were added among the early ones, so the furthest one you had open is found by name.
+const FIELDS_V1 = ['forest', 'winter', 'waste', 'swamp', 'portal', 'quel', 'grim', 'brs'];
+if (!meta.fieldsV2) { const id = FIELDS_V1[Math.min(meta.unlocked || 0, FIELDS_V1.length - 1)]; meta.unlocked = Math.max(0, LEVELS.findIndex(L => L.id === id)); meta.fieldsV2 = true; }
 // Heroes: Lothar and Grom from the start; the rest unlock by reaching a goal or by buying them with Armoury gold.
 const START_HEROES = ['lothar', 'grom'];
 const freshMeta = () => ({ gold: 0, spent: 0, ups: {}, unlocked: 0, last: null, heroes: [...START_HEROES], prog: freshProg(), evos: [], maxed: [], seen: [], prisoners: [] });
@@ -2091,9 +2122,12 @@ const HERO_UNLOCKS = {
   guldan:   { cost: 2800, goal: 'Slay the 10:00 boss as a Horde hero',     done: () => (P_().boss.Horde || 0) >= 2,    best: () => (P_().boss.Horde || 0) >= 1 ? 'slain the 5:00 boss' : 'not slain yet' },
   khadgar:  { cost: 4000, goal: 'Win any battlefield as an Alliance hero', done: () => P_().won.Alliance, best: () => 'not won yet' },
   teron:    { cost: 4000, goal: 'Win any battlefield as a Horde hero',     done: () => P_().won.Horde,    best: () => 'not won yet' },
+  // Phase R: one a side, earned on the new battlefields
+  arthas:   { cost: 2400, goal: 'Survive 10:00 in Northrend', done: () => (P_().lv.north || 0) >= 600, left: () => fmtTime(600 - (P_().lv.north || 0)) + ' to go', best: () => `best ${fmtTime(P_().lv.north || 0)}` },
+  kilrogg:  { cost: 2400, goal: 'Survive 10:00 in Durotar', done: () => (P_().lv.durotar || 0) >= 600, left: () => fmtTime(600 - (P_().lv.durotar || 0)) + ' to go', best: () => `best ${fmtTime(P_().lv.durotar || 0)}` },
 };
 const rosterDone = () => Object.keys(HERO_UNLOCKS).every(id => meta.heroes.includes(id));   // every hero you can earn or buy
-const heroOpen = id => (HEROES[id] && HEROES[id].secret ? (HEROES[id].secret === 'deathwing' ? !!meta.deathwing : rosterDone()) : START_HEROES.includes(id) || meta.heroes.includes(id));
+const heroOpen = id => (HEROES[id] && HEROES[id].secret ? (HEROES[id].secret === 'deathwing' ? !!meta.deathwing : meta.secret || rosterDone()) : START_HEROES.includes(id) || meta.heroes.includes(id));
 const heroShown = id => !HEROES[id].secret || heroOpen(id);   // the secret heroes don't exist until they're unlocked
 // The first time the whole roster is unlocked, the workers put down their tools. Returns true just that once.
 function revealSecret() { if (meta.secret || !rosterDone()) return false; meta.secret = true; saveMeta(); setTimeout(() => heroVoice('done', 1, 'peasant') || heroVoice('ready', 1, 'peasant'), 900); return true; }
@@ -2332,6 +2366,7 @@ const BOSS_POOL = {
     chogall:   { name: "Cho'gall", sprite: 'hero_chogall', scale: 1.4, sig: 'summon', move: 'Twilight Ritual' },
     dentarg:   { name: 'Dentarg', sprite: 'hero_dentarg', scale: 1.4, sig: 'barrage', move: 'Earthquake', drop: 'stone' },
     zuljin:    { name: "Zul'jin", sprite: 'hero_zuljin', scale: 1.6, sig: 'barrage', move: 'Axe Storm', drop: 'axe' },
+    kilrogg:   { name: 'Kilrogg Deadeye', sprite: 'hero_kilrogg', scale: 1.6, sig: 'barrage', move: 'Deadeye Volley', drop: 'axe' },
     deathwing: { name: 'Deathwing', sprite: 'boss3', scale: 1.3, sig: 'barrage', move: 'Rain of Fire', drop: 'fire', fly: true },
   },
   Alliance: {
@@ -2342,6 +2377,7 @@ const BOSS_POOL = {
     danath:    { name: 'Danath Trollbane', sprite: 'hero_danath', scale: 1.6, sig: 'charge', move: 'Shield Charge' },
     alleria:   { name: 'Alleria Windrunner', sprite: 'hero_alleria', scale: 1.6, sig: 'barrage', move: 'Arrow Storm', drop: 'proj' },
     khadgar:   { name: 'Khadgar', sprite: 'hero_khadgar', scale: 1.6, sig: 'barrage', move: 'Fire Rain', drop: 'fire' },
+    arthas:    { name: 'Arthas Menethil', sprite: 'hero_arthas', scale: 1.4, sig: 'charge', move: 'Frozen Charge' },
     kurdran:   { name: 'Kurdran Wildhammer', sprite: 'ally_boss3', scale: 1.35, sig: 'barrage', move: 'Storm Hammers', drop: 'hammer', fly: true },
   },
 };
@@ -2352,6 +2388,8 @@ const FINALS = {
   portal: { Horde: 'teron', Alliance: 'danath' }, quel: { Horde: 'zuljin', Alliance: 'alleria' },
   grim: { Horde: 'deathwing', Alliance: 'uther' },   // Phase M1 (Jon): Deathwing moved here from the Wastes
   brs: { Horde: 'orgrim', Alliance: 'lothar' },   // Phase M2 (Jon): Orgrim and Lothar meet at Blackrock Spire, as in the lore
+  dusk: { Horde: 'dentarg', Alliance: 'danath' }, stv: { Horde: 'zuljin', Alliance: 'kurdran' },
+  north: { Horde: 'teron', Alliance: 'arthas' }, durotar: { Horde: 'kilrogg', Alliance: 'daelin' },   // Phase R: Arthas in Northrend; Daelin at Durotar's shore
 };
 function planBosses() {   // [5:00, 10:00, 15:00, final]
   const side = foeSide(), fin = FINALS[G.LV.id][side], rest = Object.keys(BOSS_POOL[side]).filter(k => k !== fin);
@@ -2449,6 +2487,7 @@ function recalc() {
   if (HD.labour) h.might *= 1 + (G.labour || 0);   // Hard Labour: every coin collected
   if (G.buffs.lust > G.t) h.might *= 2;
   if (G.buffs.haste > G.t) { h.speed *= 1.4; h.haste *= 0.6; }
+  if (G.storm) h.speed *= G.LV.storm.slow;   // Northrend's blizzards
   h.hp = Math.min(h.hp, h.maxHp);
 }
 function gainXp(v) {
@@ -3118,6 +3157,18 @@ function spawnBoss(n, frac) {
   if (B.final) { G.final = true; G.finalName = e.name; }
   return e;
 }
+// Phase R twists. Northrend's blizzards slow everyone; Durotar's raiders charge in squads.
+function updateTwists(dt) {
+  const L = G.LV, t = G.t;
+  if (L.storm && !G.final) {
+    const S = L.storm, on = t >= S.first && ((t - S.first) % S.every) < S.len;
+    if (on !== !!G.storm) { G.storm = on; recalc(); if (on) banner('A blizzard sweeps in! Everything slows.'); }
+  }
+  if (L.raids && t >= (G.raidNext ?? L.raids.from) && !G.final) {
+    G.raidNext = (G.raidNext ?? L.raids.from) + L.raids.every;
+    if (hasFoe('charger')) { const h = G.hero, a0 = rnd(0, TAU), d = Math.hypot(W, H) / 2 + 20; for (let i = 0; i < L.raids.squad; i++) { const a = a0 + rnd(-0.25, 0.25); spawnEnemy('charger', h.x + Math.cos(a) * d, h.y + Math.sin(a) * d); } banner('Raiders ride in from the dust!'); }
+  }
+}
 // Gradually, ogres and knights become ogre-mages and paladins, and axethrowers and archers berserkers and rangers.
 const UPGRADE = { from: 360, to: 1080, max: 0.75 };
 // Phase Q: when the new troops start, and the gnoll packs and brigands.
@@ -3144,11 +3195,11 @@ function spawn(dt) {
   if (G.bossN < BOSSES.length && G.t >= BOSSES[G.bossN].at) spawnBoss(++G.bossN);
   // Gnoll packs from any direction, and brigands when there's gold lying about (Phase Q).
   if (t >= (G.gnollNext ?? NEWFOES.gnoll) && !G.final && hasFoe('gnoll')) {
-    G.gnollNext = (G.gnollNext ?? NEWFOES.gnoll) + NEWFOES.gnollEvery; const h = G.hero, a0 = rnd(0, TAU), d = Math.hypot(W, H) / 2 + 20, n = NEWFOES.pack + Math.min(4, Math.floor(t / 180));
+    G.gnollNext = (G.gnollNext ?? NEWFOES.gnoll) + (G.LV.creeps ? G.LV.creeps.every : NEWFOES.gnollEvery); const h = G.hero, a0 = rnd(0, TAU), d = Math.hypot(W, H) / 2 + 20, n = NEWFOES.pack + Math.min(4, Math.floor(t / 180));
     for (let i = 0; i < n; i++) { const a = a0 + rnd(-0.3, 0.3), dd = d + rnd(0, 50); spawnEnemy('gnoll', h.x + Math.cos(a) * dd, h.y + Math.sin(a) * dd); }
   }
   if (t >= (G.brigandNext ?? NEWFOES.brigand) && !G.final) {
-    G.brigandNext = (G.brigandNext ?? NEWFOES.brigand) + NEWFOES.brigandEvery;
+    G.brigandNext = (G.brigandNext ?? NEWFOES.brigand) + (G.LV.creeps ? G.LV.creeps.brigand : NEWFOES.brigandEvery);
     if (hasFoe('brigand') && G.gems.some(g => g.coin && !g.pull) && G.enemies.filter(e => e.type === 'brigand').length < 2) spawnEnemy('brigand');
   }
   // An elite every 50 seconds from 3:00 (every 35 from 10:00), taking turns.
@@ -3279,10 +3330,10 @@ function nearest(n, maxD) {
   arr.sort((a, b) => a[0] - b[0]);
   return arr.slice(0, n).map(a => a[1]);
 }
-const CD = { coil: 1.2, sword: 1.0, arrows: 0.75, axes: 1.8, fireball: 2.4, ballista: 2.8, runes: 3.2, cleave: 1.3, pick: 0.6, shield: 1.2, smite: 1.6, hammer: 1.1, blades: 0.55, slam: 2.6, whirl: 4.0, breath: 1.2 };
+const CD = { coil: 1.2, sword: 1.0, arrows: 0.75, axes: 1.8, fireball: 2.4, ballista: 2.8, runes: 3.2, cleave: 1.3, pick: 0.6, shield: 1.2, smite: 1.6, hammer: 1.1, blades: 0.55, slam: 2.6, whirl: 4.0, breath: 1.2, frost: 1.3, deadeye: 1.7 };
 // Death Coil healing is capped per second, so piling on coils can't make you unkillable.
 const COIL_HEAL_PER_S = 3;
-const CD_EVO = { arrows: 0.65, fireball: 2.0, ballista: 1.1, cleave: 1.1, pick: 0.35, shield: 1.2, smite: 1.3, hammer: 0.7, blades: 0.2, slam: 2.0, whirl: 4.5, breath: 0.9 };
+const CD_EVO = { arrows: 0.65, fireball: 2.0, ballista: 1.1, cleave: 1.1, pick: 0.35, shield: 1.2, smite: 1.3, hammer: 0.7, blades: 0.2, slam: 2.0, whirl: 4.5, breath: 0.9, frost: 1.0, deadeye: 1.4 };
 function fire(id, l) {
   const h = G.hero, ar = h.area;
   if (G.weapons[id] && G.weapons[id].evo && fireEvo(id)) return;
@@ -3317,6 +3368,16 @@ function fire(id, l) {
     smite(n, dmg, 1);
   } else if (id === 'hammer') {   // Kurdran: chain lightning from a hurled hammer
     chain(2 + (l >= 3) + (l >= 5) * 2, 18 + 6 * (l - 1) + (l >= 4 ? 6 : 0));
+  } else if (id === 'frost') {   // Arthas: a cone of frost that slows
+    const range = (52 + 6 * l + (l >= 3 ? 10 : 0)) * ar, dmg = 18 + 7 * (l - 1) + (l >= 5 ? 6 : 0), arc = l >= 5 ? 1.6 : 1.15, slow = l >= 4 ? 2.2 : 1.4;
+    const tg = nearest(1, range + 30)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
+    frostCone(a, range, arc, dmg, slow);
+  } else if (id === 'deadeye') {   // Kilrogg: axes at the furthest enemies in reach, one in four a deadly throw
+    const n = 1 + (l >= 2) + (l >= 4), dmg = 20 + 7 * (l - 1) + (l >= 5 ? 8 : 0), R = 260 * ar;
+    const pool = []; query(h.x, h.y, R, e => { if (!e.dead && !e.static && Math.hypot(e.x - h.x, e.y - h.y) < R) pool.push(e); });
+    pool.sort((a, b) => Math.hypot(b.x - h.x, b.y - h.y) - Math.hypot(a.x - h.x, a.y - h.y));
+    for (const e of pool.slice(0, n)) { const a = Math.atan2(e.y - h.y, e.x - h.x), crit = Math.random() < 0.25;
+      G.shots.push({ k: 'axe', role: 'axe', x: h.x, y: h.y, vx: Math.cos(a) * 260, vy: Math.sin(a) * 260, dmg: dmg * (crit ? 2.5 : 1), pierce: 1, life: 1.4, r: 6 * ar, hitCd: new Map() }); }
   } else if (id === 'blades') {   // Kargath: a flurry
     const range = (32 + 2 * l) * ar, dmg = 6 + 2.5 * (l - 1) + (l >= 5 ? 3 : 0), arc = l >= 4 ? 2.2 : 1.6, n = 2 + (l >= 3);
     for (let i = 0; i < n; i++) later(i * 0.09, () => arcHit(h.face + (i % 2 ? 0.25 : -0.25), range, arc, dmg, 50));
@@ -3411,6 +3472,13 @@ function shockwave(R, dmg) {
   const h = G.hero; G.fx.push({ k: 'ring', x: h.x, y: h.y, r: R, t: 0, life: 0.4, col: '200,160,90' });
   query(h.x, h.y, R + 12, e => { const dx = e.x - h.x, dy = e.y - h.y, d = Math.hypot(dx, dy) || 1; if (d < R + e.r) hitEnemy(e, dmg, dx / d * 90, dy / d * 90); });
 }
+function frostCone(a, range, arc, dmg, slow) {   // Arthas: frost that slows what it touches
+  const h = G.hero; G.fx.push({ k: 'ring', x: h.x, y: h.y, r: range, t: 0, life: 0.3, col: '160,210,255' }); if (arc < TAU) G.fx.push({ k: 'breath', a, r: range, arc, t: 0, life: 0.3, frost: true });
+  query(h.x, h.y, range + 12, e => {
+    const dx = e.x - h.x, dy = e.y - h.y, d = Math.hypot(dx, dy) || 1; if (d > range + e.r) return;
+    let da = Math.atan2(dy, dx) - a; da = Math.atan2(Math.sin(da), Math.cos(da)); if (arc >= TAU || Math.abs(da) <= arc / 2) { hitEnemy(e, dmg, dx / d * 30, dy / d * 30); if (!e.boss && !e.static) e.chill = slow; }
+  });
+}
 function breathe(a, range, arc, dmg) {
   const h = G.hero; G.fx.push({ k: 'breath', a, r: range, arc, t: 0, life: 0.35 });
   query(h.x, h.y, range + 12, e => {
@@ -3448,6 +3516,13 @@ function fireEvo(id) {
   if (id === 'smite') { smite(6, 110, 3); return true; }   // Wrath of the Light
   if (id === 'hammer') { chain(8, 60); return true; }   // Thunderclap
   if (id === 'blades') { arcHit(0, 55 * ar, TAU, 26, 30); return true; }   // Bladestorm
+  if (id === 'frost') { frostCone(0, 80 * ar, TAU, 50, 2); return true; }   // Frostmourne
+  if (id === 'deadeye') {   // Eye of the Hollow: four deadly axes at the furthest
+    const R = 300 * ar, pool = []; query(h.x, h.y, R, e => { if (!e.dead && !e.static && Math.hypot(e.x - h.x, e.y - h.y) < R) pool.push(e); });
+    pool.sort((a, b) => Math.hypot(b.x - h.x, b.y - h.y) - Math.hypot(a.x - h.x, a.y - h.y));
+    for (const e of pool.slice(0, 4)) { const a = Math.atan2(e.y - h.y, e.x - h.x); G.shots.push({ k: 'axe', role: 'axe', x: h.x, y: h.y, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, dmg: 90, pierce: 2, life: 1.4, r: 7 * ar, hitCd: new Map() }); }
+    return true;
+  }
   if (id === 'slam') { shockwave(150 * ar, 90); later(0.3, () => shockwave(170 * ar, 90)); later(0.6, () => shockwave(190 * ar, 90)); return true; }   // Earthshatter
   if (id === 'whirl') { for (let i = 0; i < 3; i++) addWhirl(14, 8, 1.6); return true; }   // Cyclone
   if (id === 'breath') { breathe(0, 95 * ar, TAU, 70); return true; }   // Flames of Deathwing
@@ -3519,7 +3594,7 @@ function updateWeapons(dt) {
     if (w.cd <= 0) {
       fire(id, w.lvl); w.cd = (w.evo && CD_EVO[id] || CD[id]) * h.haste;
       for (let i = n0; i < G.shots.length; i++) G.shots[i].w ||= id; for (let i = wh0; i < (G.whirls || []).length; i++) G.whirls[i].w ||= id;
-      const tg = ['sword', 'axes', 'cleave', 'shield', 'blades', 'breath', 'slam'].includes(id) ? null : nearest(1, 300)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
+      const tg = ['sword', 'axes', 'cleave', 'shield', 'blades', 'breath', 'slam', 'frost'].includes(id) ? null : nearest(1, 300)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
       h.atkT = HSWING; h.atkDir = dirOf(Math.cos(a), Math.sin(a)); const snd = { sword: 's_sword', cleave: 's_sword', pick: 's_sword', shield: 's_sword', blades: 's_sword', hammer: 's_axe', slam: 's_boom', breath: 's_fire', smite: 's_coil', arrows: 's_bow', axes: 's_axe', coil: 's_coil', ballista: 's_bow' }[id]; if (snd) sfx(snd, 0.1); }
     } finally { G.curW = null; }
   }
@@ -3698,7 +3773,7 @@ function updateEnemies(dt) {
     if (e.ship) { updateShip(e, d, dx, dy, dt); continue; }
     if (e.ambush) { updateAmbusher(e, d, dx, dy); continue; }
     if (e.demo && updateDemo(e, dt)) continue;
-    let sp = e.spd * (e.lust > 0 ? 1.4 : 1);
+    let sp = e.spd * (e.lust > 0 ? 1.4 : 1) * (G.storm && !e.fly ? G.LV.storm.slow : 1) * (e.chill > 0 ? 0.55 : 1); if (e.chill > 0) e.chill -= dt;
     if (e.range) {   // ranged units keep their distance
       if (d < e.range * (e.type === 'siege' ? 0.55 : 0.75)) sp = -sp * 0.6; else if (d < e.range) sp = 0;
     }
@@ -3780,7 +3855,7 @@ function update(dt) {
   if (h.frenzy && (h.frenzyT -= dt) <= 0) h.frenzy = Math.max(0, h.frenzy - dt * 0.15);   // Blade Frenzy fades
   if (G.HD.holyLight && h.hp > 0 && h.hp < h.maxHp * 0.3 && G.t >= (G.holyT || 0)) { G.holyT = G.t + 60; h.hp = Math.min(h.maxHp, h.hp + h.maxHp * 0.4); banner('Holy Light!'); G.fx.push({ k: 'pillar', x: h.x, y: h.y, t: 0, life: 0.6 }); }
   h.coilBank = Math.min(COIL_HEAL_PER_S, (h.coilBank || 0) + COIL_HEAL_PER_S * dt);
-  spawn(dt); updateCamps(dt); updateFort(dt); updateBoats(dt); updatePortal(dt); updateAmbush(dt); updateDemolition(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
+  updateTwists(dt); spawn(dt); updateCamps(dt); updateFort(dt); updateBoats(dt); updatePortal(dt); updateAmbush(dt); updateDemolition(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
   for (const f of G.fx) f.t += dt; G.fx = G.fx.filter(f => f.t < f.life); G.numCount = 0; for (const f of G.fx) if (f.k === 'num') G.numCount++;
   for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
   if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
@@ -4359,10 +4434,24 @@ function render() {
   }
   if (!G) return;
   if (G.space) drawSpace();
+  if (G.LV.night) drawNight();
+  if (G.storm) drawStorm();
   for (const f of G.fx) drawFx(f);
   if (G.state === 'play') drawLootArrows();
   if (G.fort && G.fort.state === 'escaping') txt(`${HEROES[G.fort.id].name} escapes in ${fmtTime(Math.max(0, PRISON.escape - (G.t - G.fort.freedAt)))}`, W / 2, 30, 7, '#ffd24a', 'center');
   drawHudSafe();
+}
+// Duskwood's night: everything beyond the torchlight round the hero is dark. Northrend's blizzard: driving snow.
+function drawNight() {
+  const h = G.hero, x = h.x - camX, y = h.y - camY, r = G.LV.night.r * (G.buffs.haste > G.t ? 1.1 : 1);
+  const g = ctx.createRadialGradient(x, y, r * 0.55, x, y, r * 1.35); g.addColorStop(0, 'rgba(4,6,14,0)'); g.addColorStop(1, 'rgba(4,6,14,0.7)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const t = ctx.createRadialGradient(x, y, 0, x, y, r * 0.7); t.addColorStop(0, 'rgba(255,190,110,0.16)'); t.addColorStop(1, 'rgba(255,190,110,0)');
+  ctx.fillStyle = t; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+}
+function drawStorm() {
+  ctx.fillStyle = 'rgba(225,235,245,0.18)'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  for (let i = 0; i < 160; i++) { const k = i * 7919, x = ((k % 997) / 997 * W + G.t * (60 + i % 40)) % W, y = ((k % 613) / 613 * H + G.t * (90 + i % 50)) % H; ctx.fillRect(x, y, 1.5, 1.5); }
 }
 // Idea 38, Orcs in Space: for one Horde run in about 200, the dark edges of the view open on a slowly drifting starfield.
 // Our own drawing: dots of light on a deep blue-black, two layers drifting at different speeds. Purely for show.
@@ -4831,6 +4920,8 @@ const BIOS = {
   zuljin: "Warlord of the Amani forest trolls, who joined the Horde to settle an ancient grudge against the elves of Quel'Thalas. Cunning and ruthless, he leads his axethrowers from the front.",
   chogall: "A two-headed ogre-mage and chieftain of the Twilight's Hammer clan, devoted to Gul'dan and to dark gods older than the Horde. His two heads seldom agree on anything but slaughter.",
   teron: "The first of the death knights: a warlock's spirit bound by Gul'dan into the body of a fallen human knight. Teron rides at the head of the Horde's undead cavalry.",
+  arthas: "Crown prince of Lordaeron and the youngest paladin of the Silver Hand, trained by Uther himself. Proud and quick to act, Arthas would one day take up a cursed runeblade in Northrend, but for now he fights for his father's kingdom.",
+  kilrogg: "Chieftain of the Bleeding Hollow clan, who put out his own eye to see the hour of his death. Knowing it, he fears nothing else, and his clan of scouts and hunters follow him anywhere.",
   kargath: 'Chieftain of the Shattered Hand clan, who cut off his own hand and fixed a great blade in its place. His warriors follow his example, and so does his reputation.',
   dentarg: "An ogre-mage of great strength and few words, bodyguard to the Horde's elder shaman. Dentarg crushes whatever stands between him and his master's enemies.",
   guldan: "The warlock who made the Shadow Council and gave the Horde its ogre-mages and death knights. Gul'dan serves only himself, and in the Second War he turned on the Horde to seek the Tomb of Sargeras.",
@@ -5155,6 +5246,8 @@ function weaponStats(id, l) {
     case 'shield': return `${16 + 6 * (l - 1) + (l >= 5 ? 6 : 0)} damage, stuns ${l >= 3 ? 0.8 : 0.5} s, reach ${30 + 3 * l + (l >= 5 ? 6 : 0)}${l >= 4 ? ', front and back' : ''}.`;
     case 'smite': return `${pl(1 + (l >= 3) + (l >= 5), 'pillar')} of ${36 + 12 * (l - 1) + (l >= 4 ? 10 : 0)} damage, healing 1 each.`;
     case 'hammer': return `${18 + 6 * (l - 1) + (l >= 4 ? 6 : 0)} damage, leaping through ${pl(2 + (l >= 3) + (l >= 5) * 2, 'enemy', 'enemies')}.`;
+    case 'frost': return `${18 + 7 * (l - 1) + (l >= 5 ? 6 : 0)} damage, reach ${52 + 6 * l + (l >= 3 ? 10 : 0)}, slows for ${l >= 4 ? 2.2 : 1.4} s.`;
+    case 'deadeye': return `${pl(1 + (l >= 2) + (l >= 4), 'axe', 'axes')} of ${20 + 7 * (l - 1) + (l >= 5 ? 8 : 0)} damage at the furthest enemies; one in four hits two and a half times as hard.`;
     case 'blades': return `${pl(2 + (l >= 3), 'slash', 'slashes')} of ${6 + 2.5 * (l - 1) + (l >= 5 ? 3 : 0)} damage, reach ${32 + 2 * l}.`;
     case 'slam': return `${14 + 6 * (l - 1) + (l >= 4 ? 6 : 0)} damage out to ${56 + 5 * l + (l >= 3 ? 10 : 0)}${l >= 5 ? ', twice' : ''}.`;
     case 'whirl': return `${pl(1 + (l >= 3) + (l >= 5), 'whirlwind')}, ${3 + 1.5 * (l - 1)} damage four times a second for ${l >= 4 ? 4.5 : 3} s.`;
@@ -5170,7 +5263,7 @@ const ITEM_ICONS = {
   'w:sword': 117, 'w:arrows': 125, 'w:axes': 129, 'w:aura': 110, 'w:fireball': 101, 'w:ballista': 140, 'w:runes': 97, 'w:coil': 108,
   'p:armour': 165, 'p:armour.orc': 168, 'p:boots': 130, 'p:heal': 107, 'p:magnet': 133, 'p:might': 118, 'p:might.orc': 120, 'p:haste': 96, 'p:area': 104, 'p:vitality': 9, 'food:food': 134,
   'w:cleave': 121, 'e:cleave': 120, 'w:pick': 86, 'e:pick': 85,
-  'w:shield': 164, 'e:shield': 166, 'w:smite': 100, 'e:smite': 106, 'w:hammer': 99, 'e:hammer': 135, 'w:blades': 116, 'e:blades': 167,
+  'w:shield': 164, 'e:shield': 166, 'w:smite': 100, 'e:smite': 106, 'w:hammer': 99, 'e:hammer': 135, 'w:blades': 116, 'e:blades': 167, 'w:frost': 105, 'e:frost': 101, 'w:deadeye': 137, 'e:deadeye': 129,
   'w:slam': 113, 'e:slam': 112, 'w:whirl': 102, 'e:whirl': 109, 'w:breath': 94, 'e:breath': 192,
   'e:sword': 119, 'e:arrows': 132, 'e:axes': 137, 'e:aura': 110, 'e:fireball': 105, 'e:ballista': 141, 'e:runes': 103, 'e:coil': 98,   // evolved weapons
 };
