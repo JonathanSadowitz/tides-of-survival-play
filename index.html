@@ -86,6 +86,7 @@
   .bookgrid .booknote{grid-column:1/-1;text-align:center;margin:0}
   .bookcard{background:rgba(0,0,0,.25);border:1px solid #6b5228;padding:7px 9px}
   .bookcard .nm{color:var(--gold);font-size:17px} .fpics{display:flex;gap:2px;flex:none} canvas.fpic{width:40px;height:40px;image-rendering:pixelated} canvas.fpic.dim{filter:brightness(0) opacity(.45)}
+.card .cmeta{font-size:13px;opacity:.85;margin-top:3px} .pactcard{border-color:#a3241a!important;box-shadow:inset 0 0 0 1px rgba(200,40,30,.5)} .pactcost{color:#ff9a7a} .lv.pact{color:#ff8a6a}
 .bookhead{grid-column:1/-1;margin:10px 0 0;color:var(--gold);font-size:18px} .bookcard .ds{font-size:15px;line-height:1.3;margin-top:4px} .bookcard .lv{font-size:14px;opacity:.9}
   .cicon.dim,.hpic.dim{filter:grayscale(1) brightness(.55)} span.cicon.blank{display:inline-block;width:46px;height:38px;background:#000}
   .booktabs .opt.cur{outline:2px solid #e8c84a}
@@ -1179,7 +1180,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.28.1', BUILD = 'b82c51d 2026-11-27';
+const VERSION = '0.29.0', BUILD = 'ef7bb96 2026-11-27';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1261,7 +1262,8 @@ const ROLES = [
   ['tank_up', 'Horde upgraded: ogre-mage'], ['ranged_up', 'Horde upgraded: troll berserker'], ['caster', 'Horde caster: death knight'], ['skel', 'Horde: skeleton'], ['daemon', 'Daemon'],
   ['ally_tank_up', 'Alliance upgraded: paladin'], ['ally_ranged_up', 'Alliance upgraded: ranger'], ['ally_caster', 'Alliance caster: mage'],
   ['proj', 'Missile: arrow'], ['bolt', 'Missile: ballista bolt'], ['rune', 'Rune'],
-  ['axe', 'Missile: thrown axe'], ['fire', 'Missile: fireball'], ['coil', 'Missile: death coil'], ['boom', 'Explosion'], ['gem', 'XP pickup']
+  ['axe', 'Missile: thrown axe'], ['fire', 'Missile: fireball'], ['coil', 'Missile: death coil'], ['boom', 'Explosion'], ['gem', 'XP pickup'],
+  ['sheep', 'Sheep (Polymorph)'], ['lightning', 'Lightning strike'], ['flame', 'Flame Shield'], ['oilfire', 'Burning oil'], ['torp', 'Torpedo (submarine)'], ['torp_orc', 'Torpedo (giant turtle)'], ['cboom', 'Cannon explosion'], ['spell', 'Spell sparkle']
 ];
 const SOUND_ROLES = [['s_hit', 'Enemy hit'], ['s_die', 'Orc dies'], ['s_die_ally', 'Human dies'], ['s_hurt', 'Hero hurt'], ['s_level', 'Level up'], ['s_boom', 'Explosion'],
   ['s_sword', 'Sword swing'], ['s_bow', 'Bow shot'], ['s_axe', 'Axe throw'], ['s_fire', 'Fireball hit'], ['s_coil', 'Death coil'], ['s_start', 'Run start'],
@@ -1292,6 +1294,9 @@ const AUTO_ROLES = {
   // Phase Q: drawn over these units' frame layouts (UNIF_ART swaps in the art; Classic shows the units underneath).
   charger: unitR(51), ally_charger: unitR(51), gunner: unitR(54), ally_gunner: unitR(54), gnoll: unitR(58), ally_gnoll: unitR(58),
   brigand: unitR(53), ally_brigand: unitR(53), bullet: { e: 340, mode: 'dir5', r0: 0, r1: 0 },
+  // Phase V: the sheep (Polymorph), and Warcraft II's spell and missile art for the new weapons.
+  sheep: { e: 64, mode: 'dir5', r0: 0, r1: 0 }, lightning: { e: 324, mode: 'cycle', r0: 10, r1: 19 }, flame: { e: 328, mode: 'cycle', r0: 0, r1: 5 }, oilfire: { e: 343, mode: 'cycle', r0: 0, r1: 5 },
+  torp: { e: 341, mode: 'dir5', r0: 0, r1: 0 }, torp_orc: { e: 342, mode: 'dir5', r0: 0, r1: 0 }, cboom: { e: 349, mode: 'cycle', r0: 0, r1: 3 }, spell: { e: 346, mode: 'cycle', r0: 0, r1: 5 },
 };
 const SWING = 0.45, HSWING = 0.35;
 const ROLE_SCALE = { ship: 0.8, ally_ship: 0.8, ship2: 0.85, ally_ship2: 0.85, transport: 0.8, transport_orc: 0.8, daemon: 0.9, hero_kurdran: 0.8, hero_deathwing: 0.85, flyer: 0.8, scout: 0.8, ally_scout: 0.7, siege: 0.8, ally_siege: 0.8, boss1: 1.5, ally_boss1: 1.6, boss2: 1.6, ally_boss2: 1.4, boss3: 1.3, ally_boss3: 1.35 };
@@ -2118,7 +2123,7 @@ const EVOS = {
   breath:   { p: 'might',    name: 'Flames of Deathwing', desc: 'Fire all around you, not only ahead.' },
   pick:     { p: 'magnet',   name: 'Overtime',            desc: 'Twice as fast, and every enemy in reach takes a hit.' },
 };
-const wName = id => G && G.weapons[id] && G.weapons[id].evo ? EVOS[id].name : WEAPONS[id].name;
+const wName = id => G && G.weapons[id] && G.weapons[id].evo && EVOS[id] ? EVOS[id].name : WEAPONS[id].name;
 const evolvable = () => Object.keys(G.weapons).filter(id => { const w = G.weapons[id]; return !w.evo && w.lvl >= MAX_LVL && EVOS[id] && G.passives[EVOS[id].p]; });
 function evolve(id) { logEvent('evolved ' + id); G.evoN = (G.evoN || 0) + 1; if (!meta.evos.includes(id)) { meta.evos.push(id); saveMeta(); } G.weapons[id].evo = true; G.weapons[id].cd = 0.3; G.weapons[id].tick = 0; }
 function evoStats(id) {
@@ -2133,6 +2138,15 @@ function evoStats(id) {
     case 'coil': return '5 coils, 40 damage, heals 2, each hit adds 4 shield (up to 40).';
     case 'cleave': return '95 damage all around you, reach about 70, every 1.1 s.';
     case 'pick': return '38 damage to every enemy within 55, every 0.35 s.';
+    case 'lightning': return '5 strikes of 70 damage, every second.';
+    case 'flameshield': return '6 flames of 26 damage, always burning.';
+    case 'polymorph': return 'Up to 14 enemies near you turn to sheep every 4 s; elites and bosses take 150 damage.';
+    case 'raisedead': return 'Up to 10 skeletons of 22 damage, lasting 15 s.';
+    case 'cannon': return '3 shells of 90 damage, blast 46, every 2 s.';
+    case 'sappers': return '4 charges of 140 damage, blast 54 to 69.';
+    case 'oil': return 'Two pools of 16 damage every 0.5 s, burning 6 s, and a burning trail as you go.';
+    case 'flier': return 'Two fliers of 40 damage, attacking every 0.55 s.';
+    case 'tower': return 'Towers fire cannonballs of 45 damage that burst among the enemy.';
     case 'shield': return '60 damage all around you, stunning for 1 s, every 1.2 s.';
     case 'smite': return '6 pillars of 110 damage, each healing 3.';
     case 'hammer': return 'Leaps through 8 enemies for 60 damage each, every 0.7 s.';
@@ -2201,6 +2215,111 @@ const PASSIVES = {
 };
 const MAX_LVL = 5, MAX_SLOTS = 6;
 
+// ---------- Phase V: build-crafting (idea 46, 0.29.0) ----------
+// The shared pool grows from 8 weapons to 17 (16 for each side), each with a role. Five passives help only some weapons.
+// Every weapon evolves; four unions merge two maxed weapons into one slot; each hero favours two weapons; two rare
+// weapons come only late in a run; pacts are optional cards with a cost. All art is Warcraft II's own.
+let sideOverride = null;
+const curSide = () => sideOverride || (G ? G.HD.side : (HEROES[(meta && meta.last && meta.last.hero) || 'lothar'] || HEROES.lothar).side);
+const bySide = o => o[curSide()] || o.Alliance;
+function nameFor(id, side) { const k = sideOverride; sideOverride = side; try { return WEAPONS[id].name; } finally { sideOverride = k; } }
+Object.assign(WEAPONS, {
+  lightning: { name: 'Lightning', desc: 'A bolt of lightning strikes the nearest enemy in an instant.', up: ['more damage', 'strikes one more enemy', 'more damage', 'strikes one more enemy'] },
+  flameshield: { name: 'Flame Shield', desc: 'Flames circle you for a while, burning whatever they touch, then die down and gather again.', up: ['one more flame', 'more damage', 'burns for longer', 'one more flame'] },
+  polymorph: { name: 'Polymorph', side: 'Alliance', desc: 'Turns the nearest enemies into harmless sheep. Elites and bosses resist: they only take damage.', up: ['one more enemy', 'cast more often', 'one more enemy', 'reaches further'] },
+  raisedead: { name: 'Raise Dead', side: 'Horde', desc: 'The fallen around you rise as skeletons and fight for you for a while.', up: ['one more skeleton', 'harder blows', 'one more skeleton', 'they last longer'] },
+  cannon: { name: 'Cannon', desc: 'Lobs a heavy shell into the thickest of the crowd.', up: ['more damage', 'a bigger blast', 'more damage', 'a second shell'] },
+  sappers: { get name() { return bySide({ Alliance: 'Dwarven Demolition', Horde: 'Goblin Sappers' }); }, get desc() { return bySide({ Alliance: 'A dwarven demolition squad runs', Horde: 'A goblin sapper runs' }) + ' into the crowd and blows itself up.'; }, up: ['more damage', 'one more', 'a bigger blast', 'one more'] },
+  oil: { name: 'Boiling Oil', desc: 'Pours boiling oil among the enemy. It burns and slows whatever walks through it.', up: ['more damage', 'a wider pool', 'more damage', 'two pools at a time'] },
+  flier: { get name() { return bySide({ Alliance: 'Gryphon Rider', Horde: 'Dragon' }); }, get desc() { return bySide({ Alliance: 'A gryphon rider circles above you, hurling storm hammers at your foes.', Horde: 'A dragon circles above you, spitting fire at your foes.' }); }, up: ['more damage', 'attacks faster', 'more damage', 'two of them'] },
+  tower: { name: 'Guard Tower', desc: 'Raises a guard tower where you stand. It shoots at enemies nearby for a while, then crumbles.', up: ['more damage', 'one more tower', 'shoots faster', 'one more tower'] },
+  broadside: { rare: true, get name() { return bySide({ Alliance: 'Battleship Broadside', Horde: 'Juggernaught Broadside' }); }, desc: 'Rare: offered only from 10:00. A warship offshore fires a broadside, and shells rain down among your foes.', up: ['more damage', 'more shells', 'more damage', 'more shells'] },
+  torpedo: { rare: true, get name() { return bySide({ Alliance: 'Gnomish Submarine', Horde: 'Giant Turtle' }); }, desc: 'Rare: offered only from 10:00. Torpedoes hunt the toughest enemies and pierce all in their way.', up: ['more damage', 'one more torpedo', 'more damage', 'one more torpedo'] },
+  // Unions: two weapons at level 5 merge at a boss chest into one, firing both at their evolved best, in one slot.
+  u_arcane: { union: ['fireball', 'lightning'], name: 'Arcane Storm', desc: 'Fireball and Lightning as one: ice storms and thunderstorms together, 15% stronger, in one slot.', up: [] },
+  u_legion: { union: ['coil', 'raisedead'], name: 'Legion of the Damned', desc: 'Death Coil and Raise Dead as one: shielding coils and an army of the dead, 15% stronger, in one slot.', up: [] },
+  u_siege: { union: ['cannon', 'sappers'], name: 'Siege Works', desc: 'Cannon and demolition as one: shell batteries and charging demolitions, 15% stronger, in one slot.', up: [] },
+  u_purge: { union: ['aura', 'flameshield'], name: 'Purifying Flame', desc: 'Holy Aura and Flame Shield as one: Exorcism inside an Inferno, 15% stronger, in one slot.', up: [] },
+});
+const UNION_MUL = 1.15;
+// Each weapon's role, shown on its card, and what the passives can do for it: missile (Longbow), amount (Quiver), duration (Runestones).
+const ROLE_NAMES = { close: 'Close', ranged: 'Ranged', crowd: 'Crowd', boss: 'Boss-killer', defence: 'Defensive', summon: 'Summon', zone: 'Zone' };
+for (const [id, role, tags] of [['sword', 'close', ''], ['arrows', 'ranged', 'missile amount'], ['axes', 'crowd', 'missile amount'], ['aura', 'defence', ''],
+  ['fireball', 'crowd', 'missile amount'], ['ballista', 'boss', 'missile'], ['runes', 'zone', 'amount duration'], ['coil', 'defence', 'missile amount'],
+  ['cleave', 'close', ''], ['shield', 'defence', ''], ['smite', 'boss', 'amount'], ['hammer', 'crowd', 'missile'], ['frost', 'close', ''], ['deadeye', 'boss', 'missile amount'],
+  ['blades', 'close', ''], ['slam', 'crowd', ''], ['whirl', 'zone', 'amount duration'], ['breath', 'close', ''], ['pick', 'close', ''],
+  ['lightning', 'boss', 'missile amount'], ['flameshield', 'defence', 'amount duration'], ['polymorph', 'crowd', 'missile amount'], ['raisedead', 'summon', 'amount duration'],
+  ['cannon', 'crowd', 'missile amount'], ['sappers', 'crowd', 'amount'], ['oil', 'zone', 'duration'], ['flier', 'summon', 'missile amount'], ['tower', 'summon', 'missile amount duration'],
+  ['broadside', 'crowd', 'amount'], ['torpedo', 'boss', 'missile amount'], ['u_arcane', 'crowd', ''], ['u_legion', 'summon', ''], ['u_siege', 'crowd', ''], ['u_purge', 'defence', '']]) {
+  WEAPONS[id].role = role; WEAPONS[id].tags = tags ? tags.split(' ') : [];
+}
+const wTag = (id, t) => !!(WEAPONS[id] && WEAPONS[id].tags && WEAPONS[id].tags.includes(t));
+const NEW_W = new Set(['lightning', 'flameshield', 'polymorph', 'raisedead', 'cannon', 'sappers', 'oil', 'flier', 'tower', 'broadside', 'torpedo']);
+Object.assign(EVOS, {
+  lightning: { p: 'crit', name: 'Thunderstorm', desc: 'Lightning strikes five enemies at a time, more than twice as hard.' },
+  flameshield: { p: 'armour', name: 'Inferno', desc: 'Six great flames circle you and never die down.' },
+  polymorph: { p: 'area', name: 'Mass Polymorph', desc: 'Every enemy near you turns to a sheep at once.' },
+  raisedead: { p: 'vitality', name: 'Army of the Dead', desc: 'Up to ten skeletons, harder hitting and longer lived.' },
+  cannon: { p: 'reach', name: 'Siege Battery', desc: 'Three shells at a time, more often, with bigger blasts.' },
+  sappers: { p: 'amount', get name() { return bySide({ Alliance: 'Demolition Squad', Horde: 'Sapper Horde' }); }, desc: 'Four charge at once, and every blast is half as wide again.' },
+  oil: { p: 'dur', name: 'Burning Fields', desc: 'A trail of burning oil follows you, and every pool burns longer and hotter.' },
+  flier: { p: 'boots', get name() { return bySide({ Alliance: 'Wildhammer Flight', Horde: 'Black Dragonflight' }); }, desc: 'Two fliers circle you, attacking twice as fast.' },
+  tower: { p: 'thorns', name: 'Cannon Tower', desc: 'Your towers fire cannonballs that burst among the enemy.' },
+});
+PASSIVES.area.name = 'Tempest';   // was Whirlwind, the same name as Gul'dan's weapon
+Object.assign(PASSIVES, {
+  reach: { name: 'Longbow', desc: '+15% missile range.', helps: 'missile' },
+  dur: { name: 'Runestones', desc: '+15% duration of spells, summons and zones.', helps: 'duration' },
+  amount: { name: 'Quiver', desc: '+1 missile, strike or summon.', helps: 'amount', max: 2 },
+  crit: { name: 'Precision', desc: '+8% chance to deal double damage.' },
+  thorns: { name: 'Spiked Shield', desc: '+6 damage to enemies that strike you.' },
+});
+const pmax = id => PASSIVES[id].max || MAX_LVL;
+// New weapons are earned (Jon): a fresh save starts with the original eight. A save that already meets a goal gets it at once.
+const achGot = id => !!(meta.ach && meta.ach[id]);
+const totalRuns = () => Object.values(P_().runsOn || {}).reduce((a, b) => a + b, 0);
+const WEAPON_UNLOCKS = {
+  lightning: { goal: 'Survive 5:00', done: () => achGot('time5') },
+  cannon: { goal: 'Slay the 5:00 boss', done: () => achGot('boss1') },
+  tower: { goal: 'Play 8 runs', done: () => totalRuns() >= 8 },
+  flameshield: { goal: 'Kill 2,000 enemies in a run', done: () => achGot('kills2k') },
+  oil: { goal: 'Evolve a weapon', done: () => achGot('evo1') },
+  polymorph: { goal: 'Survive 8:00 as an Alliance hero', done: () => sideTime('Alliance') >= 480 },
+  raisedead: { goal: 'Survive 8:00 as a Horde hero', done: () => sideTime('Horde') >= 480 },
+  sappers: { goal: 'Destroy five enemy camps in a run', done: () => achGot('raider') },
+  flier: { goal: 'Survive 10:00', done: () => achGot('time10') },
+  broadside: { goal: 'Survive 15:00', done: () => achGot('time15') },
+  torpedo: { goal: 'Sink three warships in a run', done: () => achGot('ships') },
+};
+const weaponOpen = id => !WEAPON_UNLOCKS[id] || (meta.wpn || []).includes(id);
+// At most `max` new weapons a run (drip-fed, as heroes are); the title screen catches old saves up all at once.
+function unlockWeapons(max) {
+  const got = []; meta.wpn ||= [];
+  for (const [id, U] of Object.entries(WEAPON_UNLOCKS)) { if (got.length >= max) break; if (!meta.wpn.includes(id) && U.done()) { meta.wpn.push(id); got.push(id); } }
+  if (got.length) saveMeta();
+  return got;
+}
+// Each hero's favoured weapons (shown on hero select): offered more often and 15% stronger in his hands.
+const FAV = { lothar: ['ballista', 'tower'], uther: ['sword', 'flameshield'], alleria: ['tower', 'flier'], khadgar: ['lightning', 'polymorph'],
+  grom: ['axes', 'sappers'], zuljin: ['oil', 'runes'], chogall: ['fireball', 'sappers'], teron: ['raisedead', 'runes'], danath: ['sword', 'tower'],
+  turalyon: ['aura', 'flameshield'], kurdran: ['lightning', 'flier'], kargath: ['axes', 'oil'], dentarg: ['runes', 'cannon'], guldan: ['coil', 'raisedead'],
+  arthas: ['sword', 'lightning'], kilrogg: ['axes', 'cannon'], deathwing: ['fireball', 'flier'], peasant: ['tower', 'cannon'], peon: ['sappers', 'oil'] };
+const FAV_DMG = 1.15;
+const favOf = id => FAV[id] || [];
+// Rare weapons only come late in a run; then a thin chance on each card.
+const RARE = { at: 600, wgt: 0.35 };
+// Pacts: optional cards with a cost (Jon: mild, visible, optional). From 3:00, at most two a run.
+const PACTS = {
+  blood: { name: 'Blood Pact', gain: '+30% damage.', cost: '20% less maximum health.' },
+  frenzy: { name: "Berserker's Oath", gain: '25% faster attacks.', cost: '2 less armour.' },
+  greed: { name: 'Greed', gain: '+60% gold.', cost: 'You take 15% more damage.' },
+  vigour: { name: 'Unholy Vigour', gain: '+50 maximum health.', cost: '12% slower.' },
+  tome: { name: 'Forbidden Tome', gain: 'One more card to choose from at every level-up.', cost: '20% less experience.' },
+};
+const PACT = { from: 180, max: 2, chance: 0.22 };
+const hasPact = k => !!(G && G.pacts && G.pacts.includes(k));
+const pactsOpen = () => achGot('time10');   // pacts are for seasoned players: offered once you've survived 10:00
+
 let meta = store.get('tos_meta', null) || { gold: 0, spent: 0, ups: {}, unlocked: 0, last: null };
 meta.ups ||= {};
 // Phase R: four battlefields were added among the early ones, so the furthest one you had open is found by name.
@@ -2208,7 +2327,7 @@ const FIELDS_V1 = ['forest', 'winter', 'waste', 'swamp', 'portal', 'quel', 'grim
 if (!meta.fieldsV2) { const id = FIELDS_V1[Math.min(meta.unlocked || 0, FIELDS_V1.length - 1)]; meta.unlocked = Math.max(0, LEVELS.findIndex(L => L.id === id)); meta.fieldsV2 = true; }
 // Heroes: Lothar and Grom from the start; the rest unlock by reaching a goal or by buying them with Armoury gold.
 const START_HEROES = ['lothar', 'grom'];
-const freshMeta = () => ({ gold: 0, spent: 0, ups: {}, unlocked: 0, last: null, heroes: [...START_HEROES], prog: freshProg(), evos: [], maxed: [], seen: [], prisoners: [] });
+const freshMeta = () => ({ gold: 0, spent: 0, ups: {}, unlocked: 0, last: null, heroes: [...START_HEROES], prog: freshProg(), evos: [], maxed: [], seen: [], prisoners: [], wpn: [], wpnV: 1, unions: [] });
 const freshProg = () => ({ kills: { Alliance: 0, Horde: 0 }, time: {}, won: { Alliance: false, Horde: false }, lv: {}, boss: { Alliance: 0, Horde: 0 } });
 meta.heroes ||= [...START_HEROES]; meta.prog ||= freshProg(); meta.prog.boss ||= { Alliance: 0, Horde: 0 }; meta.evos ||= []; meta.maxed ||= []; meta.seen ||= [];   // evolutions found and weapons maxed, for the Book of War
 const P_ = () => meta.prog;
@@ -2277,6 +2396,8 @@ const ACH = [
   { id: 'evoall', name: 'Every recipe', desc: 'Make every evolution.', gold: 800, ok: () => Object.keys(EVOS).every(id => meta.evos.includes(id)) },
   { id: 'fullkit', name: 'Full kit', desc: `Carry ${MAX_SLOTS} weapons, all at level ${MAX_LVL}.`, gold: 200, ok: R => R.maxed >= MAX_SLOTS },
   { id: 'banish', name: 'Not for me', desc: 'Banish a card.', gold: 50, ok: R => R.banished >= 1 },
+  { id: 'union', name: 'Two become one', desc: 'Merge two weapons into a union.', gold: 200, ok: R => R.unions >= 1 },
+  { id: 'pact', name: 'Dark bargain', desc: 'Win a battlefield with two pacts made.', gold: 300, ok: R => R.won && R.pacts >= 2 },
   { id: 'untouched', name: 'Untouchable', desc: 'Reach 3:00 without being hit.', gold: 150, ok: R => R.untouched },
   { id: 'freed', name: 'Jailbreak', desc: 'Free a prisoner from his fortress.', gold: 200, ok: R => R.freed },
   { id: 'breach', name: 'Breach', desc: "Knock down a section of a fortress's wall.", gold: 50, ok: R => R.walls >= 1 },
@@ -2294,7 +2415,7 @@ function checkAchievements() {
   st.kills += G.kills; if (G.won) { st.winsBy[G.heroId] = 1; st.winsOn[G.LV.id] = 1; st.curseWon[G.LV.id] = Math.max(st.curseWon[G.LV.id] ?? -1, curseOf()); }
   const R = { kills: G.kills, t: Math.min(G.t, RUN_LEN), won: !!G.won, level: G.LV.id, hero: G.heroId, bosses: G.bossSlain || [], evos: G.evoN || 0,
     maxed: Object.values(G.weapons).filter(w => w.lvl >= MAX_LVL).length, banished: (G.banned || []).length, untouched: !!G.untouched, freed: !!(G.fort && G.fort.state === 'escaped'),
-    walls: G.wallsDown || 0, camps: G.campsDone || 0, ships: G.shipsSunk || 0, bare: !!G.bare, curse: curseOf(), space: !!G.space };
+    walls: G.wallsDown || 0, camps: G.campsDone || 0, ships: G.shipsSunk || 0, bare: !!G.bare, curse: curseOf(), space: !!G.space, unions: G.unionN || 0, pacts: (G.pacts || []).length };
   const got = ACH.filter(a => !meta.ach[a.id] && (a.id !== 'jobsdone' || heroOpen('peasant')) && a.ok(R));
   for (const a of got) { meta.ach[a.id] = Date.now(); meta.gold += a.gold; logEvent('achievement ' + a.id); }
   return got;
@@ -2361,6 +2482,8 @@ function nextUp() {
     const how = U.done() ? `Goal met: ${wait > 0 ? `he joins after ${wait} more run${wait > 1 ? 's' : ''}` : 'he joins after your next run'}.` : `${U.goal}: ${U.best()}${U.left ? `, ${U.left()}` : ''}.`;
     out.push(`<b>Next hero: ${HEROES[h].name}.</b> ${how} Or buy him for ${U.cost.toLocaleString('en-GB')} gold in hero select.`.replace(/\bhim\b|\bhe\b/g, w => h === 'alleria' ? (w === 'him' ? 'her' : 'she') : w));
   }
+  const nw = Object.keys(WEAPON_UNLOCKS).find(id => !weaponOpen(id) && (!WEAPONS[id].side || !G || WEAPONS[id].side === G.HD.side));
+  if (nw) out.push(`<b>Next weapon: ${WEAPONS[nw].name}.</b> ${WEAPON_UNLOCKS[nw].goal}.`);
   const held = meta.prisoners.filter(id => !heroOpen(id) && !(G && G.revealed || []).includes(id));   // ones found this run are announced above
   if (held.length) out.push(`<b>Held prisoner: ${held.map(id => HEROES[id].name).join(', ')}.</b> Each is freed from an enemy fortress in a run as one of his own side's heroes.`);
   const nextP = PRISON.heroes.find(id => !heroOpen(id) && !meta.prisoners.includes(id));
@@ -2376,7 +2499,7 @@ const goldMul = () => 1 + 0.15 * up('greed');
 // roughly 15 to 20 runs to fill). Fractions carry over so small coins still count.
 // 16 November 2026: 0.5 -> 0.3 after Jon's first run on a fresh save earned 611 gold (the bot was earning about 100).
 const ECON = { gold: 0.3, minute: 4 };   // gold rate, and the bonus per minute survived
-function addGold(v) { if (!G) return; G.goldFrac = (G.goldFrac || 0) + v * (1 + CURSE.gold * curseOf()) * ECON.gold; const n = Math.floor(G.goldFrac); G.gold += n; G.goldFrac -= n; }
+function addGold(v) { if (!G) return; G.goldFrac = (G.goldFrac || 0) + v * (1 + CURSE.gold * curseOf()) * ECON.gold * (hasPact('greed') ? 1.6 : 1); const n = Math.floor(G.goldFrac); G.gold += n; G.goldFrac -= n; }
 
 /* ---------- power-ups: rare drops with a spell icon from the game ---------- */
 const POWERUPS = {
@@ -2523,7 +2646,7 @@ function snapRun() {
   return { v: 1, hero: G.heroId, level: G.LV.id, seed: G.terrain.seed, t: G.t, kills: G.kills, gold: G.gold,
     lab: G.labour || 0, bp: G.bossPlan || null, bossN: G.bossN || 0, eliteNext: G.eliteNext, eliteN: G.eliteN, swarmNext: G.swarmNext,
     bs: G.enemies.filter(e => e.boss && e.hp > 0).map(b => ({ n: b.boss, f: b.hp / b.maxHp })),   // every boss still alive, as wounded as he is
-    revives: G.revives, rerolls: G.rerolls, banishes: G.banishes, banned: G.banned || [], curse: G.curse || 0, bare: !!G.bare,
+    revives: G.revives, rerolls: G.rerolls, banishes: G.banishes, banned: G.banned || [], pc: G.pacts || [], un: G.unionN || 0, curse: G.curse || 0, bare: !!G.bare,
     sp: G.space ? 1 : 0, ac: { evo: G.evoN || 0, bs: G.bossSlain || [], camps: G.campsDone || 0, ships: G.shipsSunk || 0, walls: G.wallsDown || 0, unt: G.untouchedSet ? !!G.untouched : null },   // achievement counters   // lost from saves 0.11.3 to 0.13.0: a comment swallowed them
     pending: G.pending + (G.state === 'levelup' ? 1 : 0), chests: G.chestQueue,
     h: { x: h.x, y: h.y, hp: h.hp, xp: h.xp, level: h.level, next: h.next },
@@ -2546,7 +2669,7 @@ function continueRun() {
   G.weapons = {}; for (const [k, l] of Object.entries(s.w || {})) if (WEAPONS[k]) G.weapons[k] = { lvl: l, cd: 0.3, tick: 0, evo: (s.e || []).includes(k) && !!EVOS[k] };
   G.passives = Object.fromEntries(Object.entries(s.p || {}).filter(([k]) => PASSIVES[k]));   // drops retired passives
   // Saves from before the named bosses counted bosses due every 4 minutes from 5:00; they map onto the new 5, 10, 15.
-  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(PACE.elite, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives ?? up('revival'), rerolls: s.rerolls ?? 1 + up('reroll'), banishes: s.banishes ?? up('banish'), banishMax: up('banish'), banned: s.banned || [], curse: s.curse ?? 0, bare: !!s.bare, evoN: s.ac?.evo || 0, bossSlain: s.ac?.bs || [], campsDone: s.ac?.camps || 0, shipsSunk: s.ac?.ships || 0, wallsDown: s.ac?.walls || 0, untouchedSet: s.ac?.unt != null, untouched: !!s.ac?.unt, pending: s.pending || 0, chestQueue: s.chests || [] });
+  Object.assign(G, { t: s.t, kills: s.kills, gold: s.gold, bossN: s.bossNext ? BOSSES.filter(B => B.at < s.t).length : s.bossN || 0, eliteNext: s.eliteNext ?? Math.max(PACE.elite, s.t + 20), eliteN: s.eliteN || 0, swarmNext: s.swarmNext, revives: s.revives ?? up('revival'), rerolls: s.rerolls ?? 2 + up('reroll'), pacts: (s.pc || []).filter(k => PACTS[k]), unionN: s.un || 0, banishes: s.banishes ?? up('banish'), banishMax: up('banish'), banned: s.banned || [], curse: s.curse ?? 0, bare: !!s.bare, evoN: s.ac?.evo || 0, bossSlain: s.ac?.bs || [], campsDone: s.ac?.camps || 0, shipsSunk: s.ac?.ships || 0, wallsDown: s.ac?.walls || 0, untouchedSet: s.ac?.unt != null, untouched: !!s.ac?.unt, pending: s.pending || 0, chestQueue: s.chests || [] });
   Object.assign(G.hero, { x: s.h.x, y: s.h.y, xp: s.h.xp, level: s.h.level, next: s.h.next }); G.labour = s.lab || 0; G.bossPlan = s.bp && s.bp.length === BOSSES.length ? s.bp : null;   // runs saved before 20-minute runs plan again
   recalc(); G.hero.hp = Math.max(1, Math.min(s.h.hp, G.hero.maxHp));
   for (const b of [].concat(s.bs || [])) if (BOSSES[b.n - 1]) spawnBoss(b.n, b.f);   // older saves kept one boss, not a list
@@ -2578,7 +2701,8 @@ function newRun(heroId, levelId, seed) {
   };
   G.space = HD.side === 'Horde' && seed == null && (SPACE.force || Math.random() < SPACE.chance);   // idea 38: the rare Orcs in Space run
   addItem('w', HD.start); recalc(); G.hero.hp = G.hero.maxHp; logStart(); if (G.space) logEvent('orcs in space');
-  G.revives = up('revival'); G.rerolls = 1 + up('reroll'); G.banishes = G.banishMax = up('banish');
+  G.revives = up('revival'); G.rerolls = 2 + up('reroll'); G.banishes = G.banishMax = up('banish');   // one reroll every run is free (Phase V)
+  G.fav = new Set(favOf(heroId)); G.pacts = [];
   if (typeof startLevel === 'function') startLevel();
   ensureAudio(); sfx('s_start'); playMusic('battle'); heroVoice('ready', 1);
   hideMenu(); showHudBtns(true);
@@ -2589,6 +2713,7 @@ function addItem(kind, id) {
   if (kind === 'w') { const w = G.weapons[id] || (G.weapons[id] = { lvl: 0, cd: 0.3, tick: 0 }); w.lvl++; if (w.lvl >= MAX_LVL && !meta.maxed.includes(id)) { meta.maxed.push(id); saveMeta(); } }
   else if (kind === 'p') { G.passives[id] = (G.passives[id] || 0) + 1; if (id === 'vitality') G.hero.hp += 25; recalc(); }
   else if (kind === 'food') { G.hero.hp = Math.min(G.hero.maxHp, G.hero.hp + G.hero.maxHp * 0.4); }
+  else if (kind === 'c') { (G.pacts ||= []).push(id); logEvent('pact ' + id); if (id === 'vigour') G.hero.hp += 50; recalc(); }
 }
 function recalc() {
   const h = G.hero, p = id => G.passives[id] || 0;
@@ -2597,6 +2722,10 @@ function recalc() {
   h.might = (HD.might || 1) * (1 + 0.12 * p('might')); h.haste = (HD.haste || 1) * (1 - 0.08 * p('haste')); h.area = (HD.area || 1) * (1 + 0.12 * p('area')); h.maxHp = HD.hp + 25 * p('vitality');
   h.might *= 1 + 0.05 * up('might'); h.armour += up('armour'); h.maxHp = Math.round(h.maxHp * (1 + 0.1 * up('maxhp'))); h.regen += 0.2 * up('regen');
   h.magnet *= 1 + 0.15 * up('magnet'); h.speed *= 1 + 0.05 * up('speed'); h.haste *= 1 - 0.04 * up('haste');
+  h.reach = 1 + 0.15 * p('reach'); h.dur = 1 + 0.15 * p('dur'); h.amount = p('amount'); h.crit = 0.08 * p('crit'); h.thorns = 6 * p('thorns');
+  if (hasPact('blood')) { h.might *= 1.3; h.maxHp = Math.round(h.maxHp * 0.8); }
+  if (hasPact('frenzy')) { h.haste *= 0.8; h.armour -= 2; }
+  if (hasPact('vigour')) { h.maxHp += 50; h.speed *= 0.88; }
   if (HD.labour) h.might *= 1 + (G.labour || 0);   // Hard Labour: every coin collected
   if (G.buffs.lust > G.t) h.might *= 2;
   if (G.buffs.haste > G.t) { h.speed *= 1.4; h.haste *= 0.6; }
@@ -2604,7 +2733,7 @@ function recalc() {
   h.hp = Math.min(h.hp, h.maxHp);
 }
 function gainXp(v) {
-  const h = G.hero; h.xp += v * (1 + 0.08 * up('growth')) * (2 - EASE(G.t));   // fewer enemies early, so each is worth more
+  const h = G.hero; h.xp += v * (1 + 0.08 * up('growth')) * (2 - EASE(G.t)) * (hasPact('tome') ? 0.8 : 1);   // fewer enemies early, so each is worth more
   while (h.xp >= h.next) { h.xp -= h.next; h.level++; h.next = xpFor(h.level); G.pending++; }
 }
 
@@ -3343,16 +3472,19 @@ function tip(key, text) {
 
 /* ---------- combat ---------- */
 // Ships can only be sunk from the shore with something that flies or reaches across the water.
-const RANGED_W = new Set(['arrows', 'axes', 'fireball', 'ballista', 'runes', 'coil', 'smite', 'hammer', 'whirl']);
+const RANGED_W = new Set(['arrows', 'axes', 'fireball', 'ballista', 'runes', 'coil', 'smite', 'hammer', 'whirl', 'lightning', 'cannon', 'flier', 'tower', 'broadside', 'torpedo', 'u_arcane', 'u_siege', 'u_legion']);
 function hitEnemy(e, dmg, kx = 0, ky = 0) {
   if (e.dead) return;
   if (e.ship && !RANGED_W.has(G.curW)) return;
   const h = G.hero;
-  const dealt = dmg * h.might * (G.HD.fury && h.hp < h.maxHp / 2 ? 1.4 : 1);
+  let dealt = dmg * h.might * (G.HD.fury && h.hp < h.maxHp / 2 ? 1.4 : 1), crit = false;
+  if (G.fav && G.fav.has(G.curW)) dealt *= FAV_DMG;   // a hero's favoured weapons
+  if (G.curW && WEAPONS[G.curW] && WEAPONS[G.curW].union) dealt *= UNION_MUL;
+  if (h.crit && dmg < 1e6 && Math.random() < h.crit) { dealt *= 2; crit = true; }   // Precision
   G.stats.dmg += Math.min(dealt, e.hp); if (G.lg) G.lg.dmg += Math.min(dealt, e.hp);
   if (!e.static) { const w = G.curW || 'other'; (G.wdmg ||= {})[w] = (G.wdmg[w] || 0) + Math.min(dealt, Math.max(0, e.hp)); }   // per weapon, for the end of the run
   e.hp -= dealt; e.flash = 0.1;
-  if (cfg.opts.nums && dealt < 9000 && G.numCount < 70) { G.numCount++; G.fx.push({ k: 'num', x: e.x + rnd(-4, 4), y: e.y - e.r - 4, v: Math.max(1, Math.round(dealt)), t: 0, life: 0.6 }); }
+  if (cfg.opts.nums && dealt < 9000 && G.numCount < 70) { G.numCount++; G.fx.push({ k: 'num', x: e.x + rnd(-4, 4), y: e.y - e.r - 4, v: Math.max(1, Math.round(dealt)), t: 0, life: 0.6, crit }); }
   if (e.type !== 'boss' && !e.static) { e.kx += kx; e.ky += ky; }
   sfx('s_hit');
   if (e.hp <= 0 && e.static) { e.dead = true; if (e.wall) wallDestroyed(e); else buildingDestroyed(e); return; }
@@ -3375,6 +3507,7 @@ function washAshore(e, from) {
   G.fx.push({ k: 'boom', x: p[0], y: p[1], r: 8, t: 0, life: 0.3 });
 }
 function addCorpse(e) {
+  if (e.poly) return;   // turned into a sheep
   const role = foeSprite(e.role || e.type), sp = A.sprites[role];
   if (sp && !sp.die && (e.fly || e.type === 'siege' || e.ship)) { G.fx.push({ k: 'boom', x: e.x, y: e.y - (e.fly ? 10 : 0), r: e.r * 1.6, t: 0, life: 0.4 }); return; }   // machines blow up
   G.corpses.push({ role, x: e.x, y: e.y, dir: e.dir, t: 0, r: e.r, boss: e.type === 'boss', fly: e.fly });
@@ -3414,7 +3547,7 @@ function tipDrops(g) {
 }
 function hurtHero(d, src) {
   if (G.aboard && (src === 'ship' || src === 'siege')) return hurtBoat(d);   // shells aimed at the transport hit the transport
-  const h = G.hero; G.stats.lastHit = src || null; let dm = Math.max(1, d - h.armour);
+  const h = G.hero; G.stats.lastHit = src || null; let dm = Math.max(1, d - h.armour) * (hasPact('greed') ? 1.15 : 1);
   if (h.shield > 0) { const a = Math.min(h.shield, dm); h.shield -= a; dm -= a; if (dm <= 0) return; }
   if (G.lg) { const k = src || '?'; G.lg.hurt[k] = (G.lg.hurt[k] || 0) + Math.min(dm, Math.max(0, h.hp)); G.lg.hits++; }
   G.taken = (G.taken || 0) + Math.min(dm, Math.max(0, h.hp)); G.takenNow = (G.takenNow || 0) + dm;
@@ -3444,13 +3577,15 @@ function nearest(n, maxD) {
   arr.sort((a, b) => a[0] - b[0]);
   return arr.slice(0, n).map(a => a[1]);
 }
-const CD = { coil: 1.2, sword: 1.0, arrows: 0.75, axes: 1.8, fireball: 2.4, ballista: 2.8, runes: 3.2, cleave: 1.3, pick: 0.6, shield: 1.2, smite: 1.6, hammer: 1.1, blades: 0.55, slam: 2.6, whirl: 4.0, breath: 1.2, frost: 1.3, deadeye: 1.7 };
+const CD = { coil: 1.2, sword: 1.0, arrows: 0.75, axes: 1.8, fireball: 2.4, ballista: 2.8, runes: 3.2, cleave: 1.3, pick: 0.6, shield: 1.2, smite: 1.6, hammer: 1.1, blades: 0.55, slam: 2.6, whirl: 4.0, breath: 1.2, frost: 1.3, deadeye: 1.7,
+  lightning: 1.4, polymorph: 4.5, raisedead: 5, cannon: 2.6, sappers: 4, oil: 2.4, tower: 7, broadside: 7, torpedo: 2.2 };
 // Death Coil healing is capped per second, so piling on coils can't make you unkillable.
 const COIL_HEAL_PER_S = 3;
-const CD_EVO = { arrows: 0.65, fireball: 2.0, ballista: 1.1, cleave: 1.1, pick: 0.35, shield: 1.2, smite: 1.3, hammer: 0.7, blades: 0.2, slam: 2.0, whirl: 4.5, breath: 0.9, frost: 1.0, deadeye: 1.4 };
+const CD_EVO = { arrows: 0.65, fireball: 2.0, ballista: 1.1, cleave: 1.1, pick: 0.35, shield: 1.2, smite: 1.3, hammer: 0.7, blades: 0.2, slam: 2.0, whirl: 4.5, breath: 0.9, frost: 1.0, deadeye: 1.4, lightning: 1.0, polymorph: 4, raisedead: 4.5, cannon: 2.0, sappers: 3.5, oil: 1.6, tower: 6 };
 function fire(id, l) {
   const h = G.hero, ar = h.area;
-  if (G.weapons[id] && G.weapons[id].evo && fireEvo(id)) return;
+  if (NEW_W.has(id)) return fireNew(id, l);
+  if (isEvo(id) && fireEvo(id)) return;
   if (id === 'sword') {
     const range = (40 + 5 * l + (l >= 5 ? 6 : 0)) * ar, dmg = 14 + 6 * (l - 1), arc = 2.4;   // longer since players found Lothar had to let enemies right up to him
     const dirs = [h.face]; if (l >= 4) dirs.push(h.face + Math.PI);
@@ -3478,7 +3613,7 @@ function fire(id, l) {
     const range = (30 + 3 * l + (l >= 5 ? 6 : 0)) * ar, dmg = 16 + 6 * (l - 1) + (l >= 5 ? 6 : 0), stun = l >= 3 ? 0.8 : 0.5;
     for (const a of l >= 4 ? [h.face, h.face + Math.PI] : [h.face]) arcHit(a, range, 1.9, dmg, 260, stun);
   } else if (id === 'smite') {   // Turalyon: light on the toughest nearby
-    const n = 1 + (l >= 3) + (l >= 5), dmg = 36 + 12 * (l - 1) + (l >= 4 ? 10 : 0);
+    const n = 1 + (l >= 3) + (l >= 5) + AMT(id), dmg = 36 + 12 * (l - 1) + (l >= 4 ? 10 : 0);
     smite(n, dmg, 1);
   } else if (id === 'hammer') {   // Kurdran: chain lightning from a hurled hammer
     chain(2 + (l >= 3) + (l >= 5) * 2, 18 + 6 * (l - 1) + (l >= 4 ? 6 : 0));
@@ -3487,7 +3622,7 @@ function fire(id, l) {
     const tg = nearest(1, range + 30)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
     frostCone(a, range, arc, dmg, slow);
   } else if (id === 'deadeye') {   // Kilrogg: axes at the furthest enemies in reach, one in four a deadly throw
-    const n = 1 + (l >= 2) + (l >= 4), dmg = 20 + 7 * (l - 1) + (l >= 5 ? 8 : 0), R = 260 * ar;
+    const n = 1 + (l >= 2) + (l >= 4) + AMT(id), dmg = 20 + 7 * (l - 1) + (l >= 5 ? 8 : 0), R = 260 * ar;
     const pool = []; query(h.x, h.y, R, e => { if (!e.dead && !e.static && Math.hypot(e.x - h.x, e.y - h.y) < R) pool.push(e); });
     pool.sort((a, b) => Math.hypot(b.x - h.x, b.y - h.y) - Math.hypot(a.x - h.x, a.y - h.y));
     for (const e of pool.slice(0, n)) { const a = Math.atan2(e.y - h.y, e.x - h.x), crit = Math.random() < 0.25;
@@ -3499,7 +3634,7 @@ function fire(id, l) {
     const R = (56 + 5 * l + (l >= 3 ? 10 : 0)) * ar, dmg = 14 + 6 * (l - 1) + (l >= 4 ? 6 : 0);
     shockwave(R, dmg); if (l >= 5) later(0.35, () => shockwave(R * 1.3, dmg));
   } else if (id === 'whirl') {   // Gul'dan: whirlwinds that drift into the enemy
-    const n = 1 + (l >= 3) + (l >= 5); for (let i = 0; i < n; i++) addWhirl(3 + 1.5 * (l - 1), l >= 4 ? 4.5 : 3, 0.9);
+    const n = 1 + (l >= 3) + (l >= 5) + AMT(id); for (let i = 0; i < n; i++) addWhirl(3 + 1.5 * (l - 1), l >= 4 ? 4.5 : 3, 0.9);
   } else if (id === 'breath') {   // Deathwing: a cone of fire
     const range = (55 + 6 * l + (l >= 3 ? 10 : 0)) * ar, dmg = 26 + 9 * (l - 1) + (l >= 4 ? 10 : 0), arc = l >= 5 ? 1.5 : 1.1;
     const tg = nearest(1, range + 30)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
@@ -3509,7 +3644,7 @@ function fire(id, l) {
     for (const e of nearest(n, reach + 10)) { const dx = e.x - h.x, dy = e.y - h.y, d = Math.hypot(dx, dy) || 1; if (d > reach + e.r) continue;
       G.fx.push({ k: 'arc', a: Math.atan2(dy, dx), r: Math.min(d, reach), arc: 0.7, t: 0, life: 0.12 }); hitEnemy(e, dmg, dx / d * 40, dy / d * 40); }
   } else if (id === 'arrows') {
-    const n = 1 + (l >= 2) + (l >= 4), dmg = 10 + 3 * (l - 1) + (l >= 3 ? 3 : 0), pierce = l >= 5 ? 3 : 1;
+    const n = 1 + (l >= 2) + (l >= 4) + AMT(id), dmg = 10 + 3 * (l - 1) + (l >= 3 ? 3 : 0), pierce = l >= 5 ? 3 : 1;
     const ts = nearest(n, 260);
     for (let i = 0; i < n; i++) {
       const t = ts[i % Math.max(1, ts.length)];
@@ -3517,13 +3652,13 @@ function fire(id, l) {
       G.shots.push({ k: 'arrow', role: 'proj', x: h.x, y: h.y, vx: Math.cos(a) * 230, vy: Math.sin(a) * 230, dmg, pierce, life: 1.4, r: 3 });
     }
   } else if (id === 'axes') {
-    const n = 1 + (l >= 3) + (l >= 5), dmg = 12 + 4 * (l - 1) + (l >= 4 ? 4 : 0);
+    const n = 1 + (l >= 3) + (l >= 5) + AMT(id), dmg = 12 + 4 * (l - 1) + (l >= 4 ? 4 : 0);
     for (let i = 0; i < n; i++) {
       const a = h.face + (i - (n - 1) / 2) * 0.55;
       G.shots.push({ k: 'axe', role: 'axe', x: h.x, y: h.y, vx: Math.cos(a) * 210, vy: Math.sin(a) * 210, dmg, pierce: Infinity, life: 2.2, r: 6 * ar, hitCd: new Map() });
     }
   } else if (id === 'fireball') {
-    const n = 1 + (l >= 3) + (l >= 5), dmg = 22 + 8 * (l - 1), er = (22 + (l >= 4 ? 8 : 0)) * ar;
+    const n = 1 + (l >= 3) + (l >= 5) + AMT(id), dmg = 22 + 8 * (l - 1), er = (22 + (l >= 4 ? 8 : 0)) * ar;
     const pool = G.enemies.filter(e => Math.abs(e.x - h.x) < W / 2 && Math.abs(e.y - h.y) < H / 2);
     for (let i = 0; i < n; i++) {
       const t = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
@@ -3543,14 +3678,14 @@ function fire(id, l) {
     const dmg = 40 + 15 * (l - 1) + (l >= 5 ? 15 : 0), dirs = [aim]; if (l >= 4) dirs.push(aim + Math.PI);
     for (const a of dirs) G.shots.push({ k: 'bolt', role: 'bolt', x: h.x, y: h.y, vx: Math.cos(a) * 270, vy: Math.sin(a) * 270, dmg, pierce: Infinity, life: 1.5, r: 5 });
   } else if (id === 'coil') {
-    const n = 2 + (l >= 3) + (l >= 5), dmg = 14 + 5 * (l - 1) + (l >= 4 ? 6 : 0), heal = l >= 4 ? 2 : 1;
+    const n = 2 + (l >= 3) + (l >= 5) + AMT(id), dmg = 14 + 5 * (l - 1) + (l >= 4 ? 6 : 0), heal = l >= 4 ? 2 : 1;
     const ts = nearest(n, 300);
     for (let i = 0; i < n; i++) {
       const a = h.face + (i - (n - 1) / 2) * 0.9;
       G.shots.push({ k: 'coil', role: 'coil', x: h.x, y: h.y, vx: Math.cos(a) * 120, vy: Math.sin(a) * 120, dmg, heal, pierce: 1, life: 3, r: 4, target: ts[i % Math.max(1, ts.length)] || null });
     }
   } else if (id === 'runes') {
-    const n = 2 + (l >= 2) + (l >= 4) + (l >= 5), dmg = 30 + 10 * (l - 1) + (l >= 3 ? 10 : 0);
+    const n = 2 + (l >= 2) + (l >= 4) + (l >= 5) + AMT(id), dmg = 30 + 10 * (l - 1) + (l >= 3 ? 10 : 0);
     for (let i = 0; i < n; i++) {
       const a = rnd(0, TAU), d = rnd(18, 75);
       G.shots.push({ k: 'rune', x: h.x + Math.cos(a) * d, y: h.y + Math.sin(a) * d, vx: 0, vy: 0, dmg, er: 26 * ar, life: 9, arm: 0.4, r: 8, pierce: 1 });
@@ -3627,18 +3762,18 @@ function fireEvo(id) {
     return true;
   }
   if (id === 'shield') { arcHit(0, 60 * ar, TAU, 60, 280, 1); return true; }   // Bulwark
-  if (id === 'smite') { smite(6, 110, 3); return true; }   // Wrath of the Light
+  if (id === 'smite') { smite(6 + AMT(id), 110, 3); return true; }   // Wrath of the Light
   if (id === 'hammer') { chain(8, 60); return true; }   // Thunderclap
   if (id === 'blades') { arcHit(0, 55 * ar, TAU, 26, 30); return true; }   // Bladestorm
   if (id === 'frost') { frostCone(0, 80 * ar, TAU, 50, 2); return true; }   // Frostmourne
   if (id === 'deadeye') {   // Eye of the Hollow: four deadly axes at the furthest
     const R = 300 * ar, pool = []; query(h.x, h.y, R, e => { if (!e.dead && !e.static && Math.hypot(e.x - h.x, e.y - h.y) < R) pool.push(e); });
     pool.sort((a, b) => Math.hypot(b.x - h.x, b.y - h.y) - Math.hypot(a.x - h.x, a.y - h.y));
-    for (const e of pool.slice(0, 4)) { const a = Math.atan2(e.y - h.y, e.x - h.x); G.shots.push({ k: 'axe', role: 'axe', x: h.x, y: h.y, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, dmg: 90, pierce: 2, life: 1.4, r: 7 * ar, hitCd: new Map() }); }
+    for (const e of pool.slice(0, 4 + AMT(id))) { const a = Math.atan2(e.y - h.y, e.x - h.x); G.shots.push({ k: 'axe', role: 'axe', x: h.x, y: h.y, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, dmg: 90, pierce: 2, life: 1.4, r: 7 * ar, hitCd: new Map() }); }
     return true;
   }
   if (id === 'slam') { shockwave(150 * ar, 90); later(0.3, () => shockwave(170 * ar, 90)); later(0.6, () => shockwave(190 * ar, 90)); return true; }   // Earthshatter
-  if (id === 'whirl') { for (let i = 0; i < 3; i++) addWhirl(14, 8, 1.6); return true; }   // Cyclone
+  if (id === 'whirl') { for (let i = 0; i < 3 + AMT(id); i++) addWhirl(14, 8, 1.6); return true; }   // Cyclone
   if (id === 'breath') { breathe(0, 95 * ar, TAU, 70); return true; }   // Flames of Deathwing
   if (id === 'pick') {   // Overtime: everyone in reach
     const range = 55 * ar; query(h.x, h.y, range + 12, e => { const dx = e.x - h.x, dy = e.y - h.y, d = Math.hypot(dx, dy) || 1; if (d < range + e.r) { hitEnemy(e, 38, dx / d * 40, dy / d * 40); } });
@@ -3659,10 +3794,10 @@ function fireEvo(id) {
     const t = nearest(1, 280)[0], a0 = t ? Math.atan2(t.y - h.y, t.x - h.x) : h.face;
     for (let i = 0; i < 7; i++) { const a = a0 + (i - 3) * 0.16; G.shots.push({ k: 'arrow', role: 'proj', x: h.x, y: h.y, vx: Math.cos(a) * 260, vy: Math.sin(a) * 260, dmg: 28, pierce: 6, life: 1.4, r: 3 }); }
   } else if (id === 'axes') {
-    for (let i = 0; i < 5; i++) { const a = h.face + i * TAU / 5; G.shots.push({ k: 'axe', role: 'axe', x: h.x, y: h.y, vx: Math.cos(a) * 210, vy: Math.sin(a) * 210, dmg: 44, pierce: Infinity, life: 2.4, r: 7 * ar, hitCd: new Map(), killHeal: 1 }); }
+    for (let i = 0, n = 5 + AMT(id); i < n; i++) { const a = h.face + i * TAU / n; G.shots.push({ k: 'axe', role: 'axe', x: h.x, y: h.y, vx: Math.cos(a) * 210, vy: Math.sin(a) * 210, dmg: 44, pierce: Infinity, life: 2.4, r: 7 * ar, hitCd: new Map(), killHeal: 1 }); }
   } else if (id === 'fireball') {
     const pool = G.enemies.filter(e => !e.static && Math.abs(e.x - h.x) < W / 2 && Math.abs(e.y - h.y) < H / 2), er = 34 * ar;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 6 + AMT(id); i++) {
       const t = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null; if (!t && i) break;
       const x = t ? t.x : h.x + Math.cos(h.face) * 80, y = t ? t.y : h.y + Math.sin(h.face) * 80;
       G.fx.push({ k: 'ice', x, y, r: er, t: 0, life: 0.5 });
@@ -3673,16 +3808,233 @@ function fireEvo(id) {
     const t = nearest(1, 330)[0], a = t ? Math.atan2(t.y - h.y, t.x - h.x) : h.face;
     for (const d of [a, a + Math.PI]) G.shots.push({ k: 'bolt', role: 'bolt', x: h.x, y: h.y, vx: Math.cos(d) * 300, vy: Math.sin(d) * 300, dmg: 85, pierce: Infinity, life: 1.5, r: 6 });
   } else if (id === 'coil') {
-    const ts = nearest(5, 320);
-    for (let i = 0; i < 5; i++) { const a = h.face + (i - 2) * 0.8; G.shots.push({ k: 'coil', role: 'coil', x: h.x, y: h.y, vx: Math.cos(a) * 130, vy: Math.sin(a) * 130, dmg: 40, heal: 2, shield: 4, pierce: 1, life: 3, r: 5, target: ts[i % Math.max(1, ts.length)] || null }); }
+    const nc = 5 + AMT(id), ts = nearest(nc, 320);
+    for (let i = 0; i < nc; i++) { const a = h.face + (i - (nc - 1) / 2) * 0.8; G.shots.push({ k: 'coil', role: 'coil', x: h.x, y: h.y, vx: Math.cos(a) * 130, vy: Math.sin(a) * 130, dmg: 40, heal: 2, shield: 4, pierce: 1, life: 3, r: 5, target: ts[i % Math.max(1, ts.length)] || null }); }
   } else return false;
   return true;
 }
-function updateWeapons(dt) {
+// ---------- Phase V weapons ----------
+const isEvo = id => !!((G.weapons[id] && G.weapons[id].evo) || G.uParent === id);
+const AMT = id => wTag(id, 'amount') ? (G.hero.amount || 0) : 0;
+const DUR = () => G.hero.dur || 1, REACH = () => G.hero.reach || 1;
+const distTo = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+// The thickest part of the crowd within R: of the nearest few dozen, the one with the most neighbours within r.
+function densest(R, r, n = 1) {
+  const h = G.hero, near = nearest(40, R).filter(e => !e.static), out = [];
+  const score = near.slice(0, 24).map(e => { let k = 0; for (const o of near) if (Math.abs(o.x - e.x) < r && Math.abs(o.y - e.y) < r) k++; return [k, e]; }).sort((a, b) => b[0] - a[0]);
+  for (const [, e] of score) { if (out.length >= n) break; if (out.every(o => distTo(o, e) > r * 0.8)) out.push(e); }
+  while (out.length < n && score.length) out.push(score[out.length % score.length][1]);
+  return out;
+}
+function blast(x, y, r, dmg, push = 60, sprRole) {
+  G.fx.push(sprRole && A.sprites[sprRole] ? { k: 'spr', role: sprRole, x, y, t: 0, life: 0.45 } : { k: 'boom', x, y, r, t: 0, life: 0.4 });
+  query(x, y, r + 16, e => { const dx = e.x - x, dy = e.y - y, d = Math.hypot(dx, dy) || 1; if (d < r + e.r) hitEnemy(e, dmg, dx / d * push, dy / d * push); });
+  sfx('s_boom', 0.08);
+}
+// A shell lobbed in an arc: the Cannon, the broadside and the cannon towers.
+function lob(x0, y0, x1, y1, T, dmg, er, role, w, big) { (G.shells ||= []).push({ x0, y0, x1, y1, t: 0, T, dmg, er, role, w: w || G.curW, big }); }
+function sheep(e) {   // Polymorph: the enemy becomes a sheep that wanders off (it counts as a kill)
+  e.poly = true; hitEnemy(e, 1e7); if (!e.dead) return;
+  (G.critters ||= []).push({ x: e.x, y: e.y, dir: Math.floor(rnd(0, 8)), t: 0, life: 4 + rnd(0, 2) });
+  G.fx.push({ k: 'spr', role: 'spell', x: e.x, y: e.y - 6, t: 0, life: 0.5 });
+}
+function fireNew(id, l) {
+  const h = G.hero, ar = h.area, ev = isEvo(id);
+  if (id === 'lightning') {
+    const n = (ev ? 5 : 1 + (l >= 3) + (l >= 5)) + AMT(id), dmg = ev ? 70 : 30 + 11 * (l - 1) + (l >= 4 ? 8 : 0);
+    for (const e of nearest(n, 240 * REACH())) { G.fx.push({ k: 'zap', x: h.x, y: h.y - 10, x2: e.x, y2: e.y, t: 0, life: 0.25, wide: true }); G.fx.push({ k: 'spr', role: 'lightning', x: e.x, y: e.y, t: 0, life: 0.3 }); hitEnemy(e, dmg); }
+  } else if (id === 'polymorph') {
+    const n = (ev ? 14 : 1 + (l >= 2) + (l >= 4)) + AMT(id), R = (ev ? 130 * ar : l >= 5 ? 200 : 160) * REACH(), ts = [];
+    query(h.x, h.y, R, e => { if (!e.dead && !e.static && !e.ship && distTo(e, h) < R) ts.push(e); });
+    ts.sort((a, b) => distTo(a, h) - distTo(b, h));
+    for (const e of ts.slice(0, n)) { if (e.boss || e.type === 'boss' || /^elite/.test(e.type)) { hitEnemy(e, 50 + 20 * l); G.fx.push({ k: 'spr', role: 'spell', x: e.x, y: e.y - 6, t: 0, life: 0.5 }); } else sheep(e); }
+  } else if (id === 'raisedead') {
+    const n = (ev ? 4 : 1 + (l >= 2) + (l >= 4)) + AMT(id), cap = (ev ? 10 : 2 + l) + 2 * AMT(id), life = (ev ? 15 : 8 + (l >= 5 ? 4 : 0)) * DUR(), dmg = ev ? 22 : 8 + 3 * (l - 1) + (l >= 3 ? 3 : 0);
+    const mine = (G.allies ||= []).filter(a => a.kind === 'skel' && a.w === G.curW);
+    for (let i = 0; i < n && mine.length + i < cap; i++) {
+      const ci = G.corpses.findIndex(c => !c.boss && !c.fly && Math.abs(c.x - h.x) < 170 && Math.abs(c.y - h.y) < 170);
+      let x, y; if (ci >= 0) { ({ x, y } = G.corpses[ci]); G.corpses.splice(ci, 1); } else { const a = rnd(0, TAU); x = h.x + Math.cos(a) * 30; y = h.y + Math.sin(a) * 30; }
+      G.allies.push({ kind: 'skel', x, y, life, dmg, t: 0, atkT: rnd(0, 0.6), dir: 4, swing: 0, w: G.curW, r: 6, hp: ev ? 3 : 1 });
+      G.fx.push({ k: 'ring', x, y, r: 16, t: 0, life: 0.4, col: '120,200,120' });
+    }
+  } else if (id === 'cannon') {
+    const n = (ev ? 3 : 1 + (l >= 5)) + AMT(id), dmg = ev ? 90 : 40 + 15 * (l - 1) + (l >= 3 ? 10 : 0), er = (ev ? 46 : 30 + (l >= 2 ? 8 : 0)) * ar;
+    for (const e of densest(330 * REACH(), er, n)) lob(h.x, h.y - 8, e.x, e.y, 0.75, dmg, er, ev ? 'bigcannon' : 'cannon');
+    if (n) sfx('s_boom', 0.15);
+  } else if (id === 'sappers') {
+    const n = (ev ? 4 : 1 + (l >= 3) + (l >= 5)) + AMT(id), dmg = ev ? 140 : 55 + 20 * (l - 1), er = (ev ? 1.5 : 1) * (36 + (l >= 4 ? 10 : 0)) * ar;
+    const ts = densest(300, er, n);
+    for (let i = 0; i < n; i++) { const t = ts[i % Math.max(1, ts.length)], a = rnd(0, TAU); (G.allies ||= []).push({ kind: 'sapper', x: h.x + Math.cos(a) * 10, y: h.y + Math.sin(a) * 10, tx: t ? t.x : h.x + Math.cos(h.face) * 120, ty: t ? t.y : h.y + Math.sin(h.face) * 120, life: 3, dmg, er, t: 0, dir: 4, w: G.curW, r: 6 }); }
+  } else if (id === 'oil') {
+    const n = ev ? 2 : 1 + (l >= 5), r = (22 + (l >= 2 ? 7 : 0)) * ar * (ev ? 1.2 : 1), life = (ev ? 6 : 4) * DUR(), dmg = ev ? 16 : 5 + 2 * (l - 1) + (l >= 3 ? 2 : 0);
+    const ts = densest(170, r, n);
+    for (let i = 0; i < n; i++) { const t = ts[i]; pool(t ? t.x : h.x, t ? t.y : h.y, r, life, dmg); }
+  } else if (id === 'tower') {
+    const cap = 1 + (l >= 2) + (l >= 5) + AMT(id), mine = (G.allies ||= []).filter(a => a.kind === 'tower' && a.w === G.curW);
+    if (mine.length >= cap) mine.sort((a, b) => a.life - b.life)[0].life = 0;   // the oldest crumbles
+    const a = rnd(0, TAU), x = h.x + Math.cos(a) * 26, y = h.y + Math.sin(a) * 26;
+    G.allies.push({ kind: 'tower', x, y, life: (10 + (l >= 4 ? 2 : 0)) * DUR(), every: l >= 4 ? 0.55 : 0.8, shootT: 0.3, dmg: ev ? 45 : 12 + 5 * (l - 1) + (l >= 3 ? 4 : 0), cannonade: ev, t: 0, w: G.curW, r: 12, side: G.HD.side });
+    G.fx.push({ k: 'ring', x, y, r: 24, t: 0, life: 0.4, col: '230,210,150' });
+  } else if (id === 'broadside') {
+    const n = 6 + 2 * (l >= 3) + 2 * (l >= 5) + 2 * AMT(id), dmg = 70 + 25 * (l - 1), er = 34 * ar;
+    const pool_ = G.enemies.filter(e => !e.static && Math.abs(e.x - h.x) < W / 2 && Math.abs(e.y - h.y) < H / 2), from = Math.random() < 0.5 ? -1 : 1;
+    for (let i = 0; i < n; i++) { const t = pool_.length ? pool_[Math.floor(Math.random() * pool_.length)] : { x: h.x + rnd(-120, 120), y: h.y + rnd(-90, 90) }; later(i * 0.08, () => lob(G.hero.x + from * W * 0.6, t.y - 60, t.x + rnd(-8, 8), t.y + rnd(-8, 8), 0.9, dmg, er, 'bigcannon', null, true)); }
+  } else if (id === 'torpedo') {
+    const n = 1 + (l >= 3) + (l >= 5) + AMT(id), dmg = 45 + 15 * (l - 1) + (l >= 4 ? 10 : 0), role = G.HD.side === 'Horde' ? 'torp_orc' : 'torp';
+    for (let i = 0; i < n; i++) { const a = h.face + (i - (n - 1) / 2) * 0.7; G.shots.push({ k: 'torp', role, x: h.x, y: h.y, vx: Math.cos(a) * 150, vy: Math.sin(a) * 150, dmg, pierce: 6, life: 2.6, r: 6, hitCd: new Map() }); }
+  }
+}
+function pool(x, y, r, life, dmg) { (G.pools ||= []).push({ x, y, r, life, life0: life, dmg, tick: 0, w: G.curW, seed: Math.random() * 9 }); }
+// Weapons that run all the time rather than on a cooldown. Returns true when it has handled the tick.
+function tickNew(id, w, dt) {
+  const h = G.hero, ev = isEvo(id), l = w.lvl;
+  if (id === 'flameshield') {
+    const on = (2.5 + 0.5 * l + (l >= 4 ? 1 : 0)) * DUR(), off = 2.4;
+    w.phase ??= 0; w.phase += dt; if (!ev && w.phase > on + off) w.phase = 0;
+    if (!ev && w.phase > on) return true;
+    const n = (ev ? 6 : 2 + (l >= 2) + (l >= 5)) + AMT(id), R = (ev ? 62 : 44) * h.area, dmg = ev ? 26 : 8 + 3 * (l - 1) + (l >= 3 ? 3 : 0), hr = (ev ? 12 : 9) * h.area;
+    w.ang = (w.ang || 0) + dt * (ev ? 2.6 : 3.2); w.hit ||= new Map();
+    for (let i = 0; i < n; i++) {
+      const a = w.ang + i * TAU / n, x = h.x + Math.cos(a) * R, y = h.y + Math.sin(a) * R * 0.8;
+      (G.orbs ||= []).push({ x, y, big: ev });
+      query(x, y, hr + 14, e => { if (distTo(e, { x, y }) > hr + e.r) return; const last = w.hit.get(e); if (last != null && G.t - last < 0.45) return; w.hit.set(e, G.t); hitEnemy(e, dmg, (e.x - h.x) * 0.6, (e.y - h.y) * 0.6); });
+    }
+    if (w.hit.size > 400) w.hit.clear();
+    return true;
+  }
+  if (id === 'flier') {
+    const n = ev ? 2 : 1 + (l >= 5), every = (ev ? 0.55 : l >= 2 ? 1.0 : 1.3) * h.haste, dmg = ev ? 40 : 18 + 7 * (l - 1) + (l >= 3 ? 5 : 0);
+    w.fl ||= []; while (w.fl.length < n) w.fl.push({ a: rnd(0, TAU), cd: rnd(0.2, every), x: h.x, y: h.y, dir: 4 });
+    for (const f of w.fl.slice(0, n)) {
+      f.a += dt * 1.5; const tx = h.x + Math.cos(f.a) * 78, ty = h.y + Math.sin(f.a) * 56, vx = tx - f.x, vy = ty - f.y; f.x += vx * Math.min(1, dt * 6); f.y += vy * Math.min(1, dt * 6);
+      if (Math.abs(vx) + Math.abs(vy) > 1) f.dir = dirOf(vx, vy);
+      (G.fliersOut ||= []).push(f);
+      if ((f.cd -= dt) > 0) continue; f.cd = every;
+      for (const e of nearestFrom(f, 1 + AMT(id), 230 * REACH())) {
+        const dx = e.x - f.x, dy = e.y - f.y, d = Math.hypot(dx, dy) || 1, sp = 240;
+        if (G.HD.side === 'Horde') G.shots.push({ k: 'fire', role: 'fire', x: f.x, y: f.y - 20, tx: e.x, ty: e.y, vx: dx / d * sp, vy: dy / d * sp, dmg, er: 18 * h.area, pierce: 1, life: 1.6 * REACH(), r: 4, w: G.curW });
+        else G.shots.push({ k: 'axe', role: 'hammer', x: f.x, y: f.y - 20, vx: dx / d * sp, vy: dy / d * sp, dmg, pierce: 2, life: 0.9 * REACH(), r: 6, hitCd: new Map(), w: G.curW });
+      }
+    }
+    return true;
+  }
+  if (id === 'oil' && ev) {   // Burning Fields: a trail as you go
+    w.trail = (w.trail || 0) - dt; const moved = !w.lx || Math.hypot(h.x - w.lx, h.y - w.ly) > 26;
+    if (w.trail <= 0 && moved) { w.trail = 0.55; w.lx = h.x; w.ly = h.y; pool(h.x, h.y + 4, 24 * h.area, 5 * DUR(), 14); }
+  }
+  return false;
+}
+function toughest(R) { const h = G.hero; let best = null; for (const e of G.enemies) { if (e.dead || e.static || Math.abs(e.x - h.x) > R || Math.abs(e.y - h.y) > R) continue; if (!best || e.hp > best.hp) best = e; } return best; }
+function nearestFrom(p, n, R) { const arr = []; for (const e of G.enemies) { if (e.dead || e.static) continue; const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2; if (d < R * R) arr.push([d, e]); } arr.sort((a, b) => a[0] - b[0]); return arr.slice(0, n).map(a => a[1]); }
+// Unions: both weapons at level 5 merge at the next boss chest.
+const unionable = () => Object.keys(WEAPONS).find(u => WEAPONS[u].union && !G.weapons[u] && WEAPONS[u].union.every(p => G.weapons[p] && G.weapons[p].lvl >= MAX_LVL));
+function forgeUnion(u) {
+  for (const p of WEAPONS[u].union) delete G.weapons[p];
+  G.weapons[u] = { lvl: MAX_LVL, cd: 0.3, tick: 0, sub: {} }; G.unionN = (G.unionN || 0) + 1;
+  meta.unions ||= []; if (!meta.unions.includes(u)) meta.unions.push(u); saveMeta(); logEvent('union ' + u);
+}
+// Summons, shells, burning pools and sheep, each frame.
+function updateV(dt) {
   const h = G.hero;
-  for (const id in G.weapons) {
-    const w = G.weapons[id]; G.curW = id; const n0 = G.shots.length, wh0 = (G.whirls || []).length;
+  for (const s of G.shells || []) {
+    s.t += dt; if (s.t < s.T) continue; s.dead = true;
+    const k = G.curW; G.curW = s.w; try { blast(s.x1, s.y1, s.er, s.dmg, 70, s.big ? null : 'cboom'); } finally { G.curW = k; }
+  }
+  if (G.shells) G.shells = G.shells.filter(s => !s.dead);
+  for (const p of G.pools || []) {
+    p.life -= dt; if ((p.tick -= dt) > 0) continue; p.tick = 0.5; const k = G.curW; G.curW = p.w;
+    try { query(p.x, p.y, p.r + 14, e => { if (!e.static && distTo(e, p) < p.r + e.r) { hitEnemy(e, p.dmg); if (!e.boss) e.chill = Math.max(e.chill || 0, 0.6); } }); } finally { G.curW = k; }
+  }
+  if (G.pools) G.pools = G.pools.filter(p => p.life > 0);
+  for (const c of G.critters || []) { c.t += dt; c.life -= dt; const a = c.dir * Math.PI / 4 - Math.PI / 2; c.x += Math.cos(a) * 14 * dt; c.y += Math.sin(a) * 14 * dt; }
+  if (G.critters) G.critters = G.critters.filter(c => c.life > 0);
+  for (const a of G.allies || []) {
+    a.life -= dt; a.t += dt; a.swing = Math.max(0, (a.swing || 0) - dt); const k = G.curW; G.curW = a.w;
     try {
+      if (a.kind === 'skel') {
+        const e = nearestFrom(a, 1, 200)[0];
+        const goal = e || (distTo(a, h) > 70 ? h : null);
+        if (goal) { const dx = goal.x - a.x, dy = goal.y - a.y, d = Math.hypot(dx, dy) || 1, reach = e ? e.r + a.r + 3 : 40;
+          if (d > reach) { a.x += dx / d * 80 * dt; a.y += dy / d * 80 * dt; a.dir = dirOf(dx, dy); }
+          else if (e && (a.atkT -= dt) <= 0) { a.atkT = 0.75; a.swing = SWING; a.dir = dirOf(dx, dy); hitEnemy(e, a.dmg, dx / d * 30, dy / d * 30); } }
+        if (e && distTo(a, e) < e.r + a.r + 2 && Math.random() < dt * 0.5 / (a.hp || 1)) a.life = Math.min(a.life, 0.01);   // the crowd wears them down
+      } else if (a.kind === 'sapper') {
+        if (Math.floor(a.t * 4) !== Math.floor((a.t - dt) * 4)) { const t = nearestFrom({ x: a.tx, y: a.ty }, 1, 60)[0]; if (t) { a.tx = t.x; a.ty = t.y; } }
+        const dx = a.tx - a.x, dy = a.ty - a.y, d = Math.hypot(dx, dy) || 1; a.x += dx / d * 150 * dt; a.y += dy / d * 150 * dt; a.dir = dirOf(dx, dy);
+        let touch = false; query(a.x, a.y, 20, e => { if (!touch && !e.static && distTo(e, a) < e.r + 8) touch = true; });
+        if (touch || d < 8 || a.life <= 0) { a.dead = true; blast(a.x, a.y, a.er, a.dmg, 90); }
+      } else if (a.kind === 'tower') {
+        if ((a.shootT -= dt) > 0) continue;
+        const e = nearestFrom({ x: a.x, y: a.y - 20 }, 1, 190 * REACH())[0]; if (!e) { a.shootT = 0.2; continue; }
+        a.shootT = a.every * h.haste;
+        if (a.cannonade) lob(a.x, a.y - 30, e.x, e.y, 0.55, a.dmg, 28 * h.area, 'cannon', a.w);
+        else { const dx = e.x - a.x, dy = e.y + 4 - a.y, d = Math.hypot(dx, dy) || 1; G.shots.push({ k: 'arrow', role: 'proj', x: a.x, y: a.y - 26, vx: dx / d * 260, vy: dy / d * 260, dmg: a.dmg, pierce: 1, life: 1.2, r: 3, w: a.w }); }
+      }
+    } finally { G.curW = k; }
+  }
+  if (G.allies) G.allies = G.allies.filter(a => a.life > 0 && !a.dead);
+}
+function drawPools() {
+  const now = performance.now() / 1000, s = A.sprites.oilfire;
+  for (const p of G.pools || []) {
+    const x = p.x - camX, y = p.y - camY, fade = Math.min(1, p.life * 2, (p.life0 - p.life) * 4 + 0.3);
+    ctx.globalAlpha = 0.55 * fade; ctx.fillStyle = '#1a0e06'; ctx.beginPath(); ctx.ellipse(x, y, p.r, p.r * 0.7, 0, 0, TAU); ctx.fill();
+    if (s) for (let i = 0; i < 4; i++) { const a = p.seed + i * 1.7, rr = p.r * (i ? 0.55 : 0), fi = s.r0 + Math.floor(now * 9 + i * 2) % (s.r1 - s.r0 + 1);
+      ctx.globalAlpha = fade; ctx.drawImage(s.canvas, (fi % s.cols) * s.fw, Math.floor(fi / s.cols) * s.fh, s.fw, s.fh, Math.round(x + Math.cos(a) * rr - s.fw / 2), Math.round(y + Math.sin(a) * rr * 0.7 - s.fh + 6), s.fw, s.fh); }
+    else { ctx.globalAlpha = 0.5 * fade; circle(x, y, p.r * 0.8, '#e0701a'); }
+    ctx.globalAlpha = 1;
+  }
+}
+function drawCritters() {
+  for (const c of G.critters || []) { ctx.globalAlpha = Math.min(1, c.life); if (!drawSprite('sheep', c.x, c.y, c.dir, c.t, false)) circle(c.x - camX, c.y - camY, 5, '#f4f0e8', '#555'); ctx.globalAlpha = 1; }
+}
+function drawAllies() {
+  for (const a of G.allies || []) {
+    const fade = Math.min(1, a.life * 2);
+    if (a.kind === 'tower') { const LV = G.LV, spr = A.bldSpr && A.bldSpr[LV.bld[a.side === 'Horde' ? 'orc' : 'human'][2]]; ctx.globalAlpha = fade;
+      if (spr) ctx.drawImage(spr, Math.round(a.x - camX - spr.width / 2), Math.round(a.y - camY - spr.height + 16)); else { ctx.fillStyle = '#8a7a5a'; ctx.fillRect(a.x - camX - 10, a.y - camY - 34, 20, 34); }
+      ctx.globalAlpha = 1; continue; }
+    const role = a.kind === 'skel' ? 'skel' : G.HD.side === 'Horde' ? 'fast' : 'ally_fast';
+    ctx.globalAlpha = fade; if (!drawSprite(role, a.x, a.y, a.dir, a.t, false, a.swing > 0 ? 1 - a.swing / SWING : null)) circle(a.x - camX, a.y - camY, 5, a.kind === 'skel' ? '#ddd' : '#c90', '#222'); ctx.globalAlpha = 1;
+  }
+}
+function drawOrbs() {
+  const s = A.sprites.flame, now = performance.now() / 1000;
+  for (const o of G.orbs || []) {
+    if (s) { const fi = s.r0 + Math.floor(now * 10 + o.x) % (s.r1 - s.r0 + 1), k = o.big ? 1 : 0.75, w = s.fw * k, hh = s.fh * k; ctx.drawImage(s.canvas, (fi % s.cols) * s.fw, Math.floor(fi / s.cols) * s.fh, s.fw, s.fh, Math.round(o.x - camX - w / 2), Math.round(o.y - camY - hh + 8), w, hh); }
+    else circle(o.x - camX, o.y - camY, o.big ? 7 : 5, '#ff9a2a', '#7a2000');
+  }
+}
+function drawFliersV() {
+  const role = G.HD.side === 'Horde' ? 'flyer' : 'ally_flyer';
+  for (const f of G.fliersOut || []) { if (!drawSprite(role, f.x, f.y - FLY_UP, f.dir, G.t, false)) circle(f.x - camX, f.y - camY - FLY_UP, 7, '#d9c', '#222'); }
+}
+function drawShells() {
+  for (const s of G.shells || []) {
+    const p = Math.min(1, s.t / s.T), x = s.x0 + (s.x1 - s.x0) * p, y = s.y0 + (s.y1 - s.y0) * p, up = Math.sin(p * Math.PI) * (s.big ? 70 : 46);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x - camX, y - camY + 3, 4, 2, 0, 0, TAU); ctx.fill();
+    if (!drawSprite(s.role, x, y - up, 0, s.t, false)) circle(x - camX, y - camY - up, 3, '#222', '#000');
+  }
+}
+function updateWeapons(dt) {
+  G.orbs = []; G.fliersOut = [];
+  for (const id in G.weapons) {
+    const w = G.weapons[id];
+    if (WEAPONS[id] && WEAPONS[id].union) {   // a union fires both its weapons, evolved
+      w.sub ||= {};
+      for (const p of WEAPONS[id].union) { const sw = (w.sub[p] ||= { lvl: MAX_LVL, cd: 0.3 + Math.random() * 0.5, tick: 0, evo: true }); G.uParent = p; try { tickWeapon(p, sw, dt, id); } finally { G.uParent = null; } }
+      continue;
+    }
+    tickWeapon(id, w, dt, id);
+  }
+}
+// One weapon's turn this frame. `key` is the slot it fills (a union's own id when one of its weapons fires), for damage records.
+function tickWeapon(id, w, dt, key) {
+  const h = G.hero;
+  {
+    G.curW = key; const n0 = G.shots.length, wh0 = (G.whirls || []).length;
+    try {
+    if (NEW_W.has(id) && tickNew(id, w, dt)) return;
     if (id === 'aura') {
       w.tick -= dt;
       const r = (26 + 5 * w.lvl + (w.lvl >= 5 ? 5 : 0)) * h.area * (w.evo ? 1.25 : 1);
@@ -3694,7 +4046,7 @@ function updateWeapons(dt) {
         w.pulse = 2.5; const R = r * 1.9; G.fx.push({ k: 'ring', x: h.x, y: h.y, r: R, t: 0, life: 0.45, col: '255,236,150' });
         query(h.x, h.y, R + 12, e => { const dx = e.x - h.x, dy = e.y - h.y, d = Math.hypot(dx, dy) || 1; if (d < R + e.r) hitEnemy(e, 60, dx / d * 120, dy / d * 120); });
       }
-      continue;
+      return;
     }
     if (id === 'runes' && w.evo) {   // Death and Decay: a field of rot that follows you
       w.tick -= dt;
@@ -3702,14 +4054,15 @@ function updateWeapons(dt) {
         w.tick = 0.5; const r = 80 * h.area; G.fx.push({ k: 'rot', x: h.x, y: h.y, r, t: 0, life: 0.55 });
         query(h.x, h.y, r + 12, e => { if (Math.hypot(e.x - h.x, e.y - h.y) < r + e.r) hitEnemy(e, 22); });
       }
-      continue;
+      return;
     }
     w.cd -= dt * (1 + (h.frenzy || 0));   // Kargath's Blade Frenzy
     if (w.cd <= 0) {
       fire(id, w.lvl); w.cd = (w.evo && CD_EVO[id] || CD[id]) * h.haste;
-      for (let i = n0; i < G.shots.length; i++) G.shots[i].w ||= id; for (let i = wh0; i < (G.whirls || []).length; i++) G.whirls[i].w ||= id;
+      for (let i = n0; i < G.shots.length; i++) { const sh = G.shots[i]; sh.w ||= key; if (wTag(id, 'missile')) sh.life *= REACH(); if (sh.k === 'rune') sh.life *= DUR(); }
+      for (let i = wh0; i < (G.whirls || []).length; i++) { G.whirls[i].w ||= key; G.whirls[i].life *= DUR(); }
       const tg = ['sword', 'axes', 'cleave', 'shield', 'blades', 'breath', 'slam', 'frost'].includes(id) ? null : nearest(1, 300)[0], a = tg ? Math.atan2(tg.y - h.y, tg.x - h.x) : h.face;
-      h.atkT = HSWING; h.atkDir = dirOf(Math.cos(a), Math.sin(a)); const snd = { sword: 's_sword', cleave: 's_sword', pick: 's_sword', shield: 's_sword', blades: 's_sword', hammer: 's_axe', slam: 's_boom', breath: 's_fire', smite: 's_coil', arrows: 's_bow', axes: 's_axe', coil: 's_coil', ballista: 's_bow' }[id]; if (snd) sfx(snd, 0.1); }
+      h.atkT = HSWING; h.atkDir = dirOf(Math.cos(a), Math.sin(a)); const snd = { lightning: 's_coil', polymorph: 's_coil', oil: 's_fire', torpedo: 's_bow', sword: 's_sword', cleave: 's_sword', pick: 's_sword', shield: 's_sword', blades: 's_sword', hammer: 's_axe', slam: 's_boom', breath: 's_fire', smite: 's_coil', arrows: 's_bow', axes: 's_axe', coil: 's_coil', ballista: 's_bow' }[id]; if (snd) sfx(snd, 0.1); }
     } finally { G.curW = null; }
   }
 }
@@ -3731,8 +4084,8 @@ function updateShots(dt) {
       const sp = Math.hypot(s.vx, s.vy); if (sp > 260) { s.vx *= 260 / sp; s.vy *= 260 / sp; }
       if (d < 9) { s.dead = true; continue; }
     }
-    if (s.k === 'coil') {
-      if (!s.target || s.target.dead) s.target = nearest(1, 300)[0] || null;
+    if (s.k === 'coil' || s.k === 'torp') {
+      if (!s.target || s.target.dead) s.target = s.k === 'torp' ? toughest(320) : nearest(1, 300)[0] || null;
       if (s.target) {
         const dx = s.target.x - s.x, dy = s.target.y - s.y, d = Math.hypot(dx, dy) || 1;
         s.vx += dx / d * 900 * dt; s.vy += dy / d * 900 * dt;
@@ -3922,7 +4275,8 @@ function updateEnemies(dt) {
       const sx = e.x - o.x, sy = e.y - o.y, dd = sx * sx + sy * sy, rr = (e.r + o.r) * SPACING;
       if (dd < rr * rr && dd > 0.0001) { pushes++; const dl = Math.sqrt(dd), p = (rr - dl) * 0.25, px = e.x + sx / dl * p, py = e.y + sy / dl * p; if (e.free || !G.terrain || !footBlocked(px, py, e.r * 0.5) || footBlocked(e.x, e.y, e.r * 0.5)) { e.x = px; e.y = py; } }
     });
-    if (d < e.r + 7 && e.atkT <= 0) { hurtHero(e.dmg * (e.charge && e.charge.phase === 'go' ? 1.5 : 1), e.boss ? 'boss' : e.type); e.atkT = e.boss ? 1.4 : 1.0; e.swing = SWING; }   // bosses swing more slowly: a chance to break away
+    if (d < e.r + 7 && e.atkT <= 0) { hurtHero(e.dmg * (e.charge && e.charge.phase === 'go' ? 1.5 : 1), e.boss ? 'boss' : e.type); e.atkT = e.boss ? 1.4 : 1.0; e.swing = SWING;
+      if (h.thorns && !e.dead) { const k = G.curW; G.curW = 'thorns'; try { hitEnemy(e, h.thorns, -dx * 40, -dy * 40); } finally { G.curW = k; } } }   // bosses swing more slowly: a chance to break away
     if (d > far && e.type !== 'boss') { // wrap stragglers back in front of the hero
       const a = Math.atan2(-dy, -dx) + Math.PI + rnd(-0.8, 0.8), r = Math.hypot(W, H) / 2 + 20;
       e.x = h.x + Math.cos(a) * r; e.y = h.y + Math.sin(a) * r;
@@ -3969,7 +4323,7 @@ function update(dt) {
   if (h.frenzy && (h.frenzyT -= dt) <= 0) h.frenzy = Math.max(0, h.frenzy - dt * 0.15);   // Blade Frenzy fades
   if (G.HD.holyLight && h.hp > 0 && h.hp < h.maxHp * 0.3 && G.t >= (G.holyT || 0)) { G.holyT = G.t + 60; h.hp = Math.min(h.maxHp, h.hp + h.maxHp * 0.4); banner('Holy Light!'); G.fx.push({ k: 'pillar', x: h.x, y: h.y, t: 0, life: 0.6 }); }
   h.coilBank = Math.min(COIL_HEAL_PER_S, (h.coilBank || 0) + COIL_HEAL_PER_S * dt);
-  updateTwists(dt); spawn(dt); updateCamps(dt); updateFort(dt); updateBoats(dt); updatePortal(dt); updateAmbush(dt); updateDemolition(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateGems(dt);
+  updateTwists(dt); spawn(dt); updateCamps(dt); updateFort(dt); updateBoats(dt); updatePortal(dt); updateAmbush(dt); updateDemolition(dt); buildGrid(); updateEnemies(dt); runLater(dt); updateWeapons(dt); updateWhirls(dt); updateShots(dt); updateV(dt); updateGems(dt);
   for (const f of G.fx) f.t += dt; G.fx = G.fx.filter(f => f.t < f.life); G.numCount = 0; for (const f of G.fx) if (f.k === 'num') G.numCount++;
   for (const c of G.corpses) c.t += dt; G.corpses = G.corpses.filter(c => c.t < corpseLife(c));
   if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
@@ -4272,7 +4626,7 @@ function drawFx(f) {
     ctx.beginPath(); ctx.arc(x, y, f.r * (0.7 + 0.3 * p), f.a - f.arc / 2, f.a + f.arc / 2); ctx.stroke();
   } else if (f.k === 'num') {
     ctx.globalAlpha = Math.min(1, 2.2 * (1 - p));
-    txt(String(f.v), Math.round(f.x - camX), Math.round(f.y - camY - 10 * p), 7, f.v >= 40 ? '#ffd24a' : '#fff', 'center');
+    txt(String(f.v), Math.round(f.x - camX), Math.round(f.y - camY - 10 * p), 7, f.crit ? '#ff7a3a' : f.v >= 40 ? '#ffd24a' : '#fff', 'center');
     ctx.globalAlpha = 1;
   } else if (f.k === 'ring') {
     ctx.strokeStyle = `rgba(${f.col},${0.9 * (1 - p)})`; ctx.lineWidth = 3;
@@ -4286,8 +4640,11 @@ function drawFx(f) {
     const x = f.x - camX, y = f.y - camY, a = 1 - p;
     ctx.fillStyle = `rgba(255,244,190,${0.55 * a})`; ctx.fillRect(x - 6, y - 90 * (1 - p * 0.3), 12, 90 * (1 - p * 0.3));
     circle(x, y, 14 * (0.6 + p), `rgba(255,236,150,${0.5 * a})`);
+  } else if (f.k === 'spr') {   // a Warcraft II effect played once (lightning, explosions, the polymorph puff)
+    const s = A.sprites[f.role]; if (s) { const a = s.mode === 'cycle' ? Math.min(s.r0, s.count - 1) : 0, b = s.mode === 'cycle' ? Math.min(Math.max(s.r1, a), s.count - 1) : s.count - 1, fi = a + Math.min(b - a, Math.floor(p * (b - a + 1)));
+      ctx.drawImage(s.canvas, (fi % s.cols) * s.fw, Math.floor(fi / s.cols) * s.fh, s.fw, s.fh, Math.round(f.x - camX - s.fw / 2), Math.round(f.y - camY - s.fh / 2), s.fw, s.fh); }
   } else if (f.k === 'zap') {   // Storm Hammer lightning
-    ctx.strokeStyle = `rgba(170,210,255,${1 - p})`; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.strokeStyle = `rgba(170,210,255,${1 - p})`; ctx.lineWidth = f.wide ? 3 : 2; ctx.beginPath();
     const x1 = f.x - camX, y1 = f.y - camY, x2 = f.x2 - camX, y2 = f.y2 - camY; ctx.moveTo(x1, y1);
     for (let i = 1; i < 6; i++) { const k = i / 6; ctx.lineTo(x1 + (x2 - x1) * k + rnd(-5, 5), y1 + (y2 - y1) * k + rnd(-5, 5)); } ctx.lineTo(x2, y2); ctx.stroke();
   } else if (f.k === 'breath') {   // Dragon's Breath
@@ -4344,7 +4701,7 @@ function fontImage(str, key, scheme, scale) {
 const WC_RULES = [['h1', 'title', 'yellow', 1], ['h2', 'large', 'yellow', 2], ['h3.side', 'large', 'yellow', 1], ['button.opt:not(.card)', 'large', 'yellow', 1], ['.card .nm', 'large', 'yellow', 1]];
 // Body text in the game font as well, wrapped to the width of its box, so a menu doesn't mix
 // the pixel font with a smooth browser font.
-const WC_WRAP = [['.card .lv', 'small', 'grey', 2], ['.card .ds', 'game', 'white', 1], ['.panel .sub', 'game', 'white', 1]];
+const WC_WRAP = [['.card .lv.pact', 'small', 'red', 2], ['.card .lv', 'small', 'grey', 2], ['.card .pactcost', 'game', 'red', 1], ['.card .cmeta', 'game', 'grey', 1], ['.card .ds', 'game', 'white', 1], ['.panel .sub', 'game', 'white', 1]];
 function wcWrap(root) {
   for (const [selr, key, scheme, sc] of WC_WRAP) root.querySelectorAll(selr).forEach(el => {
     const f = fonts[key]; if (!f || el.dataset.wc) return;
@@ -4650,17 +5007,21 @@ function renderWorld() {
   list.sort((a, b) => sy(a) - sy(b));
   drawPortalGlow();
   for (const r of G.rubble || []) if (Math.abs(r.x - h.x) < W / 2 + 40 && Math.abs(r.y - h.y) < H / 2 + 40) ctx.drawImage(r.spr, Math.round(r.x - camX - 16), Math.round(r.y - camY - 16));   // fallen walls, on the ground
+  drawPools(); drawCritters();
   for (const m of G.marks) drawMark(m);
   for (const w of G.whirls || []) drawWhirl(w);
   // Every unit's shadow in one path and one fill, rather than one fill per unit.
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath();
   for (const e of list) if (e && e.type && !e.static && !e.hidden) { const x = e.x - camX, y = e.y - camY + e.r * 0.8, rx = e.r * (e.fly ? 0.8 : 1); ctx.moveTo(x + rx, y); ctx.ellipse(x, y, rx, e.r * 0.4, 0, 0, TAU); }
   ctx.fill(); G.shadowsDrawn = true;
+  drawAllies();
   for (const e of list) !e ? (G.HD.fly ? 0 : drawHero()) : e.prisoner ? drawPrisoner(e) : e.boat ? drawBoat(e.boat) : e.fly ? 0 : e.spr && !e.type ? drawBuilding(e) : e.hidden ? (ctx.globalAlpha = 0.22, drawEnemy(e), ctx.globalAlpha = 1) : drawEnemy(e);
   for (const e of list) if (e && e.fly) drawEnemy(e);   // fliers over trees and buildings
   if (G.HD.fly) drawHero();   // Kurdran and Deathwing too
+  drawOrbs(); drawFliersV();
   G.shadowsDrawn = false;
   for (const m of G.marks) drawMarkShot(m);
+  drawShells();
   for (const s of G.shots) if (s.k !== 'rune') drawShot(s);
   for (const s of G.eshots) { if (!drawSprite(s.role && A.sprites[s.role] ? s.role : foeRole('eshot'), s.x, s.y, s.dir, attract, false)) circle(s.x - camX, s.y - camY, s.homing ? 4 : 2.5, s.homing ? '#c060ff' : '#9be04a', '#203a08'); }
 }
@@ -4907,6 +5268,7 @@ function heroIcon(pic, side) {
 }
 function showTitle() {
   impOpen = false; updateHomeIcon();
+  if (meta.wpnV !== 1) { meta.wpnV = 1; const got = unlockWeapons(99); saveMeta(); if (got.length) setTimeout(() => toast(`New weapons in the armoury: ${got.map(id => WEAPONS[id].name).join(', ')}`), 600); }   // Phase V: what past runs already earned
   if (!caughtUp) { caughtUp = true; const got = meta.ladder === 2 ? [] : catchUpUnlocks(); if (meta.ladder !== 2) { meta.ladder = 2; saveMeta(); }   // once, for saves from before the easier goals
     if (got.length) { showHudBtns(false); playMusic('menu'); showMenu(`<h2>New unlocks</h2><p class="sub">The goals for heroes and battlefields are easier now, and your past runs already meet some of them.</p><p>Unlocked: <b>${got.join(', ')}</b>.</p><div class="opts"><button class="opt" data-act="title" data-back>Continue</button></div>`); return; } }
   showHudBtns(false); playMusic('menu');
@@ -5080,21 +5442,34 @@ function drawFoePics() {
     x.drawImage(s.canvas, fx + x0, fy + y0, w, h, Math.round(24 - w * sc / 2), Math.round(24 - h * sc / 2), Math.round(w * sc), Math.round(h * sc));
   });
 }
-function bookIcon(key, dim) { const c = A.icons && A.icons[key]; if (!c) return '<span class="cicon blank"></span>'; iconUrls[key] ||= c.toDataURL(); return `<img class="cicon${key.startsWith('e:') ? ' evo' : ''}${dim ? ' dim' : ''}" src="${iconUrls[key]}" alt="">`; }
+function bookIcon(key, dim) { if (curSide() === 'Horde' && A.icons && A.icons[key + '.orc']) key += '.orc'; const c = A.icons && A.icons[key]; if (!c) return '<span class="cicon blank"></span>'; iconUrls[key] ||= c.toDataURL(); return `<img class="cicon${key.startsWith('e:') ? ' evo' : ''}${dim ? ' dim' : ''}" src="${iconUrls[key]}" alt="">`; }
 function achIcon(dim) { const g = A.pick && A.pick.gold; if (!g) return '<span class="cicon blank"></span>'; iconUrls['ach'] ||= gpuCopy(g).toDataURL(); return `<img class="cicon ach${dim ? ' dim' : ''}" src="${iconUrls['ach']}" alt="">`; }   // a gold coin, as each pays gold
 function showBook(tab = 'weapons') {
   const card = (ic, nm, sub, lines) => `<div class="bookcard"><div class="chead">${ic}<span class="ctitle"><span class="nm">${nm}</span>${sub ? `<span class="lv">${sub}</span>` : ''}</span></div>${lines.filter(Boolean).map(l => `<div class="ds">${l}</div>`).join('')}</div>`;
   const starts = id => Object.entries(HEROES).filter(([k, H_]) => H_.start === id && heroShown(k)).map(([, H_]) => H_.name.split(' ')[0]).join(', ');
   const known = id => !WEAPONS[id].sig || starts(id);   // the workers' pick stays hidden with them
   let body = '';
-  if (tab === 'weapons') body = Object.entries(WEAPONS).filter(([id]) => known(id)).map(([id, W_]) => card(bookIcon('w:' + id), W_.name, starts(id) ? `${W_.sig ? 'Signature' : 'Starting'} weapon: ${starts(id)}` : '', [W_.desc, `<b>Level 1:</b> ${weaponStats(id, 1)}`, `<b>Level ${MAX_LVL}:</b> ${weaponStats(id, MAX_LVL)}`])).join('');
+  const favBy = id => Object.keys(FAV).filter(h => FAV[h].includes(id) && heroShown(h)).map(h => HEROES[h].name.split(' ')[0]).join(', ');
+  const wcard = ([id, W_]) => card(bookIcon('w:' + id, !weaponOpen(id)), W_.name, starts(id) ? `${W_.sig ? 'Signature' : 'Starting'} weapon: ${starts(id)}` : !weaponOpen(id) ? 'Not yet earned' : W_.side ? `${W_.side} heroes only` : W_.rare ? 'Rare' : '',
+    [W_.desc, W_.role ? `<b>Role:</b> ${ROLE_NAMES[W_.role]}${EVOS[id] ? `. Evolves with ${PASSIVES[EVOS[id].p].name}.` : '.'}` : '', !weaponOpen(id) ? `<b>To earn it:</b> ${WEAPON_UNLOCKS[id].goal}.` : '',
+     favBy(id) ? `<b>Favoured by:</b> ${favBy(id)}.` : '', `<b>Level 1:</b> ${weaponStats(id, 1)}`, `<b>Level ${MAX_LVL}:</b> ${weaponStats(id, MAX_LVL)}`]);
+  if (tab === 'weapons') { const all = Object.entries(WEAPONS).filter(([id, W_]) => !W_.union && known(id));
+    body = `<p class="help booknote">Each hero favours two weapons: they come up more often and hit ${Math.round((FAV_DMG - 1) * 100)}% harder in his hands. New weapons are earned by reaching goals.</p>`
+      + `<div class="bookhead">Weapons</div>` + all.filter(([, W_]) => !W_.sig && !W_.rare).map(wcard).join('')
+      + `<div class="bookhead">Rare weapons</div>` + all.filter(([, W_]) => W_.rare).map(wcard).join('')
+      + `<div class="bookhead">Heroes' own weapons</div>` + all.filter(([, W_]) => W_.sig).map(wcard).join(''); }
   else if (tab === 'passives') body = Object.entries(PASSIVES).map(([id, P]) => { const e = Object.keys(EVOS).find(w => EVOS[w].p === id && (meta.evos.includes(w) || meta.maxed.includes(w)));
-    return card(bookIcon('p:' + id), P.name, `Up to level ${MAX_LVL}`, [P.desc, e && known(e) ? `Evolves ${WEAPONS[e].name}${meta.evos.includes(e) ? ` into ${EVOS[e].name}` : ''}.` : '']); }).join('');
+    const helps = P.helps ? Object.keys(WEAPONS).filter(w => wTag(w, P.helps) && !WEAPONS[w].union && known(w) && weaponOpen(w)).map(w => WEAPONS[w].name) : null;
+    return card(bookIcon('p:' + id), P.name, `Up to level ${pmax(id)}`, [P.desc, helps ? `<b>Helps:</b> ${helps.join(', ')}.` : '', e && known(e) ? `Evolves ${WEAPONS[e].name}${meta.evos.includes(e) ? ` into ${EVOS[e].name}` : ''}.` : '']); }).join('')
+      + `<div class="bookhead">Pacts</div>` + Object.entries(PACTS).map(([k, P]) => card(bookIcon('c:' + k), P.name, 'Pact', [P.gain, `<b>Cost:</b> ${P.cost}`, `Once you've survived 10:00 in any run, from ${fmtTime(PACT.from)} a pact may be offered as an extra card, at most ${PACT.max} a run. It never takes a slot.`])).join('');
   else if (tab === 'evos') body = `<p class="help booknote">A weapon at level ${MAX_LVL} plus its partner passive (any level) evolves when you open a boss's treasure chest. Found ${meta.evos.filter(known).length} of ${Object.keys(EVOS).filter(known).length}.</p>` + Object.entries(EVOS).filter(([id]) => known(id)).map(([id, E]) => {
       const found = meta.evos.includes(id), maxed = meta.maxed.includes(id), W_ = WEAPONS[id].name, P = PASSIVES[E.p].name;
       if (found) return card(bookIcon('e:' + id), E.name, `${W_} + ${P}`, [E.desc, evoStats(id)]);
       return card(bookIcon('w:' + id, true), '???', maxed ? `${W_} + ${P}` : `${W_} + ???`, [maxed ? `You've maxed ${W_}. Carry ${P} and open a boss chest to see what it becomes.` : `Clue: its partner passive ${passiveClue(EVOS[id].p)}. Max ${W_} to learn its name.`]);
-    }).join('');
+    }).join('')
+      + `<div class="bookhead">Unions</div>` + Object.entries(WEAPONS).filter(([, W_]) => W_.union).map(([id, W_]) => { const parts = W_.union.map(p => WEAPONS[p].name).join(' + '), side = W_.union.map(p => WEAPONS[p].side).find(Boolean);
+        return (meta.unions || []).includes(id) ? card(bookIcon('e:' + id), W_.name, parts, [W_.desc, evoStats(W_.union[0]), evoStats(W_.union[1])])
+          : card(bookIcon('e:' + id, true), '???', parts, [`Carry ${parts}, both at level ${MAX_LVL}, and open a boss chest: they merge into one weapon in one slot.${side ? ` ${side} heroes only.` : ''}`]); }).join('');
   else if (tab === 'foes') body = foesBook(card);
   else if (tab === 'ach') { const got = meta.ach || {}, n = ACH.filter(a => got[a.id]).length;   // hidden until earned
     body = `<p class="help booknote">Earned ${n} of ${ACH.length}. Each pays gold once.</p>` + ACH.map(a => got[a.id]
@@ -5102,7 +5477,7 @@ function showBook(tab = 'weapons') {
       : card(achIcon(true), '???', 'Not yet earned', ['Keep playing to find out.'])).join(''); }
   else body = Object.keys(HEROES).filter(heroShown).map(id => { const H_ = HEROES[id], U = HERO_UNLOCKS[id];
       const status = heroOpen(id) ? 'Unlocked' : isPrisoner(id) ? (meta.prisoners.includes(id) ? `Held prisoner in ${anSide(enemyOf(HEROES[id].side))} fortress: play as ${anSide(HEROES[id].side)} hero to free him.` : `Held prisoner. ${U.goal} (${U.best()}) to find where.`) : `Locked. ${U.goal} (${U.best()}), or buy for ${U.cost} gold.`;
-      return card(`<canvas class="hpic${heroOpen(id) ? '' : ' dim'}" width="48" height="48" data-hero="${id}"></canvas>`, H_.name, `${H_.unit}, ${H_.side}`, [BIOS[id] ? `<i class="bio">${BIOS[id]}</i>` : '', `Starts with <b>${WEAPONS[H_.start].name}</b>. ${H_.hp} health.`, `<b>${H_.sig}:</b> ${H_.sigDesc}`, status]); }).join('');
+      return card(`<canvas class="hpic${heroOpen(id) ? '' : ' dim'}" width="48" height="48" data-hero="${id}"></canvas>`, H_.name, `${H_.unit}, ${H_.side}`, [BIOS[id] ? `<i class="bio">${BIOS[id]}</i>` : '', `Starts with <b>${WEAPONS[H_.start].name}</b>. ${H_.hp} health.`, `<b>${H_.sig}:</b> ${H_.sigDesc}`, favOf(id).length ? `<b>Favours:</b> ${favOf(id).map(w => nameFor(w, H_.side)).join(' and ')}.` : '', status]); }).join('');
   showMenu(`<h2>Book of War</h2><div class="opts buyrow booktabs">${BOOK_TABS.map(([k, l]) => `<button class="opt${k === tab ? ' cur' : ''}" data-act="book" data-tab="${k}">${l}</button>`).join('')}</div>
     <div class="bookgrid scrollbox">${body}</div><div class="opts" style="margin-top:12px"><button class="opt" data-act="title" data-back>Back</button></div>`);
   overlay.classList.remove('bare'); overlay.querySelector('.panel').classList.add('wide', 'scrolls');
@@ -5258,7 +5633,7 @@ function heroTile(id) {
 function heroDetails(id) {
   const H_ = HEROES[id], spd = H_.speed >= 82 ? 'fast' : H_.speed >= 72 ? 'average speed' : 'slow', first = H_.name.split(' ')[0];
   const about = `<span class="ds">Starts with <b>${WEAPONS[H_.start].name}</b>: ${WEAPONS[H_.start].desc} ${H_.hp} health, ${spd}${H_.fly ? ', flies' : ''}.</span>
-    <span class="ds sig"><b>${H_.sig}:</b> ${H_.sigDesc}</span>`;
+    <span class="ds sig"><b>${H_.sig}:</b> ${H_.sigDesc}</span>${favOf(id).length ? `<span class="ds">Favours <b>${favOf(id).map(w => nameFor(w, H_.side) + (weaponOpen(w) ? '' : ' (not yet earned)')).join('</b> and <b>')}</b>: offered more often, ${Math.round((FAV_DMG - 1) * 100)}% stronger.</span>` : ''}`;
   let act;
   if (!heroOpen(id) && isPrisoner(id)) { const U = HERO_UNLOCKS[id];
     act = meta.prisoners.includes(id)
@@ -5323,27 +5698,39 @@ function pauseSheet() {
     stat('Attack speed', pct(1 / h.haste - 1)), stat('Area', pct(h.area - 1)), stat('Pickup range', pct(h.magnet - 1)), stat('Regeneration', `${h.regen.toFixed(1)} per second`),
     stat('Revives', G.revives), stat('Rerolls', G.rerolls), ...(G.curse ? [stat('Curse', G.curse)] : []), ...(G.banishMax ? [stat('Banishes', G.banishes)] : [])].join('');
   const row = (kind, id, nm, lvl, ds) => `<div class="pitem">${itemIcon(kind, id)}<div><div class="nm">${nm} <span class="lv">Level ${lvl}${lvl >= MAX_LVL ? ' (max)' : ''}</span></div>${ds ? `<div class="ds">${ds}</div>` : ''}</div></div>`;
-  const ws = Object.entries(G.weapons).map(([id, w]) => w.evo ? row('w', id, EVOS[id].name, w.lvl, evoStats(id)).replace(/Level \d+ \(max\)/, 'Evolved')
+  const ws = Object.entries(G.weapons).map(([id, w]) => WEAPONS[id].union ? row('w', id, WEAPONS[id].name, w.lvl, weaponStats(id, w.lvl)).replace(/Level \d+ \(max\)/, 'Union') : w.evo ? row('w', id, EVOS[id].name, w.lvl, evoStats(id)).replace(/Level \d+ \(max\)/, 'Evolved')
     : row('w', id, WEAPONS[id].name, w.lvl, weaponStats(id, w.lvl) + (w.lvl >= MAX_LVL && EVOS[id] ? ` Evolves into ${EVOS[id].name} with ${PASSIVES[EVOS[id].p].name} and a boss chest.` : ''))).join('');
-  const ps = Object.entries(G.passives).map(([id, l]) => row('p', id, PASSIVES[id].name, l, PASSIVES[id].desc)).join('') || '<p class="sub">None yet.</p>';
+  const ps = Object.entries(G.passives).map(([id, l]) => row('p', id, PASSIVES[id].name, l, PASSIVES[id].desc).replace(`Level ${l}</span>`, `Level ${l}${l >= pmax(id) && l < MAX_LVL ? ' (max)' : ''}</span>`)).join('') || '<p class="sub">None yet.</p>';
+  const pcs = (G.pacts || []).map(k => `<div class="pitem">${itemIcon('c', k)}<div><div class="nm">${PACTS[k].name}</div><div class="ds">${PACTS[k].gain} Cost: ${PACTS[k].cost}</div></div></div>`).join('');
   return `<div class="sheet"><div class="who"><canvas class="hpic" data-hero="${G.heroId}" width="48" height="48"></canvas>
       <div><div class="nm">${HD.name}</div><div class="sub">${HD.unit}, level ${h.level}</div>${HD.sig ? `<div class="sigline"><b>${HD.sig}:</b> ${HD.sigDesc}</div>` : ''}</div></div>
     <div class="stats">${stats}</div>
     <div class="stats run">${stat('Battlefield', G.LV.name)}${stat('Time', fmtTime(G.t))}${stat('Kills', G.kills)}${stat('Gold', G.gold)}</div>
-    <div class="items scrollbox"><h3>Weapons</h3>${ws}<h3>Passives</h3>${ps}${(G.banned || []).length ? `<h3>Banished</h3><p class="sub">${G.banned.map(k => { const [kd, id] = k.split(':'); return kd === 'w' ? WEAPONS[id].name : PASSIVES[id].name; }).join(', ')}</p>` : ''}</div></div>`;
+    <div class="items scrollbox"><h3>Weapons</h3>${ws}<h3>Passives</h3>${ps}${pcs ? `<h3>Pacts</h3>${pcs}` : ''}${(G.banned || []).length ? `<h3>Banished</h3><p class="sub">${G.banned.map(k => { const [kd, id] = k.split(':'); return kd === 'w' ? WEAPONS[id].name : kd === 'c' ? PACTS[id].name : PASSIVES[id].name; }).join(', ')}</p>` : ''}</div></div>`;
 }
+function offerable(id) { const W_ = WEAPONS[id]; return !W_.sig && !W_.union && weaponOpen(id) && (!W_.side || W_.side === G.HD.side) && (!W_.rare || G.t >= RARE.at); }
 function choices(keep = []) {
-  const o = [], wc = Object.keys(G.weapons).length, pc = Object.keys(G.passives).length;
+  const o = [], wc = Object.keys(G.weapons).length, pc = Object.keys(G.passives).length, fav = G.fav || new Set();
   const out = [], ban = new Set(G.banned || []);
-  for (const id in WEAPONS) { const c = G.weapons[id]; if (!c && WEAPONS[id].sig || ban.has('w:' + id)) continue; if (c) { if (c.lvl < MAX_LVL) o.push({ kind: 'w', id, lvl: c.lvl + 1, wgt: 1.2 }); } else if (wc < MAX_SLOTS) o.push({ kind: 'w', id, lvl: 1, wgt: 0.8 }); }
-  for (const id in PASSIVES) { const c = G.passives[id] || 0; if (ban.has('p:' + id)) continue; if (c) { if (c < MAX_LVL) o.push({ kind: 'p', id, lvl: c + 1, wgt: 1 }); } else if (pc < MAX_SLOTS) o.push({ kind: 'p', id, lvl: 1, wgt: 0.7 }); }
+  for (const id in WEAPONS) {
+    const c = G.weapons[id]; if (ban.has('w:' + id) || WEAPONS[id].union) continue;
+    if (c) { if (c.lvl < MAX_LVL) o.push({ kind: 'w', id, lvl: c.lvl + 1, wgt: 1.2 * (fav.has(id) ? 1.3 : 1) }); }
+    else if (wc < MAX_SLOTS && offerable(id)) o.push({ kind: 'w', id, lvl: 1, wgt: (WEAPONS[id].rare ? RARE.wgt : 0.8) * (fav.has(id) ? 2.2 : 1) });
+  }
+  const pw = 0.7 * 8 / Object.keys(PASSIVES).length;   // 13 passives now, not 8: each new one is rarer, so weapons come up as often as before
+  for (const id in PASSIVES) { const c = G.passives[id] || 0; if (ban.has('p:' + id)) continue; if (c) { if (c < pmax(id)) o.push({ kind: 'p', id, lvl: c + 1, wgt: 1 }); } else if (pc < MAX_SLOTS) o.push({ kind: 'p', id, lvl: 1, wgt: Object.keys(G.weapons).some(w => EVOS[w] && EVOS[w].p === id && !G.weapons[w].evo) ? 0.7 : pw }); }   // an evolution partner of a weapon you carry comes up as often as ever
   for (const k of keep) { const i = o.findIndex(c => c.kind === k.kind && c.id === k.id); if (i >= 0) out.push(o.splice(i, 1)[0]); }   // cards kept when one is banished
-  while (out.length < (G.HD.cards || 3) && o.length) {
+  const want = (G.HD.cards || 3) + (hasPact('tome') ? 1 : 0), pacts = Object.keys(PACTS).filter(k => !(G.pacts || []).includes(k) && !ban.has('c:' + k));
+  const kept = keep.find(k => k.kind === 'c'); if (kept && pacts.includes(kept.id)) out.push({ kind: 'c', id: kept.id, lvl: 0 });
+  else if (!keep.length && pactsOpen() && G.t >= PACT.from && (G.pacts || []).length < PACT.max && pacts.length && Math.random() < PACT.chance) out.push({ kind: 'c', id: pacts[Math.floor(Math.random() * pacts.length)], lvl: 0 });   // now and then, a pact
+  const extra = out.some(c => c.kind === 'c') ? 1 : 0;   // a pact comes as an extra card: it never takes a choice away
+  while (out.length < want + extra && o.length) {
     let s = o.reduce((a, b) => a + b.wgt, 0), r = Math.random() * s, i = 0;
     for (; i < o.length; i++) { r -= o[i].wgt; if (r <= 0) break; }
     out.push(o.splice(Math.min(i, o.length - 1), 1)[0]);
   }
-  if (!out.length) out.push({ kind: 'food', id: 'food', lvl: 0 }, { kind: 'gold', id: 'gold', lvl: 0 });   // everything maxed
+  out.sort((a, b) => (a.kind === 'c') - (b.kind === 'c'));   // a pact always sits last
+  if (!out.some(c => c.kind !== 'c')) out.push({ kind: 'food', id: 'food', lvl: 0 }, { kind: 'gold', id: 'gold', lvl: 0 });   // everything maxed
   return out;
 }
 // What a weapon does at a level, in numbers, so an upgrade card says exactly what you'll get.
@@ -5370,6 +5757,18 @@ function weaponStats(id, l) {
     case 'whirl': return `${pl(1 + (l >= 3) + (l >= 5), 'whirlwind')}, ${3 + 1.5 * (l - 1)} damage four times a second for ${l >= 4 ? 4.5 : 3} s.`;
     case 'breath': return `${26 + 9 * (l - 1) + (l >= 4 ? 10 : 0)} damage in a cone out to ${55 + 6 * l + (l >= 3 ? 10 : 0)}${l >= 5 ? ', wider' : ''}.`;
     case 'pick': return `${pl(1 + (l >= 3) + (l >= 5), 'enemy', 'enemies')} at a time, ${12 + 5 * (l - 1) + (l >= 4 ? 5 : 0)} damage, reach ${34 + 3 * l}.`;
+    case 'lightning': return `${pl(1 + (l >= 3) + (l >= 5), 'strike')} of ${30 + 11 * (l - 1) + (l >= 4 ? 8 : 0)} damage, reach 240.`;
+    case 'flameshield': return `${pl(2 + (l >= 2) + (l >= 5), 'flame')} of ${8 + 3 * (l - 1) + (l >= 3 ? 3 : 0)} damage, burning ${(2.5 + 0.5 * l + (l >= 4 ? 1 : 0)).toFixed(1)} s in every ${(4.9 + 0.5 * l + (l >= 4 ? 1 : 0)).toFixed(1)}.`;
+    case 'polymorph': return `${pl(1 + (l >= 2) + (l >= 4), 'enemy', 'enemies')} within ${l >= 5 ? 200 : 160} every ${l >= 3 ? 4 : 4.5} s; elites and bosses take ${50 + 20 * l} damage.`;
+    case 'raisedead': return `${pl(1 + (l >= 2) + (l >= 4), 'skeleton')} at a time (up to ${2 + l}), ${8 + 3 * (l - 1) + (l >= 3 ? 3 : 0)} damage, lasting ${8 + (l >= 5 ? 4 : 0)} s.`;
+    case 'cannon': return `${pl(1 + (l >= 5), 'shell')} of ${40 + 15 * (l - 1) + (l >= 3 ? 10 : 0)} damage, blast ${30 + (l >= 2 ? 8 : 0)}.`;
+    case 'sappers': return `${pl(1 + (l >= 3) + (l >= 5), 'charge')} of ${55 + 20 * (l - 1)} damage, blast ${36 + (l >= 4 ? 10 : 0)}.`;
+    case 'oil': return `${pl(1 + (l >= 5), 'pool')} of ${5 + 2 * (l - 1) + (l >= 3 ? 2 : 0)} damage every 0.5 s, radius ${22 + (l >= 2 ? 7 : 0)}, burning 4 s and slowing.`;
+    case 'flier': return `${pl(1 + (l >= 5), 'flier')}, ${18 + 7 * (l - 1) + (l >= 3 ? 5 : 0)} damage every ${l >= 2 ? '1.0' : '1.3'} s.`;
+    case 'tower': return `${pl(1 + (l >= 2) + (l >= 5), 'tower')} at a time, ${12 + 5 * (l - 1) + (l >= 3 ? 4 : 0)} damage every ${l >= 4 ? 0.55 : 0.8} s, standing ${10 + (l >= 4 ? 2 : 0)} s.`;
+    case 'broadside': return `${6 + 2 * (l >= 3) + 2 * (l >= 5)} shells of ${70 + 25 * (l - 1)} damage every 7 s.`;
+    case 'torpedo': return `${pl(1 + (l >= 3) + (l >= 5), 'torpedo', 'torpedoes')} of ${45 + 15 * (l - 1) + (l >= 4 ? 10 : 0)} damage, each piercing 6.`;
+    case 'u_arcane': case 'u_legion': case 'u_siege': case 'u_purge': return WEAPONS[id].union.map(evoStats).join(' ') + ' 15% stronger.';
   }
   return '';
 }
@@ -5384,7 +5783,19 @@ const ITEM_ICONS = {
   'w:slam': 113, 'e:slam': 112, 'w:whirl': 102, 'e:whirl': 109, 'w:breath': 94, 'e:breath': 192,
   'e:sword': 119, 'e:arrows': 132, 'e:axes': 137, 'e:aura': 110, 'e:fireball': 105, 'e:ballista': 141, 'e:runes': 103, 'e:coil': 98,   // evolved weapons
 };
-const iconKey = (kind, id) => { if (kind === 'w' && G && G.weapons[id] && G.weapons[id].evo) return 'e:' + id; const k = kind + ':' + id; return G && G.HD.side === 'Horde' && ITEM_ICONS[k + '.orc'] != null ? k + '.orc' : k; };
+// Phase V icons, all from Warcraft II's own icon sheet. Lightning takes the blue bolt (Storm Hammer moves to the dwarven hammer),
+// Flame Shield the burning hand (Cyclone takes the whirlwind's own), and Ranger's Volley the triple arrow (Longbow takes the bow).
+Object.assign(ITEM_ICONS, {
+  'w:hammer': 135, 'e:whirl': 102, 'e:arrows': 126,
+  'w:lightning': 99, 'e:lightning': 99, 'w:flameshield': 109, 'e:flameshield': 109, 'w:polymorph': 115, 'e:polymorph': 115, 'w:raisedead': 114, 'e:raisedead': 114,
+  'w:cannon': 139, 'e:cannon': 143, 'w:sappers': 12, 'w:sappers.orc': 13, 'e:sappers': 12, 'e:sappers.orc': 13, 'w:oil': 158, 'e:oil': 159,
+  'w:flier': 30, 'w:flier.orc': 31, 'e:flier': 30, 'e:flier.orc': 31, 'w:tower': 59, 'w:tower.orc': 61, 'e:tower': 59, 'e:tower.orc': 61,
+  'w:broadside': 20, 'w:broadside.orc': 21, 'w:torpedo': 156, 'w:torpedo.orc': 157,
+  'e:u_arcane': 14, 'e:u_legion': 15, 'e:u_siege': 16, 'e:u_siege.orc': 17, 'e:u_purge': 10,
+  'p:reach': 132, 'p:reach.orc': 127, 'p:dur': 81, 'p:amount': 124, 'p:amount.orc': 128, 'p:crit': 131, 'p:crit.orc': 136, 'p:thorns': 166, 'p:thorns.orc': 169,
+  'c:blood': 112, 'c:frenzy': 7, 'c:greed': 89, 'c:greed.orc': 90, 'c:vigour': 113, 'c:tome': 82,
+});
+const iconKey = (kind, id) => { let k = kind + ':' + id; if (kind === 'w' && (WEAPONS[id] && WEAPONS[id].union || G && G.weapons[id] && G.weapons[id].evo)) k = 'e:' + id; return curSide() === 'Horde' && ITEM_ICONS[k + '.orc'] != null ? k + '.orc' : k; };
 const iconUrls = {};
 function itemIcon(kind, id) {
   const key = iconKey(kind, id), c = A.icons && A.icons[key]; if (!c) return '';
@@ -5409,11 +5820,24 @@ function passiveChange(id, lvl) {
 }
 // A marker on cards that lead towards an evolution you could make.
 function evoMark(c) {
+  if (c.kind === 'w') { const u = Object.keys(WEAPONS).find(k => WEAPONS[k].union && WEAPONS[k].union.includes(c.id) && WEAPONS[k].union.every(p => p === c.id || G.weapons[p])); if (u) { const o = WEAPONS[u].union.find(p => p !== c.id); return `Union path: with your ${wName(o)}, both at level ${MAX_LVL}, a boss chest merges them into ${WEAPONS[u].name}.`; } }
   if (c.kind === 'w' && EVOS[c.id] && G.passives[EVOS[c.id].p]) return `Evolution path: you carry its partner, ${PASSIVES[EVOS[c.id].p].name}.`;
   if (c.kind === 'p') { const w = Object.keys(G.weapons).find(w => EVOS[w] && EVOS[w].p === c.id && !G.weapons[w].evo); if (w) return `Evolution path: the partner of your ${wName(w)}.`; }
   return '';
 }
+// The small print under a card: a weapon's role, its evolution partner and whether your hero favours it; what a passive helps.
+function cardMeta(c) {
+  if (c.kind === 'w') { const W_ = WEAPONS[c.id], bits = [];
+    if (W_.role) bits.push(`<b>${ROLE_NAMES[W_.role]}</b>`);
+    if (EVOS[c.id] && c.lvl < MAX_LVL && !(G && G.passives[EVOS[c.id].p])) bits.push(`Evolves with ${PASSIVES[EVOS[c.id].p].name}`);   // once you carry it, the evolution path line says so
+    if (G && G.fav && G.fav.has(c.id)) bits.push(`Favoured by ${G.HD.name.split(' ')[0]}: +${Math.round((FAV_DMG - 1) * 100)}% damage`);
+    return bits.length ? bits.join('. ') + '.' : ''; }
+  if (c.kind === 'p') { const P = PASSIVES[c.id]; if (!P.helps || !G) return ''; const ws = Object.keys(G.weapons).filter(w => wTag(w, P.helps) || WEAPONS[w].union && WEAPONS[w].union.some(u => wTag(u, P.helps)));
+    return ws.length ? `Helps your ${ws.map(wName).join(', ')}.` : 'Helps none of your weapons yet.'; }
+  return '';
+}
 function itemInfo(c) {
+  if (c.kind === 'c') { const P = PACTS[c.id]; return { nm: P.name, ds: P.gain, lv: '<span class="lv pact">Pact</span>' }; }
   if (c.kind === 'w') { const W_ = WEAPONS[c.id]; return { nm: W_.name, ds: c.lvl === 1 ? `${W_.desc} ${weaponStats(c.id, 1)}` : `${W_.up[c.lvl - 2].replace(/^./, m => m.toUpperCase())}: ${statChange(weaponStats(c.id, c.lvl - 1), weaponStats(c.id, c.lvl)).replace(/^./, m => m.toLowerCase())}`, lv: c.lvl === 1 ? '<span class="lv new">New weapon</span>' : `<span class="lv">Level ${c.lvl}</span>`, hint: c.lvl >= MAX_LVL && EVOS[c.id] ? `Max level. With ${PASSIVES[EVOS[c.id].p].name}, a boss chest evolves it into ${EVOS[c.id].name}.` : '' }; }
   if (c.kind === 'p') { const P = PASSIVES[c.id]; return { nm: P.name, ds: c.lvl > 1 ? `${P.desc} ${passiveChange(c.id, c.lvl)}` : P.desc, lv: c.lvl === 1 ? '<span class="lv new">New</span>' : `<span class="lv">Level ${c.lvl}</span>` }; }
   if (c.kind === 'food') return { nm: 'Field rations', ds: 'Restore 40% of your health.', lv: '<span class="lv">Everything is maxed</span>' };
@@ -5427,7 +5851,7 @@ function openLevelUp(reroll, keep) {
   const offer = choices(keep); G.offer = offer.map(c => c.id); G.offerFull = offer;
   const cards = offer.map((c, i) => {
     const { nm, ds, lv, hint } = itemInfo(c);
-    return `<button class="opt card" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="chead">${itemIcon(c.kind, c.id)}<span class="ctitle"><span class="nm">${i + 1}. ${nm}</span>${lv}</span></span><span class="ds">${ds}</span>${hint ? `<span class="ds evohint">${hint}</span>` : evoMark(c) ? `<span class="ds evohint">${evoMark(c)}</span>` : ''}</button>`;
+    return `<button class="opt card${c.kind === 'c' ? ' pactcard' : ''}" data-act="pick" data-kind="${c.kind}" data-id="${c.id}"><span class="chead">${itemIcon(c.kind, c.id)}<span class="ctitle"><span class="nm">${i + 1}. ${nm}</span>${lv}</span></span><span class="ds">${ds}</span>${c.kind === 'c' ? `<span class="ds pactcost">Cost: ${PACTS[c.id].cost}</span>` : ''}${cardMeta(c) ? `<span class="ds cmeta">${cardMeta(c)}</span>` : ''}${hint ? `<span class="ds evohint">${hint}</span>` : evoMark(c) ? `<span class="ds evohint">${evoMark(c)}</span>` : ''}</button>`;
   }).join('');
   showMenu(`<h2>Level ${G.hero.level}</h2><div class="cards">${cards}</div>
     <div class="lvlrow"><button class="opt" data-act="reroll" ${G.rerolls > 0 ? '' : 'disabled'}>Reroll (${G.rerolls})</button><button class="opt" data-act="skip">Skip (+10% health)</button>${G.banishMax ? `<button class="opt" data-act="banish" ${G.banishes > 0 ? '' : 'disabled'}>Banish (${G.banishes})</button>` : ''}</div>
@@ -5467,9 +5891,10 @@ function pickCard(kind, id) {
 function openChest(kind) {
   G.state = 'chest'; joy = null; showHudBtns(false); sfx(levelSnd(), 0); guardMenu(MENU_LOCK);
   const r = Math.random(), n = kind === 'boss' ? (r < 0.15 ? 5 : r < 0.5 ? 3 : 1) : (r < 0.35 ? 1 : 0);
-  const got = [], evo = kind === 'boss' ? evolvable()[0] : null;
+  const uni = kind === 'boss' ? unionable() : null, got = [], evo = kind === 'boss' && !uni ? evolvable()[0] : null;
+  if (uni) { forgeUnion(uni); got.push({ nm: WEAPONS[uni].name, lv: '<span class="lv new">Union!</span>', ds: `${WEAPONS[uni].union.map(wName).join(' and ')} have merged into one. ${WEAPONS[uni].desc}`, ic: itemIcon('w', uni) }); }
   if (evo) { evolve(evo); got.push({ nm: EVOS[evo].name, lv: '<span class="lv new">Evolved!</span>', ds: `${WEAPONS[evo].name} has evolved. ${EVOS[evo].desc}`, ic: itemIcon('w', evo) }); }
-  for (let i = evo ? 1 : 0; i < n; i++) { const c = choices()[0]; if (!c) break; addItem(c.kind, c.id); got.push({ ...itemInfo(c), ic: itemIcon(c.kind, c.id) }); }
+  for (let i = evo || uni ? 1 : 0; i < n; i++) { const c = choices().find(c => c.kind !== 'c'); if (!c) break; addItem(c.kind, c.id); got.push({ ...itemInfo(c), ic: itemIcon(c.kind, c.id) }); }
   const gold = Math.round((kind === 'boss' ? 60 + rnd(0, 40) : 15 + rnd(0, 20)) * goldMul());
   addGold(gold);
   const step = cfg.opts.quickChest ? 0 : 0.45;
@@ -5492,7 +5917,7 @@ function endRun(won) {
   G.state = 'over'; G.won = won; showHudBtns(false); joy = null; logEnd(won);
   runs.push(runRecord(won)); if (runs.length > 200) runs = runs.slice(-200); store.set('tos_runs', runs);
   if (G.t > best.time || (won && G.kills > best.kills)) { best = { time: Math.floor(G.t), kills: G.kills, level: G.hero.level, hero: G.HD.name }; store.set('tos_best', best); }
-  const unlocked = bankRun(); G.newAch = G.newAch || checkAchievements(); saveMeta();
+  const unlocked = bankRun(); G.newAch = G.newAch || checkAchievements(); G.newWeapons = G.newWeapons || unlockWeapons(2); saveMeta();
   const na = G.newAch;   // captured: G may be a new run by the time the toasts show
   na.slice(0, 4).forEach((a, i) => setTimeout(() => toast(`Achievement: ${a.name} (+${a.gold} gold)`), 400 + i * 500));
   if (na.length > 4) { const more = na.length - 4; setTimeout(() => toast(`And ${more} more: see the Book of War`), 400 + 4 * 500); }
@@ -5501,7 +5926,7 @@ function endRun(won) {
     <div class="endbody scrollbox"><div class="endl">
     <div class="stats"><b>Hero</b><span>${G.HD.name}</span><b>Battlefield</b><span>${G.LV.name}${curseOf() ? `, curse ${curseOf()}` : ''}</span><b>Survived</b><span>${fmtTime(G.t)}</span><b>Level</b><span>${G.hero.level}</span><b>Kills</b><span>${G.kills}</span><b>Gold</b><span>+${G.gold}${G.bonus ? ` (+${G.bonus} for surviving)` : ''}</span></div>
     ${deathRecap()}
-    ${unlocked || G.newHeroes.length ? `<h3 class="chestgold">Unlocked</h3>${[unlocked && `New battlefield: ${unlocked}`, ...G.newHeroes.filter(id => !HEROES[id].secret).map(id => `New hero: ${HEROES[id].name}`),
+    ${unlocked || G.newHeroes.length || G.newWeapons.length ? `<h3 class="chestgold">Unlocked</h3>${[unlocked && `New battlefield: ${unlocked}`, ...G.newHeroes.filter(id => !HEROES[id].secret).map(id => `New hero: ${HEROES[id].name}`), ...G.newWeapons.map(id => `New weapon in the armoury: ${WEAPONS[id].name}${WEAPONS[id].side ? ` (${WEAPONS[id].side} heroes)` : ''}`),
       G.newHeroes.includes('peasant') && 'Someone has been watching from the woodpile. Secret heroes: the Peasant and the Peon!',
       G.newHeroes.includes('deathwing') && 'Deathwing has fallen, and now he answers to you. Secret hero: Deathwing!'].filter(Boolean).map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}` : ''}
     ${fortNews().map(t => `<p class="sub chestgold unl">${t}</p>`).join('')}
@@ -5513,7 +5938,7 @@ function endRun(won) {
 // The fuller end of a run: damage by weapon, healing and damage taken, and health over time.
 function runBreakdown() {
   const wd = Object.entries(G.wdmg || {}).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]), tot = wd.reduce((a, [, v]) => a + v, 0) || 1;
-  const nm = k => k === 'other' ? 'Other' : k === 'whirl' ? 'Whirlwinds' : WEAPONS[k] ? wName(k) : k;
+  const nm = k => k === 'other' ? 'Other' : k === 'whirl' ? 'Whirlwinds' : k === 'thorns' ? PASSIVES.thorns.name : WEAPONS[k] ? wName(k) : k;
   const rows = wd.slice(0, 8).map(([k, v]) => `<div class="wrow"><span>${nm(k)}</span><span class="wbar"><i style="width:${Math.round(v / wd[0][1] * 100)}%"></i></span><span>${Math.round(v).toLocaleString('en-GB')} (${Math.round(v / tot * 100)}%)</span></div>`).join('');
   const hist = G.hpHist || [], gw = 300, gh = 50, pts = hist.map((f, i) => `${(i / Math.max(1, hist.length - 1) * gw).toFixed(1)},${(gh - f * gh).toFixed(1)}`).join(' ');
   const graph = hist.length > 1 ? `<svg class="hpgraph" viewBox="-2 -2 ${gw + 4} ${gh + 4}" preserveAspectRatio="none" aria-label="Health over the run"><polyline points="0,${gh} ${pts} ${gw},${gh}" fill="rgba(63,165,63,.25)" stroke="${cfg.opts.colours === 'cb' ? '#2f7fd8' : '#5fd05f'}" stroke-width="1.5"/></svg><div class="hpaxis"><span>0:00</span><span>Health over the run</span><span>${fmtTime(G.t)}</span></div>` : '';
@@ -5950,7 +6375,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, DB, md, packState, packLater, PACK, showSettings, musicSource, midiHas, midiSong, ensureAudio, playlistFor, LEVELS_IDS: () => LEVELS.map(l => l.id), tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { recalc, fire, addItem, openLevelUp, weaponStats, evoStats, WEAPON_UNLOCKS, FAV, PACTS, PACT, RARE, NEW_W, unionable, forgeUnion, weaponOpen, unlockWeapons, fireNew, pmax, favOf, offerable, wTag, cardMeta, sheep, nameFor, get G() { return G; }, DB, md, packState, packLater, PACK, showSettings, musicSource, midiHas, midiSong, ensureAudio, playlistFor, LEVELS_IDS: () => LEVELS.map(l => l.id), tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
