@@ -1179,7 +1179,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.27.0', BUILD = 'f0e9f92 2026-11-27';
+const VERSION = '0.28.0', BUILD = '09b3df1 2026-11-27';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1345,6 +1345,7 @@ function packWar(items) {
 const PACK = {
   urls: ['pack/', 'https://jonathansadowitz.github.io/tides-of-survival-play/pack/'],   // on itch.io it's fetched from the play site
   key: 'tos_pack', imported: 'tos_imported',
+  later: 'tos_pack_later',   // archives held only as their first-run core, with the full file still to fetch in the background
 };
 // Players who had the 1996 shareware: its MAINDAT.WAR carried this marker as an extra last entry.
 const isDemoMain = w => !!w && w.count === 529 && (() => { const d = Core.safeEntry(w, 528); return !!d && new TextDecoder().decode(d) === 'TOS-DEMO'; })();
@@ -1358,33 +1359,75 @@ async function fetchBytes(url, onBytes) {
 }
 // Load the pack, or the parts of a newer one. force: reload every part the player didn't import.
 // Returns true when the game has the pack.
+// Phase U (faster first launch): a first install fetches each big archive's core first (only the entries the title, the
+// menus and a first run in Elwynn Forest read, found by scripts/build-core.js) and some archives gzipped, shows the title,
+// then fetches the full archives in the background (packLater). ?fullpack=1 skips the cores (used to find them).
+const PACK_FULL = /[?&]fullpack/.test(location.search);
+async function packBytes(base, f, onBytes) {
+  if (f.gz && typeof DecompressionStream !== 'undefined') try {
+    const b = await fetchBytes(base + f.gz.file, onBytes);
+    if (b[0] !== 0x1f || b[1] !== 0x8b) return b;   // the server already unpacked it
+    return new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  } catch (e) { console.warn('pack gz', f.gz.file, e); }
+  return fetchBytes(base + f.file, onBytes);
+}
+const packSize = f => f.gz && typeof DecompressionStream !== 'undefined' ? f.gz.size : f.size;
 async function loadPack(force) {
   for (const base of PACK.urls) {
     let man;
     try { const r = await fetch(base + 'pack.json', { cache: 'no-cache' }); if (!r.ok) continue; man = await r.json(); } catch (e) { continue; }
     A.credits = man.credits || []; if (man.synth) store.set('tos_synth', { base, files: man.synth });   // the MIDI player's files, fetched when music first plays
-    const had = store.get(PACK.key, null), mine = importedNames(), shas = store.get(PACK.key + '_files', {});
+    const had = store.get(PACK.key, null), mine = importedNames(), shas = store.get(PACK.key + '_files', {}), later = new Set(store.get(PACK.later, []));
     // Only the parts that changed (by checksum) are fetched again.
-    const want = man.files.filter(f => !mine.has(f.name) && (force || !A.wars[f.name] || (had !== man.version && shas[f.name] !== f.sha)));
-    if (!want.length) { store.set(PACK.key, man.version); store.set(PACK.key + '_files', Object.fromEntries(man.files.map(f => [f.name, f.sha]))); return true; }
-    const total = want.reduce((a, f) => a + f.size, 0); let got = 0;
+    const want = man.files.filter(f => !mine.has(f.name) && (force || !A.wars[f.name] || later.has(f.name) || (had !== man.version && shas[f.name] !== f.sha)));
+    // An archive we don't have at all and that has a core: the core now, the full archive in the background.
+    // One we already hold as a core: only the background part.
+    const now = [], bg = [];
+    for (const f of want) {
+      if (f.core && !PACK_FULL && (!A.wars[f.name] || later.has(f.name))) { if (!A.wars[f.name]) now.push({ ...f, file: f.core.file, size: f.core.size, gz: null }); bg.push(f); }
+      else now.push(f);
+    }
+    const finish = () => { store.set(PACK.key, man.version); store.set(PACK.key + '_files', Object.fromEntries(man.files.map(f => [f.name, f.sha]))); store.set(PACK.later, bg.map(f => f.name)); if (bg.length) setTimeout(() => packLater(base, bg), 0); };
+    if (!now.length) { finish(); return true; }
+    const total = now.reduce((a, f) => a + packSize(f), 0); let got = 0;
     overlay.className = ''; overlay.style.display = 'flex';
     overlay.innerHTML = `<div class="panel"><h2>Tides of Survival</h2><p class="sub">${had ? 'Updating the game\'s art and sounds…' : 'Getting the game\'s art and sounds (once only)…'}</p>
       <div class="packbar"><div id="packFill"></div></div><p class="help" id="packProg">0 of ${(total / 1048576).toFixed(1)} MB</p></div>`;
     const tick = n => { got += n; const f = $('#packFill'), t = $('#packProg'); if (f) f.style.width = Math.min(100, 100 * got / total).toFixed(1) + '%'; if (t) t.textContent = `${(Math.min(got, total) / 1048576).toFixed(1)} of ${(total / 1048576).toFixed(1)} MB`; };
     try {
-      for (const f of want) {
-        const b = await fetchBytes(base + f.file, tick), buf = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+      for (const f of now) {
+        const b = await packBytes(base, f, tick), buf = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
         addWar(f.name, buf); await DB.put(f.name, buf);
         if (f.names) { A.wars[f.name].names = f.names; store.set('tos_sndnames_' + f.name, f.names); }
       }
     } catch (e) { console.warn('pack', base, e); continue; }
     if (A.wars['DEMODATA/SOUNDS.WAR']) { delete A.wars['DEMODATA/SOUNDS.WAR']; await DB.del('DEMODATA/SOUNDS.WAR'); }   // the old shareware's sounds
-    store.set(PACK.key, man.version); store.set(PACK.key + '_files', Object.fromEntries(man.files.map(f => [f.name, f.sha])));
-    if (want.some(f => /SOUNDS|MAINDAT/.test(f.name))) { for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k]; autoAssign(true); }
+    finish();
+    if (now.some(f => /SOUNDS|MAINDAT/.test(f.name))) { for (const k of Object.keys(cfg.sounds)) delete cfg.sounds[k]; autoAssign(true); }
     A.tilesets = {}; return true;
   }
   return false;
+}
+// The rest of the pack, while the player is on the title screen or in a first run. Nothing waits for it: once it's in,
+// the sprites and tiles are rebuilt from the full archives (Classic art, later battlefields and heroes need them).
+const packState = { later: null };
+async function packLater(base, files) {
+  if (packState.later) return packState.later;
+  packState.later = (async () => {
+    for (const f of files) {
+      let b; for (let k = 0; k < 3 && !b; k++) { try { b = await packBytes(base, f, () => {}); } catch (e) { await new Promise(r => setTimeout(r, 4000 * (k + 1))); } }
+      if (!b) { packState.later = null; return false; }   // try again on the next launch
+      const buf = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+      if (importedNames().has(f.name)) continue;   // the player imported their own meanwhile
+      addWar(f.name, buf); await DB.put(f.name, buf);
+      if (f.names) { A.wars[f.name].names = f.names; store.set('tos_sndnames_' + f.name, f.names); }
+      store.set(PACK.later, store.get(PACK.later, []).filter(n => n !== f.name));
+    }
+    A.tilesets = {}; for (const k of Object.keys(unifCache)) delete unifCache[k];
+    if (A.wars['MAINDAT.WAR']) rebuildSprites();
+    return true;
+  })();
+  return packState.later;
 }
 const A = { wars: {}, sprites: {}, pal: Core.greyPalette(), palSrc: null, actx: null, sbuf: {}, lastPlay: {}, active: 0 };
 
@@ -3266,7 +3309,8 @@ function spawn(dt) {
   // Gnoll packs from any direction, and brigands when there's gold lying about (Phase Q).
   if (t >= (G.gnollNext ?? NEWFOES.gnoll) && !G.final && hasFoe('gnoll')) {
     G.gnollNext = (G.gnollNext ?? NEWFOES.gnoll) + (G.LV.creeps ? G.LV.creeps.every : NEWFOES.gnollEvery); const h = G.hero, a0 = rnd(0, TAU), d = Math.hypot(W, H) / 2 + 20, n = NEWFOES.pack + Math.min(4, Math.floor(t / 180));
-    for (let i = 0; i < n; i++) { const a = a0 + rnd(-0.3, 0.3), dd = d + rnd(0, 50); spawnEnemy('gnoll', h.x + Math.cos(a) * dd, h.y + Math.sin(a) * dd); }
+    // Each gnoll looks for open ground near the pack's side (a woody side used to swallow some of the pack, or all of it).
+    for (let i = 0; i < n; i++) for (let k = 0; k < 12; k++) { const a = a0 + rnd(-0.3, 0.3) * (1 + k / 3), dd = d + rnd(0, 50 + k * 15), x = h.x + Math.cos(a) * dd, y = h.y + Math.sin(a) * dd; if (!footBlocked(x, y, 4)) { spawnEnemy('gnoll', x, y); break; } }
   }
   if (t >= (G.brigandNext ?? NEWFOES.brigand) && !G.final) {
     G.brigandNext = (G.brigandNext ?? NEWFOES.brigand) + (G.LV.creeps ? G.LV.creeps.brigand : NEWFOES.brigandEvery);
@@ -5906,7 +5950,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { get G() { return G; }, DB, md, showSettings, musicSource, midiHas, midiSong, ensureAudio, playlistFor, LEVELS_IDS: () => LEVELS.map(l => l.id), tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { get G() { return G; }, DB, md, packState, packLater, PACK, showSettings, musicSource, midiHas, midiSong, ensureAudio, playlistFor, LEVELS_IDS: () => LEVELS.map(l => l.id), tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>

@@ -1,18 +1,28 @@
 {
- "version": "167ef566b13c",
+ "version": "89d30d8e3587",
  "built": "2026-11-26",
  "files": [
   {
    "name": "MAINDAT.WAR",
    "file": "maindat.war",
    "size": 9831037,
-   "sha": "8587c3cbf8d70d83"
+   "sha": "8587c3cbf8d70d83",
+   "core": {
+    "file": "maindat-core.war",
+    "size": 2373851,
+    "sha": "7e55264773c5376e"
+   }
   },
   {
    "name": "REZDAT.WAR",
    "file": "rezdat.war",
    "size": 2811086,
-   "sha": "dff429b8a8627dba"
+   "sha": "dff429b8a8627dba",
+   "core": {
+    "file": "rezdat-core.war",
+    "size": 275366,
+    "sha": "fdbfea1171ac1c06"
+   }
   },
   {
    "name": "WAR2DAT/WORKERS.WAR",
@@ -261,7 +271,12 @@
     "u_dragon:ready",
     "u_gryphon:what",
     "u_gryphon:ready"
-   ]
+   ],
+   "core": {
+    "file": "war2dat_workers-core.war",
+    "size": 484473,
+    "sha": "bfba61a41262b1da"
+   }
   },
   {
    "name": "WAR2DAT/SOUNDS.WAR",
@@ -352,7 +367,11 @@
     "unit/rifleman",
     "unit/dwarfrifle",
     "unit/bullet"
-   ]
+   ],
+   "gz": {
+    "file": "unif.war.gz",
+    "size": 1284221
+   }
   },
   {
    "name": "UNIFVOX.WAR",
@@ -412,7 +431,12 @@
     "arthas:yes",
     "arthas:yes",
     "arthas:yes"
-   ]
+   ],
+   "core": {
+    "file": "unifvox-core.war",
+    "size": 197833,
+    "sha": "9597da59e7f97069"
+   }
   },
   {
    "name": "MIDI.WAR",
@@ -435,7 +459,11 @@
     "orc-music-3",
     "orc-music-4",
     "orc-victory"
-   ]
+   ],
+   "gz": {
+    "file": "midi.war.gz",
+    "size": 148411
+   }
   }
  ],
  "credits": [
