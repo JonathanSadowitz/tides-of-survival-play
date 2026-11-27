@@ -20,6 +20,9 @@
   html,body{margin:0;height:100%;background:#000;overflow:hidden;color:var(--ink);
     font:15px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none;
     -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  :root{--tacoH:0px;--vh:1dvh}
+  #taco{position:fixed;left:0;right:0;bottom:0;height:var(--tacoH);display:none;z-index:12;background:#120d08;border-top:3px solid #8a6a2a;touch-action:none}
+  body.taco #taco{display:block} body.taco #overlay{bottom:var(--tacoH);padding-bottom:12px} body.tacofit #taco{border-top-color:#ffd24a;box-shadow:0 -3px 0 #ffd24a} #taco svg{display:block;width:100%;height:100%}
   canvas#c{position:fixed;inset:0;display:block;image-rendering:pixelated;-webkit-touch-callout:none}
   @media (pointer:coarse) and (max-height:599px),(pointer:coarse) and (max-width:599px){ button.opt:not(.wcstage *){min-height:44px} #pauseBtn,#speedBtn{width:46px;height:46px} }
   #pauseBtn{position:fixed;top:calc(env(safe-area-inset-top) + 34px);right:calc(env(safe-area-inset-right) + 8px);
@@ -51,7 +54,7 @@
   body.wcbtn .panel button.opt:not(.card):active{border-image:var(--btnbp) 5 fill stretch}
   body.wcbtn .panel button.opt:not(.card):disabled{border-image:var(--btnbg) 5 fill stretch}
   #overlay.parch{background-color:#000;background-size:contain;background-repeat:no-repeat;background-position:center;image-rendering:pixelated}
-  #overlay.parch.bare{align-items:flex-start;padding-top:max(12px,calc(50vh - min(37.5vw,50vh) * 0.42))}
+  #overlay.parch.bare{align-items:flex-start;padding-top:max(12px,calc(50 * var(--vh) - min(37.5vw,50 * var(--vh)) * 0.42))}
   #overlay>*{margin:auto}
   #overlay.parch.bare>.panel{margin:0 auto}
   #overlay.parch.bare .panel{background:none;border:0;outline:0;box-shadow:none;max-width:420px}
@@ -71,17 +74,17 @@
   #overlay a{color:#e7c04a}
   p.unl{margin:2px 0}
   .bookwiki{display:grid;grid-template-columns:minmax(180px,250px) minmax(0,1fr);gap:10px;text-align:left;margin-top:8px;min-height:360px}
-  .booklist{display:flex;flex-direction:column;gap:3px;max-height:min(52vh,430px);overflow:auto;padding-right:4px}
+  .booklist{display:flex;flex-direction:column;gap:3px;max-height:min(calc(52 * var(--vh)),430px);overflow:auto;padding-right:4px}
   .booklist button.bookentry{display:flex;align-items:center;justify-content:flex-start;text-align:left;padding:3px 6px;min-height:28px;width:100%;flex:none}
   .booklist button.bookentry .chead{display:flex;align-items:center;gap:6px} .booklist .nm{font-size:15px;color:var(--gold)} .booklist .cicon,.booklist canvas{width:28px!important;height:24px!important}
   .booklisthead{color:var(--gold);font-size:15px;margin:8px 0 2px;border-bottom:1px solid #6b5228}
   .bookdetail .bookcard{min-height:200px} .bookdetail .bio{display:block;color:#e8d9b0;margin:4px 0 6px;line-height:1.35}
-  @media (max-width:760px), (pointer:coarse) and (max-height:500px){ .bookwiki{grid-template-columns:minmax(0,1fr);min-height:0} .booklist{max-height:30vh} .bookdetail .bookcard{min-height:0} }
+  @media (max-width:760px), (pointer:coarse) and (max-height:500px){ .bookwiki{grid-template-columns:minmax(0,1fr);min-height:0} .booklist{max-height:calc(30 * var(--vh))} .bookdetail .bookcard{min-height:0} }
   @media (pointer:coarse){ .booklist button.bookentry{min-height:40px} }
   .bookgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;text-align:left;margin-top:8px}
   .opts.row{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:8px}
   .opts.row .opt{width:auto!important;min-width:150px;padding-left:14px;padding-right:14px}
-  .panel.scrolls{display:flex;flex-direction:column;max-height:calc(100dvh - 24px)}
+  .panel.scrolls{display:flex;flex-direction:column;max-height:calc(100 * var(--vh) - 24px)}
   .panel.scrolls .scrollbox{overflow:auto;min-height:0;flex:1 1 auto;overscroll-behavior:contain;padding-right:4px}
   .bookgrid .booknote{grid-column:1/-1;text-align:center;margin:0}
   .bookcard{background:rgba(0,0,0,.25);border:1px solid #6b5228;padding:7px 9px}
@@ -169,7 +172,7 @@
   .sheet .who{display:flex;gap:10px;align-items:center;grid-column:1}
   .sheet .who .nm{color:var(--gold);font-size:1.15em}
   .sheet .stats{grid-column:1;margin:4px 0}
-  .sheet .items{grid-column:2;grid-row:1 / span 3;max-height:calc(100dvh - 190px)}
+  .sheet .items{grid-column:2;grid-row:1 / span 3;max-height:calc(100 * var(--vh) - 190px)}
   .panel.scrolls .sheet{min-height:0}
   .sheet .items h3{margin:2px 0 4px}
   .sheet .sigline{font-size:14px;opacity:.9;margin-top:2px}
@@ -203,7 +206,7 @@
   .hinfo{margin-top:8px;border:1px solid var(--gold2);border-radius:6px;padding:8px 12px;background:rgba(0,0,0,.25);min-height:104px;text-align:left}
   .hinfo-in{display:flex;gap:12px;align-items:flex-start} .hinfo .nm{color:var(--gold);font-size:18px} .hinfo .ds{display:block;font-size:15px;margin-top:4px}
   .hinfo .opts{margin-top:8px;justify-content:flex-start}
-  @media (max-width:760px){ .hsel{grid-template-columns:minmax(0,1fr)} .hinfo{position:sticky;bottom:0;z-index:2;background:#1d160f;max-height:45vh;overflow:auto} }   /* on a phone the details stay in view */
+  @media (max-width:760px){ .hsel{grid-template-columns:minmax(0,1fr)} .hinfo{position:sticky;bottom:0;z-index:2;background:#1d160f;max-height:calc(45 * var(--vh));overflow:auto} }   /* on a phone the details stay in view */
   @media (max-width:340px){ .htiles{grid-template-columns:minmax(0,1fr)} }
   .hrow{display:flex;gap:10px;align-items:center}
   .hrow>span{display:flex;flex-direction:column}
@@ -243,7 +246,7 @@
   .muted{opacity:.65}
   .hint{background:#241b12;border-left:3px solid var(--gold2);padding:8px 10px;margin:8px 0;line-height:1.45}
   code{background:#0d0a06;padding:1px 4px;border-radius:3px;font-size:12px}
-  @media (max-width:760px){#labMain{flex-direction:column}#labSide{width:auto;border-left:0;border-top:2px solid var(--gold2);max-height:52vh}}
+  @media (max-width:760px){#labMain{flex-direction:column}#labSide{width:auto;border-left:0;border-top:2px solid var(--gold2);max-height:calc(52 * var(--vh))}}
   @media (max-height:520px){ .panel.scrolls .sheet{overflow:auto;overscroll-behavior:contain} .panel.scrolls .sheet .items{max-height:none;overflow:visible} }   /* phones on their side: the whole sheet scrolls */
   @media (max-width:600px){   /* narrow (phone upright): one column */
     .sheet{grid-template-columns:1fr} .sheet .items{grid-column:1;grid-row:auto;max-height:none}
@@ -259,6 +262,7 @@
 <button id="pauseBtn" aria-label="Pause">II</button>
 <button id="speedBtn" aria-label="Game speed: Normal"></button>
 <div id="overlay"></div>
+<div id="taco" aria-hidden="true"></div>
 
 <div id="lab">
   <header>
@@ -1180,7 +1184,7 @@ function speedIcon() {
 function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.29.0', BUILD = 'ef7bb96 2026-11-27';
+const VERSION = '0.30.0', BUILD = 'abb1928 2026-11-27';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -1210,7 +1214,7 @@ const store = {
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(() => {}); } catch (e) {}
 let cfg = store.get('tos_cfg', null) || { roles: {}, sounds: {}, palette: null };
 cfg.roles ||= {}; cfg.sounds ||= {};
-cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, voice: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fps: false, fx: 'full', colours: 'std', tips: true, sprites: 'updated', musicSrc: 'cd' }, cfg.opts || {});
+cfg.opts = Object.assign({ speed: 1, music: 0.4, sfx: 0.8, voice: 0.8, nums: true, quickChest: false, ui: 1, minimap: true, fps: false, fx: 'full', colours: 'std', tips: true, sprites: 'updated', musicSrc: 'cd', taco: 'normal', tacoMm: 60 }, cfg.opts || {});
 if (!cfg.optsV) { if (cfg.opts.music === 0.6) cfg.opts.music = 0.4; cfg.optsV = 2; }   // 60% was the old default: too loud
 const saveCfg = () => store.set('tos_cfg', cfg);
 let best = store.get('tos_best', { time: 0, kills: 0, level: 0 });
@@ -1768,13 +1772,13 @@ function retitleLogo(c) {
 // easy to tap (40 screen pixels tall where there's room); held upright, the art sits at the top and the buttons below it.
 function fitStage() {
   const st = overlay.querySelector('.wcstage'); if (!st) return;
-  const tall = innerHeight > innerWidth * 1.15, z = tall ? innerWidth / 640 : Math.min(innerWidth / 640, innerHeight / 480);
-  st.style.zoom = z; st.classList.toggle('tall', tall); st.style.height = tall ? innerHeight / z + 'px' : '';
+  const tall = viewH() > innerWidth * 1.15, z = tall ? innerWidth / 640 : Math.min(innerWidth / 640, viewH() / 480);
+  st.style.zoom = z; st.classList.toggle('tall', tall); st.style.height = tall ? viewH() / z + 'px' : '';
   const btns = st.querySelector('.wcbtns'), note = st.querySelector('.note'), ver = st.querySelector('.ver'); if (!btns) return;
   const n = btns.children.length, gap = n >= 7 && !tall ? 3 : 7, bh = n * 28 + (n - 1) * gap; btns.style.gap = gap + 'px';   // seven buttons (a saved run to continue) on a phone held sideways: closer together, so each stays big enough to tap
   let k = Math.min(2.4, Math.max(1, 41 / (28 * z))), top;
   if (tall) {   // the art, then the buttons under it
-    const sh = innerHeight / z, nh = note ? 80 : 0, room = sh - 490 - 60 - nh; k = Math.max(1, Math.min(k, room / bh));
+    const sh = viewH() / z, nh = note ? 80 : 0, room = sh - 490 - 60 - nh; k = Math.max(1, Math.min(k, room / bh));
     const off = Math.max(0, Math.round((sh - (480 + 30 + bh * k + nh)) / 2));   // art and buttons together, centred
     top = off + 510; st.querySelector('img.bg').style.top = off + 'px';
   } else {
@@ -1784,8 +1788,8 @@ function fitStage() {
   if (note) Object.assign(note.style, tall ? { top: end + 24 + 'px', left: '60px', width: '520px', fontSize: '22px', color: '#e8d9b0' }
     : z < 1.3 ? { top: Math.min(446, end + 6) + 'px', left: '140px', width: '420px', fontSize: Math.ceil(13 / z) + 'px', color: '' }   // readable on a small screen
     : { top: '', left: '', width: '', fontSize: '', color: '' });
-  if (ver) Object.assign(ver.style, tall ? { top: innerHeight / z - 40 + 'px', left: '24px' } : { top: '', left: '' });
-  const vn = st.querySelector('.vernum'); if (vn) Object.assign(vn.style, tall ? { top: innerHeight / z - 40 + 'px', right: '24px' } : { top: '', right: '' });
+  if (ver) Object.assign(ver.style, tall ? { top: viewH() / z - 40 + 'px', left: '24px' } : { top: '', left: '' });
+  const vn = st.querySelector('.vernum'); if (vn) Object.assign(vn.style, tall ? { top: viewH() / z - 40 + 'px', right: '24px' } : { top: '', right: '' });
 }
 addEventListener('resize', fitStage);
 
@@ -5060,6 +5064,7 @@ const endJoy = e => { if (e.pointerType === 'mouse') { ms.held = false; return; 
 cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
 addEventListener('keydown', () => G && G.inputs && G.inputs.add('keys'), true);
 addEventListener('pointerdown', e => G && G.inputs && G.inputs.add(e.pointerType === 'touch' ? 'touch' : e.pointerType === 'pen' ? 'pen' : 'mouse'), true);
+addEventListener('gamepadconnected', () => { if (isPhone() && innerHeight > innerWidth && cfg.opts.taco !== 'taco' && !store.get('tos_taco_tip', false)) { store.set('tos_taco_tip', true); toast('Controller clipped onto your phone? Settings, Phone layout: Pocket Taco keeps it off the game.'); } });
 function getPad() { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.connected) return p; return null; }
 function readMove() {
   if (G && G.bot) return G.bot;                 // the balance report's bot steers through this
@@ -5072,6 +5077,7 @@ function readMove() {
     if (Math.hypot(ax, ay) > 0.2) { x += ax; y += ay; if (G && G.inputs) G.inputs.add('pad'); }
     const b = i => p.buttons[i] && p.buttons[i].pressed;
     if (b(14)) x--; if (b(15)) x++; if (b(12)) y--; if (b(13)) y++;
+    if (G && G.inputs && p.buttons.some(q => q && q.pressed)) G.inputs.add('pad');
   }
   if (joy) { const s = 40 * (window.devicePixelRatio || 1); x += (joy.x - joy.ox) / s; y += (joy.y - joy.oy) / s; }
   if (x || y) { if (G) G.moveTo = null; return [x, y]; }        // keys, stick or touch take over from the mouse
@@ -5200,7 +5206,10 @@ overlay.addEventListener('click', e => {
   else if (act === 'impfiles') { impBusy(); $('#labInput').click(); }
   else if (act === 'settings') showSettings(b.dataset.from);
   else if (act === 'about') showAbout();
-  else if (act === 'opt') { changeOpt(b.dataset.k); showSettings(b.dataset.from, b.dataset.k); }
+  else if (act === 'opt') { changeOpt(b.dataset.k); if (b.dataset.k === 'taco' && cfg.opts.taco === 'taco' && tacoOn()) showTacoFit(b.dataset.from); else showSettings(b.dataset.from, b.dataset.k); }
+  else if (act === 'tacofit') showTacoFit(b.dataset.from);
+  else if (act === 'tacomm') { cfg.opts.tacoMm = Math.max(TACO.min, Math.min(TACO.max, (cfg.opts.tacoMm || TACO.def) + +b.dataset.d)); saveCfg(); resize(); showTacoFit(b.dataset.from, b.dataset.d > 0 ? 1 : 0); }
+  else if (act === 'tacodone') { document.body.classList.remove('tacofit'); showSettings(b.dataset.from, 'taco'); }
   else if (act === 'shop') showShop();
   else if (act === 'book') showBook(b.dataset.tab);
   else if (act === 'bookentry') { const i = opts().indexOf(b); if (i >= 0) { sel = i; highlight(); } }
@@ -5374,6 +5383,7 @@ const OPT_DEFS = {
   tips: { label: 'Tips', vals: [true, false], fmt: v => v ? 'On' : 'Off' },
   colours: { label: 'Colours', vals: ['std', 'cb'], fmt: v => v === 'cb' ? 'Colour-blind friendly (blue health, orange foes)' : 'Standard' },
   sprites: { label: 'Art', vals: ['updated', 'classic'], fmt: v => v === 'classic' ? 'Classic' : 'Updated' },   // units, heroes and battlefields
+  taco: { label: 'Phone layout', vals: ['normal', 'taco'], fmt: v => v === 'taco' ? 'Pocket Taco (controller clipped on)' : 'Normal', show: () => isPhone() || cfg.opts.taco === 'taco' },
   musicSrc: { label: 'Music', vals: ['cd', 'midi'], fmt: v => v === 'midi' ? 'MIDI' : 'CD tracks', show: () => mu.names.size > 0 },   // only once there are CD tracks to choose
 };
 function changeOpt(k) {
@@ -5381,6 +5391,7 @@ function changeOpt(k) {
   cfg.opts[k] = d.vals[(i + 1) % d.vals.length]; saveCfg();
   if (k === 'music') musicVolume(); if (k === 'sfx') sfx('s_hit', 0); if (k === 'voice') heroVoice('yes', 1, (G && G.heroId) || store.get('tos_hero', 'lothar'));
   if (k === 'sprites') { A.tilesets = {}; if (A.wars['MAINDAT.WAR']) rebuildSprites(); }
+  if (k === 'taco') { resize(); fitStage(); }
   if (k === 'musicSrc' && mu.want) { const w = mu.want; mu.kind = null; playMusic(w); }   // previews are kept per art setting (PV_KEY)
 }
 /* ---------- Book of War: everything you can find, and how evolutions are made ----------
@@ -5540,7 +5551,8 @@ function showSettings(from, focus) {
   const keys = Object.keys(OPT_DEFS).filter(k => !OPT_DEFS[k].show || OPT_DEFS[k].show());
   const rows = keys.map(k => `<button class="opt" data-act="opt" data-k="${k}" data-from="${from}">${OPT_DEFS[k].label}: ${OPT_DEFS[k].fmt(cfg.opts[k])}</button>`).join('');
   const xfer = from === 'pause' ? '' : `<button class="opt" data-act="history">Run history</button><button class="opt" data-act="exportsave">Copy save code</button><button class="opt" data-act="importsave">Load save code</button><button class="opt" data-act="import">Game files (music)</button><button class="opt" data-act="lab">Asset Lab (advanced)</button><button class="opt" data-act="resettips">Show tips again</button><button class="opt danger" data-act="reset">Reset progress</button>`;
-  showMenu(`<h2>Settings</h2><div class="opts set">${rows}${xfer}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
+  const fit = cfg.opts.taco === 'taco' ? `<button class="opt" data-act="tacofit" data-from="${from}">Fit the controller</button>` : '';
+  showMenu(`<h2>Settings</h2><div class="opts set">${rows}${fit}${xfer}<button class="opt" data-act="${from === 'pause' ? 'pause' : 'title'}" data-back>Back</button></div>`);
   if (focus) { sel = keys.indexOf(focus); highlight(); }
 }
 /* ---------- save codes: move your progress to another browser or device ---------- */
@@ -6309,9 +6321,37 @@ safeProbe.style.cssText = 'position:fixed;left:0;top:0;visibility:hidden;pointer
 document.body.appendChild(safeProbe);
 // Launched from an iPhone's home screen, the page can report a height that stops short of the home indicator,
 // leaving a black strip under the game. There, size the canvas to the whole screen instead.
+// Pocket Taco mode (idea 41, 0.30.0): a clip-on clamshell controller covers the bottom of a phone held upright, so the
+// game ends above it and a drawn stand-in (shoulder buttons, a D-pad, four face buttons) fills the covered strip. Jon's
+// GameSir Pocket Taco covers 6 cm of an iPhone 11's screen; "Fit the controller" moves the line a millimetre at a time.
+const TACO = { ptPerMm: 6.42, def: 60, min: 30, max: 90, keep: 300 };   // iPhones show about 163 points an inch
+const tacoOn = () => cfg.opts.taco === 'taco' && innerHeight > innerWidth;
+function tacoPx(h = innerHeight) { return tacoOn() ? Math.max(0, Math.min(Math.round((cfg.opts.tacoMm || TACO.def) * TACO.ptPerMm), h - TACO.keep)) : 0; }
+const viewH = () => innerHeight - tacoPx();
+let tacoDrawn = '';
+function applyTaco(h) {
+  const t = tacoPx(h), on = t > 0, r = document.documentElement.style;
+  document.body.classList.toggle('taco', on); r.setProperty('--tacoH', t + 'px'); r.setProperty('--vh', on ? (innerHeight - t) / 100 + 'px' : '1dvh');
+  const el = document.getElementById('taco'), key = innerWidth + 'x' + t; if (!on || !el || tacoDrawn === key) return; tacoDrawn = key;
+  const w = innerWidth, cy = t * 0.55, u = Math.min(w / 10, t / 5.5), dx = w * 0.24, bx = w * 0.76, ln = 'stroke="#8a6a2a" stroke-width="2"', fl = 'fill="#2a1f14"';
+  const sh = x => `<rect x="${x}" y="${u * 0.4}" width="${u * 2.2}" height="${u * 0.7}" rx="${u * 0.3}" ${fl} ${ln}/>`;
+  const btn = (x, y, l) => `<circle cx="${x}" cy="${y}" r="${u * 0.55}" ${fl} ${ln}/><text x="${x}" y="${y + u * 0.2}" font-size="${u * 0.55}" text-anchor="middle" fill="#8a6a2a" font-family="sans-serif">${l}</text>`;
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${t}" xmlns="http://www.w3.org/2000/svg">${sh(u * 0.5)}${sh(w - u * 2.7)}
+    <path d="M${dx - u * 0.45} ${cy - u * 1.4}h${u * 0.9}v${u * 0.95}h${u * 0.95}v${u * 0.9}h${-u * 0.95}v${u * 0.95}h${-u * 0.9}v${-u * 0.95}h${-u * 0.95}v${-u * 0.9}h${u * 0.95}z" ${fl} ${ln}/>
+    ${btn(bx, cy - u * 1.1, 'Y')}${btn(bx - u * 1.1, cy, 'X')}${btn(bx + u * 1.1, cy, 'B')}${btn(bx, cy + u * 1.1, 'A')}</svg>`;
+}
+// Fitting it: with the controller on, move the line until it just shows above the controller's edge.
+function showTacoFit(from, focus = 0) {
+  document.body.classList.add('tacofit');
+  showMenu(`<h2>Fit the controller</h2><p class="help">Slide the controller on, then move the gold line until it just shows above the controller's edge. Nothing of the game will be hidden under it.</p>
+    <div class="opts"><button class="opt" data-act="tacomm" data-d="-1" data-from="${from}">Line down</button><button class="opt" data-act="tacomm" data-d="1" data-from="${from}">Line up</button><button class="opt" data-act="tacodone" data-from="${from}" data-back>Done</button></div>
+    <p class="sub">The controller covers ${cfg.opts.tacoMm || TACO.def} mm of the screen.</p>`);
+  sel = focus; highlight();
+}
 function viewSize() {
   let w = innerWidth, h = Math.max(innerHeight, document.documentElement.clientHeight || 0);
   if (navigator.standalone && screen.width && screen.height) { const tall = h >= w, sw = tall ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height), sh = tall ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height); if (Math.abs(sw - w) < 2 && sh > h) h = sh; }
+  applyTaco(h); h -= tacoPx(h);
   return { w, h };
 }
 function resize() {
@@ -6320,6 +6360,7 @@ function resize() {
   SCALE = Math.max(1, Math.round(Math.min(pw, ph) / (Object.keys(A.sprites).length ? 420 : 250))); W = pw / SCALE; H = ph / SCALE;
   const cs = getComputedStyle(safeProbe), k = dpr / SCALE, px = v => Math.ceil((parseFloat(v) || 0) * k);
   SAFE = safeOverride ? { ...safeOverride } : { t: px(cs.paddingTop), r: px(cs.paddingRight), b: px(cs.paddingBottom), l: px(cs.paddingLeft) };
+  if (tacoOn()) SAFE.b = 0;   // the home bar is under the controller
 }
 addEventListener('resize', resize);
 addEventListener('orientationchange', () => setTimeout(resize, 300));
@@ -6375,7 +6416,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { recalc, fire, addItem, openLevelUp, weaponStats, evoStats, WEAPON_UNLOCKS, FAV, PACTS, PACT, RARE, NEW_W, unionable, forgeUnion, weaponOpen, unlockWeapons, fireNew, pmax, favOf, offerable, wTag, cardMeta, sheep, nameFor, get G() { return G; }, DB, md, packState, packLater, PACK, showSettings, musicSource, midiHas, midiSong, ensureAudio, playlistFor, LEVELS_IDS: () => LEVELS.map(l => l.id), tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { cfg, resize, tacoPx, tacoOn, applyTaco, showTacoFit, viewH, recalc, fire, addItem, openLevelUp, weaponStats, evoStats, WEAPON_UNLOCKS, FAV, PACTS, PACT, RARE, NEW_W, unionable, forgeUnion, weaponOpen, unlockWeapons, fireNew, pmax, favOf, offerable, wTag, cardMeta, sheep, nameFor, get G() { return G; }, DB, md, packState, packLater, PACK, showSettings, musicSource, midiHas, midiSong, ensureAudio, playlistFor, LEVELS_IDS: () => LEVELS.map(l => l.id), tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
