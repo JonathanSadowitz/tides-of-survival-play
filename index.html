@@ -22,7 +22,11 @@
     -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
   :root{--tacoH:0px;--vh:1dvh}
   #taco{position:fixed;left:0;right:0;bottom:0;height:var(--tacoH);display:none;z-index:12;background:#120d08;border-top:3px solid #8a6a2a;touch-action:none}
-  body.taco #taco{display:block;top:var(--gameH);bottom:auto} body.taco #overlay{bottom:auto;height:var(--gameH);padding-bottom:12px} body.tacofit #taco{border-top-color:#ffd24a;box-shadow:0 -3px 0 #ffd24a} #taco svg{display:block;width:100%;height:100%}
+  body.taco #taco{display:block;top:var(--gameH);bottom:auto} body.taco #overlay{bottom:auto;height:var(--gameH);padding-bottom:12px} body.taco .hinfo{max-height:calc(30 * var(--vh))} body.taco .cards .card:not(.sel) .ds{display:none} body.taco .cards .card{padding-top:6px;padding-bottom:6px} body.taco .cards{gap:6px}
+  body.taco .lvlrow{gap:6px} body.taco .lvlrow .opt{min-height:40px;padding:4px 6px} body.taco #overlay h2{margin:2px 0 6px}
+  .padhints{margin:10px 0 0;text-align:center;color:#c9b88a;white-space:pre-wrap}
+  #overlay::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:#000;z-index:11;pointer-events:none}   /* menus scroll under a black band, never under the clock */
+  body.tacofit #taco{border-top-color:#ffd24a;box-shadow:0 -3px 0 #ffd24a} #taco svg{display:block;width:100%;height:100%}
   canvas#c{position:fixed;inset:0;display:block;image-rendering:pixelated;-webkit-touch-callout:none}
   @media (pointer:coarse) and (max-height:599px),(pointer:coarse) and (max-width:599px){ button.opt:not(.wcstage *){min-height:44px} #pauseBtn,#speedBtn{width:46px;height:46px} }
   #pauseBtn{position:fixed;top:calc(env(safe-area-inset-top) + 34px);right:calc(env(safe-area-inset-right) + 8px);
@@ -1181,10 +1185,13 @@ function speedIcon() {
   speedBtn.innerHTML = `<svg viewBox="0 0 40 36" aria-hidden="true"><path d="M5 25 A15 15 0 0 1 35 25" fill="none" stroke="currentColor" stroke-width="2" opacity=".5"/><g stroke="currentColor" stroke-width="2">${ticks}</g><line x1="20" y1="25" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#ffd24a" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="25" r="3" fill="#ffd24a"/></svg>`;
   speedBtn.setAttribute('aria-label', `Game speed: ${speedName(cfg.opts.speed)}`); speedBtn.title = `Game speed: ${speedName(cfg.opts.speed)}`;
 }
-function showHudBtns(v) { pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
+function showHudBtns(v) { if (v && cfg.opts.taco === 'taco' && innerHeight > innerWidth && getPad()) v = false;   // Pocket Taco: Start pauses and Y changes speed, so the battlefield gets the room
+  pauseBtn.style.display = speedBtn.style.display = v ? 'block' : 'none'; speedIcon(); }
+addEventListener('gamepadconnected', () => { if (G && G.state === 'play') showHudBtns(true); if (menuOpen()) { padHints(); wcify(overlay); } });
+addEventListener('gamepaddisconnected', () => { if (G && G.state === 'play') showHudBtns(true); if (menuOpen()) { padHints(); wcify(overlay); } });
 function cycleSpeed() { cfg.opts.speed = SPEEDS[(SPEEDS.indexOf(cfg.opts.speed) + 1) % SPEEDS.length]; saveCfg(); speedIcon(); if (G && G.log) logEvent(`speed ${cfg.opts.speed}`); if (G && G.state === 'play') banner(`Game speed: ${speedName(cfg.opts.speed)}`); }
 // The version: kept in step with package.json. The deploy script stamps BUILD with the commit and date.
-const VERSION = '0.30.1', BUILD = 'e598858 2026-11-27';
+const VERSION = '0.31.0', BUILD = '35d6e52 2026-11-27';
 const ITCH_URL = 'https://captmurdock.itch.io/tides-of-survival';
 const RUN_LEN = 20 * 60;   // Phase G: 20 minutes (was 15)
 // The first minutes are gentler: enemy numbers, health and damage ease up to full strength over seven minutes,
@@ -5097,13 +5104,19 @@ function pollPad(dt) {
   else if (menuOpen()) {
     pad.navT -= dt;
     const ay = (p.axes[1] || 0) + (p.axes[0] || 0) * 0.0, ax = p.axes[0] || 0;
-    let nav = 0;
-    if (edge(12) || edge(14)) nav = -1; else if (edge(13) || edge(15)) nav = 1;
-    else if (pad.navT <= 0 && (Math.abs(ay) > 0.6 || Math.abs(ax) > 0.6)) { nav = (Math.abs(ay) > Math.abs(ax) ? ay : ax) > 0 ? 1 : -1; pad.navT = 0.22; }
+    let dir = null; const dpad = edge(12) || edge(13) || edge(14) || edge(15);
+    if (edge(12)) dir = [0, -1]; else if (edge(13)) dir = [0, 1]; else if (edge(14)) dir = [-1, 0]; else if (edge(15)) dir = [1, 0];
+    else if (pad.navT <= 0 && (Math.abs(ay) > 0.6 || Math.abs(ax) > 0.6)) { dir = Math.abs(ay) > Math.abs(ax) ? [0, Math.sign(ay)] : [Math.sign(ax), 0]; pad.navT = 0.22; }
     if (Math.abs(ay) < 0.3 && Math.abs(ax) < 0.3) { pad.navT = 0; pad.needNeutral = false; }
-    if (nav && !(pad.needNeutral && !(edge(12) || edge(13) || edge(14) || edge(15)))) moveSel(nav);
+    if (dir && !(pad.needNeutral && !dpad)) moveDir(dir[0], dir[1]);
     if (edge(0) && !menuLocked()) clickSel();
-    if (edge(1) || edge(9)) { const back = overlay.querySelector('[data-back]'); if (back) back.click(); }
+    const lvl = G && G.state === 'levelup' && overlay.querySelector('[data-act=pick]'), btn = a => { const b = overlay.querySelector(`[data-act=${a}]`); if (b && !b.disabled && !menuLocked()) b.click(); };
+    if (lvl) {   // the level-up's own buttons: X reroll, Y banish, B skip (or cancel a banish)
+      if (edge(2)) btn('reroll'); if (edge(3)) btn('banish');
+      if (edge(1)) { if (G.banishing) setBanishing(false); else btn('skip'); }
+      if (edge(9)) { const back = overlay.querySelector('[data-back]'); if (back) back.click(); }
+    } else if (edge(1) || edge(9)) { const back = overlay.querySelector('[data-back]'); if (back) back.click(); }
+    if (edge(4)) shoulderTab(-1); if (edge(5)) shoulderTab(1);
   } else if (G && G.state === 'play') { if (edge(9) || edge(8)) pauseRun(); else if (edge(3)) cycleSpeed(); }
   pad.prev = p.buttons.map(b => b.pressed);
 }
@@ -5126,7 +5139,7 @@ const RUN_MENU = new Set(['pick', 'reroll', 'skip', 'chestok', 'banish']);
 function showMenu(html) {
   overlay.className = ''; overlay.innerHTML = `<div class="panel">${html}</div>`; overlay.style.display = 'flex'; sel = 0; titleArt(false);
   if (!G && A.menuBg) { overlay.classList.add('parch'); overlay.style.backgroundImage = `url(${A.menuBg})`; if (!overlay.querySelector('.cards, .hsel, .ftiles, .about')) overlay.classList.add('bare'); }
-  wcify(overlay); fitPanel(); highlight();
+  padHints(); wcify(overlay); fitPanel(); highlight();
 }
 // Shrink a menu slightly when it would otherwise need scrolling, but never so far that text drops below
 // 13 px (MIN_TEXT): past that the menu scrolls instead. Long menus (.scrolls) scroll inside their panel.
@@ -5153,8 +5166,41 @@ function titleArt(on) {
 }
 function hideMenu() { overlay.style.display = 'none'; overlay.innerHTML = ''; overlay.className = ''; }
 const opts = () => [...overlay.querySelectorAll('button.opt')];
-function highlight() { opts().forEach((b, i) => b.classList.toggle('sel', i === sel)); const b = opts()[sel]; if (b) { b.scrollIntoView?.({ block: 'nearest' }); if (b.dataset.act === 'hero') showHeroInfo(b.dataset.id); if (b.dataset.act === 'field') showFieldInfo(b); if (b.dataset.act === 'bookentry') showBookEntry(b); } }
+// On a phone the hero and battlefield details stick to the foot of the menu; scroll a chosen tile out from under them.
+function unhide(b) { const info = overlay.querySelector('.hinfo'); if (!info || info.contains(b) || getComputedStyle(info).position !== 'sticky') return; const over = b.getBoundingClientRect().bottom - info.getBoundingClientRect().top + 6; if (over > 0) overlay.scrollTop += over; }
+function highlight() { opts().forEach((b, i) => b.classList.toggle('sel', i === sel)); const b = opts()[sel]; if (b) { b.scrollIntoView?.({ block: 'nearest' }); unhide(b); if (b.dataset.act === 'hero') showHeroInfo(b.dataset.id); if (b.dataset.act === 'field') showFieldInfo(b); if (b.dataset.act === 'bookentry') showBookEntry(b); } }
 function moveSel(d) { const n = opts().length; if (!n) return; sel = (sel + d + n) % n; highlight(); }
+// A controller's D-pad moves to the nearest button that way, as the menu is laid out (hero and battlefield tiles,
+// the Book of War's tabs and list), rather than stepping through every button in order (Jon, Pocket Taco, Phase X).
+// With nothing that way, it steps on in order, so the end of a row leads to the next one.
+function moveDir(dx, dy) {
+  const list = opts(), cur = list[sel]; if (!cur || !cur.getClientRects().length) return moveSel(dx + dy > 0 ? 1 : -1);
+  const r = cur.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  let best = -1, bs = Infinity;
+  list.forEach((b, i) => {
+    if (i === sel || !b.getClientRects().length) return;
+    const q = b.getBoundingClientRect(), ox = q.left + q.width / 2 - cx, oy = q.top + q.height / 2 - cy;
+    const along = dx ? ox * dx : oy * dy, across = dx ? Math.abs(oy) : Math.abs(ox);
+    if (along < 6) return;
+    const s = along + across * 2.5; if (s < bs) { bs = s; best = i; }
+  });
+  if (best >= 0) { sel = best; highlight(); } else moveSel(dx + dy > 0 ? 1 : -1);
+}
+// The Book of War's tabs on the shoulder buttons.
+function shoulderTab(d) {
+  const tabs = [...overlay.querySelectorAll('[data-act=book][data-tab]')]; if (!tabs.length) return false;
+  const i = Math.max(0, tabs.findIndex(t => t.classList.contains('cur'))); tabs[(i + d + tabs.length) % tabs.length].click(); return true;
+}
+// What the controller's buttons do on this menu, in a line at its foot (only while a controller is connected).
+function padHints() {
+  const old = overlay.querySelector('.padhints'); if (old) old.remove();
+  const p = overlay.querySelector('.panel'); if (!p || !getPad()) return;
+  const lv = !!p.querySelector('[data-act=pick]'), parts = ['A choose'];
+  if (lv) { if (p.querySelector('[data-act=reroll]')) parts.push('X reroll'); if (p.querySelector('[data-act=banish]')) parts.push('Y banish'); parts.push(G && G.banishing ? 'B cancel' : 'B skip'); }
+  else if (p.querySelector('[data-back]')) parts.push('B back');
+  if (p.querySelector('[data-act=book][data-tab]')) parts.push('L and R tabs');
+  p.insertAdjacentHTML('beforeend', `<p class="sub padhints">${parts.join(', ')}</p>`);
+}
 function clickSel() { const b = opts()[sel]; if (b) b.click(); }
 function menuKey(code) {
   if (['ArrowUp', 'ArrowLeft', 'KeyW', 'KeyA'].includes(code)) moveSel(-1);
@@ -5875,6 +5921,7 @@ function setBanishing(on) {
   G.banishing = on; overlay.classList.toggle('banishing', on);
   const b = overlay.querySelector('[data-act=banish]'), note = overlay.querySelector('.banishnote');
   if (b) { b.textContent = on ? 'Cancel' : `Banish (${G.banishes})`; delete b.dataset.wc; if (on) b.setAttribute('data-back', ''); else b.removeAttribute('data-back'); wcify(overlay); }
+  if (getPad()) { padHints(); wcify(overlay); }
   if (note) note.style.display = on ? '' : 'none';   // not the hidden attribute: the game lettering's own display rule wins over it
 }
 function banishCard(kind, id) {
@@ -6416,7 +6463,7 @@ async function boot() {
 // Keep a copy for playing offline when served from the web (GitHub Pages) or the test server.
 if ('serviceWorker' in navigator && /(^|\.)github\.io$|^localhost$/.test(location.hostname))
   navigator.serviceWorker.register('sw.js').catch(() => {});
-window.__tos = { cfg, resize, tacoPx, tacoOn, applyTaco, showTacoFit, viewH, recalc, fire, addItem, openLevelUp, weaponStats, evoStats, WEAPON_UNLOCKS, FAV, PACTS, PACT, RARE, NEW_W, unionable, forgeUnion, weaponOpen, unlockWeapons, fireNew, pmax, favOf, offerable, wTag, cardMeta, sheep, nameFor, get G() { return G; }, DB, md, packState, packLater, PACK, showSettings, musicSource, midiHas, midiSong, ensureAudio, playlistFor, LEVELS_IDS: () => LEVELS.map(l => l.id), tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
+window.__tos = { moveDir, padHints, showHudBtns, cfg, resize, tacoPx, tacoOn, applyTaco, showTacoFit, viewH, recalc, fire, addItem, openLevelUp, weaponStats, evoStats, WEAPON_UNLOCKS, FAV, PACTS, PACT, RARE, NEW_W, unionable, forgeUnion, weaponOpen, unlockWeapons, fireNew, pmax, favOf, offerable, wTag, cardMeta, sheep, nameFor, get G() { return G; }, DB, md, packState, packLater, PACK, showSettings, musicSource, midiHas, midiSong, ensureAudio, playlistFor, LEVELS_IDS: () => LEVELS.map(l => l.id), tileSkin, hasFoe, pickType, NEWFOES, UNIF_ONLY, UNIF_ART, unif, unifSprite, UPGRADE_ROLES, upgradeArt, rebuildSprites, get A() { return A; }, SPIRE, spireWeak, wallRing, FINALS, SPACE, drawSpace, runLogCode, addGold, hpCol, voiceLines, voiceNote, ACH, CURSE, curseOpen, checkAchievements, P_, addMark, PERF, perfFrame, nextUp, loadTileset, WALL, WALL_SHAPE, wallRing, solidAt, GRACE, graceFor, updateHomeIcon, setHomeIcon: v => { HOME_ICON = v; }, livingBosses, tip, TIPS, PORTAL, portalPos, updatePortal, AMBUSH, updateAmbush, rebuildSprites, LEVELS, shipCells, shipAt, EARLY, BOSSFIGHT, BOSS_K, upCost, showTitle, catchUpUnlocks, newRun, update, A, Core, hitEnemy, spawnEnemy, cfg, SPEEDS, SPEED_NAMES, MUSIC, MENU_MUSIC, mu, loadTrack, playMusic, meta, terrainChunk, footBlocked, flowDir, FLOW, nearestLand, washAshore, PRISON, isPrisoner, BOAT, seaAt, boatFits, landNear, tryBoard, moveBoat, hurtBoat, setupBoats, deathRecap, srcName, RECAP, revealPrisoners, setupFortress, freePrisoner, isFortCamp, recordProgress, buyHero, nextUp, heroDetails, render, importFromHandle, findInstall, installPaths, usePowerup, POWERUPS, UPGRADES, endRun, get runs() { return runs; }, saveRun, continueRun, makeSaveCode, readSaveCode, unpackTrack, musicWorker, showBook, resetProgress, openLab, showImport, loadFiles, loadPack, isDemoMain, PACK, AUTO_ROLES, MPQ_SOUNDS, levelOpen, showLevels, showSaveCode, heroOpen, buyHero, HERO_UNLOCKS, START_HEROES, recordProgress, nextUp, showChoose, HERO_UNLOCKS, UPGRADE, upShare, TEAM, STRETCH, MID, PACE, ECON, showRunLog, runLogCode, HEROES, SECRET, LABOUR, rosterDone, revealSecret, setSafe: v => { safeOverride = v; resize(); }, get SAFE() { return SAFE; }, get VIEW() { return { W, H, SCALE }; }, fitStage, showAbout, runBreakdown, OPT_DEFS, LATE, FINAL, BOSS_HIT, BOSSES, BOSS_POOL, FINALS, FOES, spawnBoss, upCost, EVOS, evolve, evolvable, openChest, snapRun, pauseRun, choices, pickCard, drawFromBag, iconKey, ITEM_ICONS, WEAPONS, PASSIVES, MAX_LVL };
 boot();
 })();
 </script>
