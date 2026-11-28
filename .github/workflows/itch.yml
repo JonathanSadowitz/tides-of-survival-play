@@ -22,7 +22,7 @@ jobs:
           if [ -z "$BUTLER_API_KEY" ]; then echo "::error::No BUTLER_API_KEY repository secret, so nothing was uploaded to itch.io."; exit 1; fi; echo "ready=yes" >> "$GITHUB_OUTPUT"
       - name: Build the upload
         if: steps.setup.outputs.ready == 'yes'
-        run: mkdir build && cp index.html build/ && cp -r demo build/   # the game plus the Warcraft II shareware it loads on first launch
+        run: mkdir build && cp -r index.html sw.js manifest.webmanifest icons pack build/   # the game and its asset pack (the shareware folder went in 0.21.0)
       - name: Install butler
         if: steps.setup.outputs.ready == 'yes'
         run: |
